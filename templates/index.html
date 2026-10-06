@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vivo - Kafka Data Producer Studio</title>
+  <link rel="icon" type="image/png" href="/static/vivo-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header Principal com Identidade Vivo -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-logo-wrap" title="Vivo Telecomunicações">
+          <img src="/static/vivo-logo.png" alt="Vivo Logo" class="brand-logo-img">
+        </div>
+        <div class="brand-divider"></div>
+        <div class="brand-headings">
+          <h1>Kafka Data Producer Studio</h1>
+          <p class="subtitle">Plataforma Vivo &bull; Envio de Notificações Push & Mensagens Estruturadas no Apache Kafka</p>
+        </div>
+      </div>
+      <div class="header-badges">
+        <span class="status-pill status-online" id="status-indicator">
+          <span class="status-dot"></span> Servidor Vivo Pronto
+        </span>
+      </div>
+    </header>
+
+    <form id="kafka-form">
+      <!-- Navegação Principal em Duas Seções -->
+      <nav class="screens-nav" aria-label="Navegação de seções">
+        <button type="button" class="screen-tab-btn active" id="tab-btn-data" onclick="switchMainScreen('data')">
+          <span class="screen-tab-icon">📋</span>
+          <div class="screen-tab-meta">
+            <span class="screen-tab-title">Casos de Uso & Notificação Push</span>
+            <span class="screen-tab-sub">Seleção do caso, dados do formulário e destino de integração</span>
+          </div>
+          <span class="screen-tab-pill" id="screen-data-pill">Seção 1</span>
+        </button>
+
+        <button type="button" class="screen-tab-btn" id="tab-btn-kafka" onclick="switchMainScreen('kafka')">
+          <span class="screen-tab-icon">⚡</span>
+          <div class="screen-tab-meta">
+            <span class="screen-tab-title">Servidor Kafka, JSON & Logs</span>
+            <span class="screen-tab-sub">Tópico de destino, payload final em tempo real e console de eventos</span>
+          </div>
+          <span class="screen-tab-pill" id="screen-kafka-pill">Seção 2</span>
+        </button>
+      </nav>
+
+      <!-- ========================================================================= -->
+      <!-- TELA 1: CASOS DE USO, NOTIFICAÇÃO PUSH E DESTINO DE INTEGRAÇÃO            -->
+      <!-- ========================================================================= -->
+      <div id="screen-data-view" class="view-screen active">
+        <section class="card screen-card">
+
+          <!-- ================= SELETOR DE CASOS DE USO ================= -->
+          <div class="usecase-selector-container">
+            <div class="usecase-selector-header">
+              <span class="usecase-badge">Selecione o Caso de Negócio</span>
+              <h2 class="usecase-main-title">Casos de Uso Empresariais Vivo</h2>
+              <p class="section-desc">
+                Escolha o fluxo de dados que deseja processar. Os dados capturados serão estruturados como objeto JSON no campo <code>content</code> da mensagem enviada ao Kafka.
+              </p>
+            </div>
+
+            <div class="usecase-tabs-grid">
+              <button type="button" class="usecase-tab-card active" id="btn-usecase-1" onclick="switchUseCase(1)">
+                <div class="usecase-tab-icon">🧾</div>
+                <div class="usecase-tab-info">
+                  <div class="usecase-tab-badge">Caso 1</div>
+                  <div class="usecase-tab-title">Fatura / Recibo Digital</div>
+                  <div class="usecase-tab-desc">Emissão e confirmação de fatura digital corporativa com detalhamento de itens</div>
+                </div>
+              </button>
+
+              <button type="button" class="usecase-tab-card" id="btn-usecase-2" onclick="switchUseCase(2)">
+                <div class="usecase-tab-icon">📞</div>
+                <div class="usecase-tab-info">
+                  <div class="usecase-tab-badge">Caso 2</div>
+                  <div class="usecase-tab-title">Solicitação de Contato Telefonia</div>
+                  <div class="usecase-tab-desc">Captura de lead interessado em planos e soluções corporativas de telefonia Vivo</div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- ================= A) NOTIFICAÇÃO PUSH ================= -->
+          <div class="step-card push-card">
+            <div class="step-header">
+              <div class="step-badge">A</div>
+              <div>
+                <h3 class="step-title">Notificação Push</h3>
+                <p class="step-desc">Defina o título e o conteúdo da notificação push que acompanhará o payload.</p>
+              </div>
+            </div>
+
+            <div class="grid-2-col" style="margin-top: 1.1rem;">
+              <div class="form-group">
+                <label for="push_title">
+                  <span class="label-icon">🏷️</span> Título da Notificação <span class="required">*</span>
+                </label>
+                <input type="text" id="push_title" name="push_title" value="Sua Fatura de Setembro está disponível" placeholder="ex. Notificação de Fatura ou Solicitação Comercial" oninput="handleFieldChange()">
+                <span class="hint">Título breve exibido na notificação móvel</span>
+              </div>
+
+              <div class="form-group">
+                <label for="push_content">
+                  <span class="label-icon">💬</span> Conteúdo do Push <span class="required">*</span>
+                </label>
+                <textarea id="push_content" name="push_content" rows="2" placeholder="ex. Sua fatura no valor de R$ 1.450,00 foi processada com sucesso." oninput="handleFieldChange()">Prezado cliente, sua fatura digital de Setembro no valor de R$ 1.450,00 foi gerada com sucesso.</textarea>
+                <span class="hint">Mensagem principal da notificação push</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ================= B) FORMULÁRIO DO CASO DE USO ================= -->
+          <div class="step-card usecase-form-card">
+            <div class="step-header">
+              <div class="step-badge">B</div>
+              <div>
+                <h3 class="step-title" id="usecase-form-heading">Formulário do Caso de Uso: Fatura / Recibo Digital</h3>
+                <p class="step-desc">Preencha ou altere os dados do formulário. Estes campos serão agrupados dentro de <code>"content": { ... }</code>.</p>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 1.1rem; margin-bottom: 1.25rem;">
+              <label for="use_case">
+                <span class="label-icon">📂</span> Tipo de Caso de Uso no JSON <span class="badge-opt">Campo Raiz</span>
+              </label>
+              <input type="text" id="use_case" name="use_case" value="Fatura / Recibo Digital" placeholder="ex. Fatura / Recibo Digital" oninput="handleFieldChange()">
+              <span class="hint">Identificador enviado no campo raiz <code>"use_case"</code> da estrutura JSON no Kafka</span>
+            </div>
+
+            <!-- Painel Caso 1: Fatura Digital Corporativa -->
+            <div id="panel-usecase-1" class="usecase-panel active">
+              <div class="form-subheading">Informações Gerais da Fatura</div>
+              <div class="grid-3-col">
+                <div class="form-group">
+                  <label for="f_billing_period">Período de Faturamento</label>
+                  <input type="text" id="f_billing_period" value="Setembro 2026" oninput="handleFieldChange()">
+                  <span class="hint">Chave: BILLING_PERIOD</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_company_name">Razão Social / Empresa</label>
+                  <input type="text" id="f_company_name" value="Empresa Serviços Digitais S.A." oninput="handleFieldChange()">
+                  <span class="hint">Chave: COMPANY_NAME</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_rfc">CNPJ / Identificação Fiscal</label>
+                  <input type="text" id="f_rfc" value="12.345.678/0001-90" oninput="handleFieldChange()">
+                  <span class="hint">Chave: RFC</span>
+                </div>
+              </div>
+
+              <div class="grid-4-col" style="margin-top: 1rem;">
+                <div class="form-group">
+                  <label for="f_folio">Número da Fatura / Folio</label>
+                  <input type="text" id="f_folio" value="9A8B7C-6543" oninput="handleFieldChange()">
+                  <span class="hint">Chave: FOLIO_FISCAL</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_status">Status da Fatura</label>
+                  <input type="text" id="f_status" value="PAGA" oninput="handleFieldChange()">
+                  <span class="hint">Chave: STATUS_BADGE</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_currency">Moeda</label>
+                  <input type="text" id="f_currency" value="BRL" oninput="handleFieldChange()">
+                  <span class="hint">Chave: CURRENCY</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_total">Valor Total</label>
+                  <input type="text" id="f_total" value="R$ 1.450,00" oninput="handleFieldChange()">
+                  <span class="hint">Chave: TOTAL_AMOUNT</span>
+                </div>
+              </div>
+
+              <div class="form-subheading" style="margin-top: 1.5rem;">Detalhamento dos Itens</div>
+              <div class="grid-3-col">
+                <div class="form-group">
+                  <label for="f_item1_name">Item 1 - Descrição</label>
+                  <input type="text" id="f_item1_name" value="Assinatura Plano Corporativo Cloud" oninput="handleFieldChange()">
+                  <span class="hint">Chave: ITEM_1_NAME</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_item1_price">Item 1 - Preço</label>
+                  <input type="text" id="f_item1_price" value="R$ 1.250,00" oninput="handleFieldChange()">
+                  <span class="hint">Chave: ITEM_1_PRICE</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_item1_qty">Item 1 - Quantidade</label>
+                  <input type="text" id="f_item1_qty" value="1" oninput="handleFieldChange()">
+                  <span class="hint">Chave: ITEM_1_QTY</span>
+                </div>
+              </div>
+
+              <div class="grid-3-col" style="margin-top: 0.75rem;">
+                <div class="form-group">
+                  <label for="f_item2_name">Item 2 - Descrição</label>
+                  <input type="text" id="f_item2_name" value="Serviço de Notificações Push Adicionais" oninput="handleFieldChange()">
+                  <span class="hint">Chave: ITEM_2_NAME</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_item2_price">Item 2 - Preço</label>
+                  <input type="text" id="f_item2_price" value="R$ 200,00" oninput="handleFieldChange()">
+                  <span class="hint">Chave: ITEM_2_PRICE</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_item2_qty">Item 2 - Quantidade</label>
+                  <input type="text" id="f_item2_qty" value="1" oninput="handleFieldChange()">
+                  <span class="hint">Chave: ITEM_2_QTY</span>
+                </div>
+              </div>
+
+              <div class="grid-2-col" style="margin-top: 1rem;">
+                <div class="form-group">
+                  <label for="f_tax">Discriminação de Tributos</label>
+                  <input type="text" id="f_tax" value="Impostos inclusos" oninput="handleFieldChange()">
+                  <span class="hint">Chave: TAX_DISCLAIMER</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_support_email">E-mail de Suporte</label>
+                  <input type="email" id="f_support_email" value="suporte@empresa.com.br" oninput="handleFieldChange()">
+                  <span class="hint">Chave: SUPPORT_EMAIL</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Painel Caso 2: Solicitação de Contato Telefonia Vivo -->
+            <div id="panel-usecase-2" class="usecase-panel" style="display: none;">
+              <div class="form-subheading">Dados do Cliente Solicitante</div>
+              <div class="grid-3-col">
+                <div class="form-group">
+                  <label for="c_customer_name">Nome Completo <span class="required">*</span></label>
+                  <input type="text" id="c_customer_name" value="Carlos Eduardo Siqueira" placeholder="Nome e Sobrenome" oninput="handleFieldChange()">
+                  <span class="hint">Chave: CUSTOMER_NAME</span>
+                </div>
+                <div class="form-group">
+                  <label for="c_customer_phone">Telefone de Contato <span class="required">*</span></label>
+                  <input type="text" id="c_customer_phone" value="+55 11 98765-4321" placeholder="+55 11..." oninput="handleFieldChange()">
+                  <span class="hint">Chave: CUSTOMER_PHONE</span>
+                </div>
+                <div class="form-group">
+                  <label for="c_customer_email">E-mail de Contato <span class="required">*</span></label>
+                  <input type="email" id="c_customer_email" value="carlos.siqueira@empresa.com.br" placeholder="email@empresa.com.br" oninput="handleFieldChange()">
+                  <span class="hint">Chave: CUSTOMER_EMAIL</span>
+                </div>
+              </div>
+
+              <div class="form-subheading" style="margin-top: 1.5rem;">Detalhes do Interesse em Telefonia Vivo</div>
+              <div class="grid-3-col">
+                <div class="form-group">
+                  <label for="c_service_type">Plano / Serviço de Interesse</label>
+                  <select id="c_service_type" onchange="handleFieldChange()">
+                    <option value="Plano Móvel Empresarial 5G Ilimitado" selected>Plano Móvel Empresarial 5G Ilimitado</option>
+                    <option value="Vivo Fibra Empresarial Dedicada">Vivo Fibra Empresarial Dedicada</option>
+                    <option value="Combo Móvel + Internet Fixa">Combo Móvel + Internet Fixa</option>
+                    <option value="Tronco SIP Cloud & PABX Virtual">Tronco SIP Cloud & PABX Virtual</option>
+                  </select>
+                  <span class="hint">Chave: SERVICE_TYPE</span>
+                </div>
+                <div class="form-group">
+                  <label for="c_request_type">Tipo de Solicitação</label>
+                  <select id="c_request_type" onchange="handleFieldChange()">
+                    <option value="Portabilidade de Linhas" selected>Portabilidade de Linhas</option>
+                    <option value="Contratação de Nova Linha">Contratação de Nova Linha</option>
+                    <option value="Renovação / Upgrade de Plano">Renovação / Upgrade de Plano</option>
+                  </select>
+                  <span class="hint">Chave: REQUEST_TYPE</span>
+                </div>
+                <div class="form-group">
+                  <label for="c_contact_time">Horário Preferencial de Contato</label>
+                  <select id="c_contact_time" onchange="handleFieldChange()">
+                    <option value="Pela manhã (09:00 - 12:00)">Pela manhã (09:00 - 12:00)</option>
+                    <option value="Pela tarde (13:00 - 18:00)" selected>Pela tarde (13:00 - 18:00)</option>
+                    <option value="Imediato / Assim que possível">Imediato / Assim que possível</option>
+                  </select>
+                  <span class="hint">Chave: PREFERRED_CONTACT_TIME</span>
+                </div>
+              </div>
+
+              <div class="grid-2-col" style="margin-top: 1rem;">
+                <div class="form-group">
+                  <label for="c_location_city">Cidade / Estado</label>
+                  <input type="text" id="c_location_city" value="São Paulo / SP" oninput="handleFieldChange()">
+                  <span class="hint">Chave: LOCATION_CITY</span>
+                </div>
+                <div class="form-group">
+                  <label for="c_notes">Observações / Requisitos Adicionais</label>
+                  <input type="text" id="c_notes" value="Interesse em migrar 15 linhas corporativas com roaming internacional" oninput="handleFieldChange()">
+                  <span class="hint">Chave: NOTES</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ================= C) DESTINO DE INTEGRAÇÃO ================= -->
+          <div class="step-card integration-step-card">
+            <div class="step-header">
+              <div class="step-badge">C</div>
+              <div>
+                <h3 class="step-title">Destino de Integração</h3>
+                <p class="step-desc">Selecione a plataforma de destino. O <code>user_id</code> será atribuído automaticamente conforme a opção escolhida.</p>
+              </div>
+            </div>
+
+            <!-- Dois Cartões de Opção Interativa -->
+            <div class="integration-cards-grid" style="margin-top: 1.1rem;">
+              <!-- Opção 1: 3rd Party -->
+              <div class="integration-card active" id="card-int-3rd" onclick="selectIntegration('3rd Party')">
+                <div class="int-card-radio-mark">
+                  <span class="int-radio-dot"></span>
+                </div>
+                <div class="int-card-icon-wrap push-gradient">
+                  <span>🔔</span>
+                </div>
+                <div class="int-card-body">
+                  <div class="int-card-header-row">
+                    <h4 class="int-card-title">3rd Party</h4>
+                    <span class="int-tag int-tag-push">Third Party</span>
+                  </div>
+                  <p class="int-card-desc">
+                    Integração com serviços de mensageria externa e parceiros terceiros.
+                  </p>
+                  <div class="assigned-user-id-box">
+                    <span>ID de Usuário atribuído:</span>
+                    <code>quadientlatam@gmail.com</code>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Opção 2: Quadient Inspire DAS -->
+              <div class="integration-card" id="card-int-das" onclick="selectIntegration('Quadient Inspire DAS')">
+                <div class="int-card-radio-mark">
+                  <span class="int-radio-dot"></span>
+                </div>
+                <div class="int-card-icon-wrap das-gradient">
+                  <span>🏛️</span>
+                </div>
+                <div class="int-card-body">
+                  <div class="int-card-header-row">
+                    <h4 class="int-card-title">Quadient Inspire DAS</h4>
+                    <span class="int-tag int-tag-das">Quadient DAS</span>
+                  </div>
+                  <p class="int-card-desc">
+                    Processamento via motor Quadient Inspire Digital Advantage Suite (DAS).
+                  </p>
+                  <div class="assigned-user-id-box">
+                    <span>ID de Usuário atribuído:</span>
+                    <code>xbaGznvBRTbXKT0YOVEH30959486</code>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Campos Ocultos para Transmissão -->
+          <input type="hidden" id="integration" name="integration" value="3rd Party">
+          <input type="hidden" id="user_id" name="user_id" value="quadientlatam@gmail.com">
+          <input type="hidden" id="data_type" name="data_type" value="json">
+          <input type="hidden" id="type_field" name="type_field" value="type">
+          <input type="hidden" id="content_field" name="content_field" value="content">
+          <input type="hidden" id="integration_field" name="integration_field" value="integration">
+          <textarea id="content" name="content" style="display: none;"></textarea>
+
+          <!-- Alerta Rápido de Feedback -->
+          <div id="quick-preview-alert" class="quick-alert" style="display: none;">
+            <div class="quick-alert-content">
+              <span class="quick-alert-icon">📋</span>
+              <div class="quick-alert-text" id="quick-preview-text">Visualização do JSON gerada com sucesso.</div>
+            </div>
+            <button type="button" class="btn btn-sm btn-accent" onclick="switchMainScreen('kafka')">
+              Ver JSON & Logs ➔
+            </button>
+          </div>
+
+          <!-- Barra de Botões de Ação na Tela 1 -->
+          <div class="actions-bar">
+            <button type="button" class="btn btn-secondary" id="btn-preview" onclick="handleGeneratePreview()">
+              👁️ Visualizar JSON
+            </button>
+            <button type="submit" class="btn btn-primary" id="btn-send">
+              <span id="btn-send-spinner" class="spinner" style="display: none;"></span>
+              <span id="btn-send-text">🚀 Enviar para o Kafka</span>
+            </button>
+            <button type="button" class="btn btn-ghost" onclick="switchMainScreen('kafka')">
+              ⚡ Ir para Servidor Kafka & Logs ➔
+            </button>
+          </div>
+
+        </section>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- TELA 2: CONFIGURAÇÃO DO KAFKA, VISUALIZAÇÃO E ATIVIDADE / LOGS             -->
+      <!-- ========================================================================= -->
+      <div id="screen-kafka-view" class="view-screen" style="display: none;">
+        
+        <!-- Cartão de Configuração do Servidor Kafka -->
+        <section class="card config-card">
+          <div class="card-header-flex">
+            <div class="section-title" style="margin-bottom: 0;">
+              <span class="icon">⚡</span> Configuração do Servidor Kafka
+            </div>
+            <div class="card-header-actions">
+              <button type="button" class="btn btn-sm btn-ghost" onclick="switchMainScreen('data')">
+                ⯇ Voltar para Caso de Uso
+              </button>
+            </div>
+          </div>
+
+          <div class="grid-3-col" style="margin-top: 1.25rem;">
+            <div class="form-group">
+              <label for="host">IP ou Host do Kafka</label>
+              <input type="text" id="host" name="host" placeholder="ex. 192.168.1.50 ou localhost" value="{{ config.kafka_host }}">
+              <span class="hint">Variável: KAFKA_HOST</span>
+            </div>
+            <div class="form-group">
+              <label for="port">Porta</label>
+              <input type="number" id="port" name="port" placeholder="9092" value="{{ config.kafka_port }}">
+              <span class="hint">Variável: KAFKA_PORT</span>
+            </div>
+            <div class="form-group">
+              <label for="topic">Tópico de Destino <span class="required">*</span></label>
+              <input type="text" id="topic" name="topic" placeholder="ex. eventos-push, sensor-data" value="{{ config.kafka_topic or 'sensor-data' }}" required>
+              <span class="hint">Variável: KAFKA_TOPIC</span>
+            </div>
+          </div>
+
+          <div class="actions-bar" style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+            <button type="button" class="btn btn-secondary" onclick="handleGeneratePreview()">
+              👁️ Atualizar Visualização
+            </button>
+            <button type="submit" class="btn btn-primary" id="btn-send-screen2">
+              <span>🚀 Publicar no Kafka</span>
+            </button>
+            <span class="hint" style="margin-left: auto; align-self: center;">
+              Publica a mensagem estruturada neste tópico do Kafka.
+            </span>
+          </div>
+        </section>
+
+        <!-- Monitoramento, Visualização & Logs de Atividade -->
+        <div class="kafka-workspace-grid" style="margin-top: 1.5rem;">
+          
+          <!-- Coluna A: Visualização do JSON & Payload -->
+          <section class="card results-card">
+            
+            <!-- Banner de Status / Resultado -->
+            <div id="result-banner" class="banner banner-idle">
+              <div class="banner-icon" id="banner-icon">ℹ️</div>
+              <div class="banner-body">
+                <div class="banner-title" id="banner-title">Pronto para enviar</div>
+                <div class="banner-text" id="banner-text">Verifique o JSON final abaixo e publique no Kafka para monitorar o resultado em tempo real.</div>
+              </div>
+            </div>
+
+            <!-- Painel de Métricas -->
+            <div class="metrics-grid" id="metrics-panel">
+              <div class="metric-item">
+                <div class="metric-val" id="metric-sent">0</div>
+                <div class="metric-label">Mensagens Enviadas</div>
+              </div>
+              <div class="metric-item">
+                <div class="metric-val" id="metric-time">0.00s</div>
+                <div class="metric-label">Tempo Total</div>
+              </div>
+              <div class="metric-item">
+                <div class="metric-val" id="metric-rate">0 /s</div>
+                <div class="metric-label">Taxa Média</div>
+              </div>
+              <div class="metric-item">
+                <div class="metric-val" id="metric-errors">0</div>
+                <div class="metric-label">Erros</div>
+              </div>
+            </div>
+
+            <!-- Contêiner de Visualização -->
+            <div class="preview-container">
+              <div class="preview-header">
+                <h3>📬 Payload JSON Estruturado para o Kafka</h3>
+                <span class="badge" id="preview-count-badge">Formato JSON Validado</span>
+              </div>
+
+              <!-- Visualizador de Envelope JSON -->
+              <div class="envelope-wrapper" id="envelope-wrapper">
+                <div class="envelope-header">
+                  <span class="envelope-title">Estrutura exata da mensagem publicada:</span>
+                </div>
+                <pre class="json-code-box"><code id="preview-envelope-code"></code></pre>
+              </div>
+            </div>
+
+          </section>
+
+          <!-- Coluna B: Console de Atividade & Logs -->
+          <section class="card console-card">
+            <div class="console-section" style="margin-top: 0; height: 100%; display: flex; flex-direction: column;">
+              <div class="console-header">
+                <span>📟 Registro de Atividade & Logs</span>
+                <div style="display: flex; gap: 0.5rem;">
+                  <button type="button" class="btn-link" onclick="copyConsoleLogs()">Copiar</button>
+                  <button type="button" class="btn-link" onclick="clearConsole()">Limpar</button>
+                </div>
+              </div>
+              <pre class="console-output" id="console-output" style="flex: 1; min-height: 480px;">Aguardando ações do usuário...</pre>
+            </div>
+          </section>
+
+        </div>
+
+      </div>
+
+    </form>
+
+    <footer class="app-footer">
+      <span>Vivo &bull; Kafka Data Producer Studio &bull; Plataforma Empresarial de Eventos & Streaming</span>
+      <span>API Endpoint: <code>POST /api/send</code></span>
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

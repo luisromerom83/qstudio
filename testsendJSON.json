@@ -1,0 +1,24 @@
+{
+  "content": {
+    "BILLING_PERIOD": "Septiembre 2026",
+    "COMPANY_NAME": "Empresa Servicios Digitales S.A.",
+    "CURRENCY": "MXN",
+    "FOLIO_FISCAL": "9A8B7C-6543",
+    "ITEM_1_NAME": "Suscripción Plan Corporativo Cloud",
+    "ITEM_1_PRICE": "$1,250.00",
+    "ITEM_1_QTY": "1",
+    "ITEM_2_NAME": "Servicio de Notificaciones Push Adicionales",
+    "ITEM_2_PRICE": "$200.00",
+    "ITEM_2_QTY": "1",
+    "RFC": "ESD120304XYZ",
+    "STATUS_BADGE": "PAGADA",
+    "SUPPORT_EMAIL": "soporte@empresa.com",
+    "TAX_DISCLAIMER": "IVA incluido",
+    "TOTAL_AMOUNT": "$1,450.00"
+  },
+  "integration": "Quadient Inspire DAS",
+  "push_content": "Nueva fatura DAS",
+  "push_title": "Push desde DAS",
+  "type": "JSON",
+  "user_id": "xbaGznvBRTbXKT0YOVEH30959486"
+}

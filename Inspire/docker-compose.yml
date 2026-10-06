@@ -1,0 +1,256 @@
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Base de Datos PostgreSQL (con icm_db y scaler_db independientes)
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: quadient-postgres
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: scaler
+      POSTGRES_PASSWORD: scalerpassword123
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:z
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scaler -d postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  # ----------------------------------------------------------------------------
+  # 2. Quadient Inspire Content Manager (ICM)
+  # ----------------------------------------------------------------------------
+  icm:
+    image: quadientdistribution.azurecr.io/flex/icm:17.5-latest
+    container_name: inspire-icm
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .quadient_credentials.env
+    environment:
+      CX_LICENSE: cl
+      CX_LIC_SERVER: ${CX_LIC_SERVER}
+      DB_TYPE: PostgreSQL
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: icm_db
+      DB_USER: scaler
+      DB_PASS: scalerpassword123
+    ports:
+      - "30353:30353"
+    volumes:
+      - icmdata:/opt/Quadient/Inspire-Designer-data/icm
+
+  # ----------------------------------------------------------------------------
+  # 3. Inicialización de Esquema de BD para Scaler (One-Shot)
+  # ----------------------------------------------------------------------------
+  scaler-prepare:
+    image: quadientdistribution.azurecr.io/flex/scaler:17.5-latest
+    container_name: inspire-scaler-prepare
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      icm:
+        condition: service_started
+    env_file:
+      - .quadient_credentials.env
+    environment:
+      TYPE: prepare
+      DB_TYPE: postgresql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: scaler_db
+      DB_USER: scaler
+      DB_PASS: scalerpassword123
+      ICM_HOST: icm
+      ICM_PORT: 30353
+      ICM_USER: system
+      ICM_PASS: "Password12345*"
+      ICM_API_AUTHENTICATION_GROUP: "Administrators"
+      CX_LICENSE: cl
+      CX_LIC_SERVER: ${CX_LIC_SERVER}
+
+  # ----------------------------------------------------------------------------
+  # 4. Quadient Inspire Scaler (Stateful Engine)
+  # ----------------------------------------------------------------------------
+  scaler:
+    image: quadientdistribution.azurecr.io/flex/scaler:17.5-latest
+    container_name: inspire-scaler
+    depends_on:
+      scaler-prepare:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      icm:
+        condition: service_started
+    env_file:
+      - .quadient_credentials.env
+    environment:
+      TYPE: run
+      DB_TYPE: postgresql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: scaler_db
+      DB_USER: scaler
+      DB_PASS: scalerpassword123
+      ICM_HOST: icm
+      ICM_PORT: 30353
+      ICM_USER: system
+      ICM_PASS: "Password12345*"
+      CX_LICENSE: cl
+      CX_LIC_SERVER: ${CX_LIC_SERVER}
+    ports:
+      - "30600:30600"
+      - "30354:30354"
+
+  # ----------------------------------------------------------------------------
+  # 5. Quadient Inspire Production Server (IPS) - Comparte red/localhost con Scaler
+  # ----------------------------------------------------------------------------
+  ips:
+    image: quadientdistribution.azurecr.io/flex/ips:17.5-latest
+    container_name: inspire-ips
+    network_mode: "service:scaler"
+    depends_on:
+      - scaler
+    env_file:
+      - .quadient_credentials.env
+    environment:
+      CX_LICENSE: cl
+      CX_LIC_SERVER: ${CX_LIC_SERVER}
+      ICM_HOST: icm
+      ICM_PORT: 30353
+      ICM_USER: system
+      ICM_PASS: "Password12345*"
+
+  # ----------------------------------------------------------------------------
+  # 6. Preparación Inicial de Interactive (One-Shot: BD + ICM + Scaler)
+  # ----------------------------------------------------------------------------
+  interactive-prepare:
+    image: quadientdistribution.azurecr.io/flex/interactive:17.5-latest
+    container_name: inspire-interactive-prepare
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      icm:
+        condition: service_started
+      scaler:
+        condition: service_started
+    env_file:
+      - .quadient_credentials.env
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        echo "[*] Ejecutando inicialización de Interactive en ICM y Base de Datos..."
+        cd /install && bash docker-config-configuration.sh || true
+        echo "[✓] Preparación de Interactive finalizada."
+    environment:
+      EULA_ACCEPTED: "true"
+      PRODUCTION_ENVIRONMENT: "false"
+      CX_LICENSE: cl
+      CX_LIC_SERVER: ${CX_LIC_SERVER}
+      USE_HTTP: "true"
+      APPLICATION_URL: "http://localhost:30701/interactive"
+      ICM_ROOT: "icm://Interactive/"
+      ICM_PORT: 30353
+      ICM_HOST: icm
+      ICM_HOST_SECOND: icm
+      ICM_PORT_SECOND: 30353
+      ICM_HOST2: icm
+      ICM_PORT2: 30353
+      ICM_USER: system
+      ICM_PASS: "Password12345*"
+      GROO_ICM_USER: system
+      GROO_ICM_PASS: "Password12345*"
+      IPS_HOST: localhost
+      IPS_PORT: 30354
+      DB_TYPE: POSTGRESQL
+      DB_NAME: interactive_db
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: scaler
+      DB_PASS: scalerpassword123
+      SCALER_URL: "http://scaler:30600"
+      SCALER_USER: system
+      SCALER_PASS: "Password12345*"
+
+  # ----------------------------------------------------------------------------
+  # 7. Quadient Inspire Interactive (Web Application)
+  # ----------------------------------------------------------------------------
+  interactive:
+    image: quadientdistribution.azurecr.io/flex/interactive:17.5-latest
+    container_name: inspire-interactive
+    hostname: inspire-interactive
+    extra_hosts:
+      - "inspire-interactive:127.0.0.1"
+    user: "0:0"
+    depends_on:
+      interactive-prepare:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      icm:
+        condition: service_started
+      scaler:
+        condition: service_started
+    env_file:
+      - .quadient_credentials.env
+    environment:
+      TYPE: run
+      EULA_ACCEPTED: "true"
+      CX_LICENSE: cl
+      CX_LIC_SERVER: ${CX_LIC_SERVER}
+      ICM_HOST: icm
+      ICM_PORT: 30353
+      ICM_HOST_SECOND: icm
+      ICM_PORT_SECOND: 30353
+      ICM_HOST2: icm
+      ICM_PORT2: 30353
+      ICM_USER: system
+      ICM_PASS: "Password12345*"
+      GROO_ICM_USER: system
+      GROO_ICM_PASS: "Password12345*"
+      ICM_ROOT: "icm://Interactive/"
+      DB_TYPE: PostgreSql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: interactive_db
+      DB_USER: scaler
+      DB_PASS: scalerpassword123
+      SCALER_URL: "http://scaler:30600"
+      SCALER_USER: system
+      SCALER_PASS: "Password12345*"
+      IPS_HOST: localhost
+      IPS_PORT: 30354
+      APPLICATION_URL: "http://localhost:30701/interactive"
+    ports:
+      - "30701:30701"
+
+  # ----------------------------------------------------------------------------
+  # 7. Quadient Inspire Production Server (IPS) dedicado para Interactive
+  # ----------------------------------------------------------------------------
+  interactive-ips:
+    image: quadientdistribution.azurecr.io/flex/ips:17.5-latest
+    container_name: inspire-interactive-ips
+    network_mode: "service:interactive"
+    depends_on:
+      - interactive
+    env_file:
+      - .quadient_credentials.env
+    environment:
+      CX_LICENSE: cl
+      CX_LIC_SERVER: ${CX_LIC_SERVER}
+      ICM_HOST: icm
+      ICM_PORT: 30353
+      ICM_USER: system
+      ICM_PASS: "Password12345*"
+
+volumes:
+  pgdata:
+  icmdata:

@@ -1,0 +1,17 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+tests
+.git
+.gitignore
+.env*
+.quadient*
+*.env
+manager/environments/*
+manager/data/environments.json
+manager/data/snapshots/*
+manager/studio.log
+manager/.studio.pid
+*.log

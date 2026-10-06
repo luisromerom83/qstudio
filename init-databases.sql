@@ -1,0 +1,7 @@
+-- Inicialización de bases de datos independientes para Quadient
+CREATE DATABASE scaler_db;
+CREATE DATABASE icm_db;
+CREATE DATABASE interactive_db;
+GRANT ALL PRIVILEGES ON DATABASE scaler_db TO scaler;
+GRANT ALL PRIVILEGES ON DATABASE icm_db TO scaler;
+GRANT ALL PRIVILEGES ON DATABASE interactive_db TO scaler;
