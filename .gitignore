@@ -1,58 +1,15 @@
-# ==============================================================================
-# Git Ignore - QStudio & Quadient Inspire Flex Stack
-# ==============================================================================
-
-# Credenciales y Variables de Entorno (CRÍTICO: No subir secretos a repositorios)
-.env
-.env.*
-!.env.example
-*.env
-!*.env.example
-.quadient_credentials.env
-!.quadient_credentials.env.example
-!*.quadient_credentials.env.example
-!**/.env.example
-!**/.quadient_credentials.env.example
-
-# Python y Entornos Virtuales
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-.venv/
-.pytest_cache/
-
-# Logs y Archivos de Depuración
-*.log
-interactive.log
-manager/studio.log
-manager/.studio.pid
-
-# Ambientes dinámicos y datos locales de Manager
-manager/environments/*
-!manager/environments/.gitkeep
-manager/data/environments.json
-manager/data/snapshots/*
-!manager/data/snapshots/.gitkeep
-
-# Archivos comprimidos y respaldos grandes (>100MB o paquetes temporales)
-*.tar.gz
-*.tar
-*.zip
-*.7z
-
-# Documentación binaria propietaria y notas de extracción
-*.pdf
-pdf_text.txt
-
-# Archivos temporales del sistema operativo e IDEs
+# OS / Editor files
 .DS_Store
 Thumbs.db
-.idea/
-.vscode/
 *.swp
 *~
+.idea/
+.vscode/
+
+# Environment files with sensitive credentials
+.env
+.env.local
+.quadient_credentials.env
+
+# Logs
+*.log

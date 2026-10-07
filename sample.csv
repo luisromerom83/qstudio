@@ -1,6 +1,0 @@
-id,timestamp,sensor,temperatura,humedad,ubicacion
-1,2026-08-31T10:00:00Z,DHT22_01,24.5,55.2,Almacen_A
-2,2026-08-31T10:01:00Z,DHT22_02,26.1,48.7,Almacen_B
-3,2026-08-31T10:02:00Z,DHT22_01,24.8,54.9,Almacen_A
-4,2026-08-31T10:03:00Z,DHT22_03,22.0,60.1,Oficina_Principal
-5,2026-08-31T10:04:00Z,DHT22_02,26.5,47.9,Almacen_B

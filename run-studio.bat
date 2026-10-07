@@ -9,8 +9,8 @@ echo ==========================================================
 echo    QUADIENT INSPIRE FLEX - DEMO & POC STUDIO
 echo ==========================================================
 echo [*] Descargando y levantando contenedor desde Docker Hub...
-docker compose -f docker-compose.studio.yml pull
-docker compose -f docker-compose.studio.yml up -d
+docker compose pull
+docker compose up -d
 
 if %ERRORLEVEL% EQU 0 (
     echo.

@@ -8,8 +8,8 @@ Write-Host "   QUADIENT INSPIRE FLEX - DEMO & POC STUDIO (WINDOWS)    " -Foregro
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "[*] Descargando y levantando contenedor desde Docker Hub..." -ForegroundColor Yellow
 
-docker compose -f docker-compose.studio.yml pull
-docker compose -f docker-compose.studio.yml up -d
+docker compose pull
+docker compose up -d
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""
