@@ -24,5 +24,8 @@ services:
 
 volumes:
   studio_data:
+    name: studio_data
   studio_environments:
+    name: studio_environments
   studio_docker_config:
+    name: studio_docker_config

@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quadient Inspire Flex | Demo & PoC Studio</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#fff7ed',
+              100: '#ffedd5',
+              200: '#fed7aa',
+              300: '#fdba74',
+              400: '#FF6833',
+              500: '#FF4200', /* Primary q-Orange (#FF4200) */
+              600: '#CC3400', /* Accessible q-Orange for buttons with white text (#CC3400) */
+              700: '#992600',
+              800: '#661900',
+              900: '#330d00',
+            },
+            qorange: {
+              DEFAULT: '#FF4200',
+              accessible: '#CC3400',
+              light: '#FF6833',
+              hover: '#E03A00',
+            },
+            qgraphite: {
+              DEFAULT: '#374151',
+              light: '#5C6371',
+              subtle: '#D1D5DB',
+              border: '#4B5563',
+              dark: '#1F2937',
+              darker: '#111827',
+            },
+            qviolet: {
+              DEFAULT: '#7536F0',
+              light: '#915DF3',
+              dark: '#5824C4',
+              subtle: 'rgba(117, 54, 240, 0.15)',
+            },
+            qblue: {
+              DEFAULT: '#05B9F0',
+              light: '#38BDF8',
+              dark: '#0284C7',
+              subtle: 'rgba(5, 185, 240, 0.15)',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="h-full flex flex-col antialiased selection:bg-brand-500 selection:text-white">
+
+  <!-- ========================================================================= -->
+  <!-- Top Navigation Bar                                                        -->
+  <!-- ========================================================================= -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Brand & Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF4200] to-[#CC3400] flex items-center justify-center shadow-lg shadow-[#FF4200]/25 text-white font-extrabold text-xl tracking-tight border border-[#FF6833]/30">
+          Q
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base font-bold text-white tracking-tight">Quadient Inspire Flex</h1>
+            <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#7536F0]/15 text-[#915DF3] border border-[#7536F0]/30">Studio Demos & PoC</span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Gestor de Ambientes y Demostraciones por Vertical</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="hidden md:flex items-center gap-1 bg-slate-950/60 p-1 rounded-xl border border-slate-800 text-sm">
+        <button onclick="switchTab('catalog')" id="tab-catalog" class="tab-btn active px-3.5 py-1.5 rounded-lg font-medium transition flex items-center gap-2 text-white bg-slate-800 shadow-sm border border-slate-700">
+          <i data-lucide="layout-grid" class="w-4 h-4 text-brand-400"></i>
+          Catálogo Demos
+        </button>
+        <button onclick="switchTab('services')" id="tab-services" class="tab-btn px-3.5 py-1.5 rounded-lg font-medium transition flex items-center gap-2 text-slate-400 hover:text-slate-200 border border-transparent">
+          <i data-lucide="server" class="w-4 h-4 text-emerald-400"></i>
+          Servicios & Logs
+        </button>
+        <button onclick="switchTab('acr')" id="tab-acr" class="tab-btn px-3.5 py-1.5 rounded-lg font-medium transition flex items-center gap-2 text-slate-400 hover:text-slate-200 border border-transparent">
+          <i data-lucide="cloud-download" class="w-4 h-4 text-[#05B9F0]"></i>
+          Versiones Azure
+        </button>
+        <button onclick="switchTab('storage')" id="tab-storage" class="tab-btn px-3.5 py-1.5 rounded-lg font-medium transition flex items-center gap-2 text-slate-400 hover:text-slate-200 border border-transparent">
+          <i data-lucide="hard-drive" class="w-4 h-4 text-[#7536F0]"></i>
+          Almacenamiento
+        </button>
+        <button onclick="switchTab('settings')" id="tab-settings" class="tab-btn px-3.5 py-1.5 rounded-lg font-medium transition flex items-center gap-2 text-slate-400 hover:text-slate-200 border border-transparent">
+          <i data-lucide="settings" class="w-4 h-4 text-amber-400"></i>
+          Ajustes
+        </button>
+      </nav>
+
+      <!-- Right Actions: RAM Saver & New Demo -->
+      <div class="flex items-center gap-3">
+        <!-- RAM Saver Indicator -->
+        <div class="hidden lg:flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg text-xs" title="Modo On-Demand activo: al iniciar una demo se pausan las demás para liberar RAM y CPU">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-emerald-300 font-medium">Ahorro de RAM: On-Demand</span>
+        </div>
+
+        <button onclick="openNewEnvModal()" class="inline-flex items-center gap-2 bg-[#CC3400] hover:bg-[#FF4200] text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-lg shadow-[#CC3400]/25 transition active:scale-95">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i>
+          <span>Nueva Demo</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- Main Content Area                                                         -->
+  <!-- ========================================================================= -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Global Notification Banner -->
+    <div id="alert-banner" class="hidden p-4 rounded-xl border flex items-center justify-between text-sm transition-all duration-300">
+      <div class="flex items-center gap-3">
+        <i id="alert-icon" data-lucide="info" class="w-5 h-5 flex-shrink-0"></i>
+        <span id="alert-text">Mensaje</span>
+      </div>
+      <button onclick="dismissAlert()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+
+    <!-- --------------------------------------------------------------------- -->
+    <!-- VIEW 1: Catálogo de Demos (Showroom de Preventa)                      -->
+    <!-- --------------------------------------------------------------------- -->
+    <section id="view-catalog" class="space-y-6">
+      
+      <!-- Section Header with Quadient Brand Accent Bar -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-1.5 h-7 rounded-full bg-gradient-to-b from-[#FF4200] to-[#CC3400]"></div>
+          <div>
+            <h2 class="text-lg font-bold text-white tracking-tight">Catálogo de Demostraciones</h2>
+            <p class="text-xs text-slate-400">Ambientes aislados por vertical de industria y casos de uso de Quadient Inspire Flex</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter Bar & Search -->
+      <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
+        <!-- Vertical Pills -->
+        <div class="flex flex-wrap gap-1.5" id="vertical-filter-pills">
+          <button onclick="filterVertical('all')" class="vertical-pill active px-3 py-1 rounded-lg text-xs font-semibold bg-[#CC3400] text-white border border-[#FF4200] shadow-sm shadow-[#CC3400]/20">Todos</button>
+          <button onclick="filterVertical('insurance')" class="vertical-pill px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800">🛡️ Seguros</button>
+          <button onclick="filterVertical('financials')" class="vertical-pill px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800">🏦 Banca y Finanzas</button>
+          <button onclick="filterVertical('telco')" class="vertical-pill px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800">📡 Telecom</button>
+          <button onclick="filterVertical('healthcare')" class="vertical-pill px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800">🏥 Salud</button>
+          <button onclick="filterVertical('poc')" class="vertical-pill px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800">💼 PoCs de Cliente</button>
+        </div>
+
+        <div class="text-xs text-slate-400 flex items-center gap-2">
+          <span>Total Ambientes: <strong id="env-count" class="text-white">0</strong></span>
+          <span class="text-slate-600">•</span>
+          <button onclick="loadEnvironments()" class="hover:text-brand-400 flex items-center gap-1">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refrescar
+          </button>
+        </div>
+      </div>
+
+      <!-- Environments Grid -->
+      <div id="environments-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Rendered dynamically via JS -->
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------------------------- -->
+    <!-- VIEW 2: Servicios & Logs del Ambiente                                 -->
+    <!-- --------------------------------------------------------------------- -->
+    <section id="view-services" class="space-y-6 hidden">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
+        <div class="flex items-center gap-3">
+          <label for="service-env-select" class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Ambiente Seleccionado:</label>
+          <select id="service-env-select" onchange="renderServicesView()" class="bg-slate-950 border border-slate-700 text-sm rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-brand-500">
+            <!-- Dynamic options -->
+          </select>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="editSelectedEnvironment()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/30 flex items-center gap-1.5 transition" title="Configurar Stacks y Servicios Opcionales">
+            <i data-lucide="settings-2" class="w-3.5 h-3.5"></i> Configurar Stacks
+          </button>
+          <button onclick="startSelectedEnvironment()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 flex items-center gap-1.5 transition">
+            <i data-lucide="play" class="w-3.5 h-3.5"></i> Iniciar Todo
+          </button>
+          <button onclick="stopSelectedEnvironment()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600/30 flex items-center gap-1.5 transition">
+            <i data-lucide="square" class="w-3.5 h-3.5"></i> Detener Todo
+          </button>
+          <button onclick="deleteSelectedEnvironment()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 flex items-center gap-1.5 transition" title="Eliminar ambiente seleccionado">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Eliminar Ambiente
+          </button>
+        </div>
+      </div>
+
+      <!-- Services Architecture Diagram & Containers -->
+      <div id="services-grid" class="w-full">
+        <!-- Dynamic architecture view & containers -->
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------------------------- -->
+    <!-- VIEW 3: Versiones de Azure (ACR Explorer)                            -->
+    <!-- --------------------------------------------------------------------- -->
+    <section id="view-acr" class="space-y-6 hidden">
+      <div class="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <i data-lucide="cloud" class="w-5 h-5 text-cyan-400"></i>
+              Explorador de Versiones en Azure Container Registry
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">Consulta en vivo las versiones disponibles en <span class="font-mono text-slate-300">quadientdistribution.azurecr.io/flex/interactive</span></p>
+          </div>
+          <button onclick="loadAcrVersions()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg text-cyan-400 flex items-center gap-2 border border-slate-700">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i> Consultar Ahora
+          </button>
+        </div>
+
+        <div id="acr-loading" class="hidden py-12 text-center text-slate-400">
+          <i data-lucide="loader-2" class="w-8 h-8 animate-spin mx-auto text-cyan-400 mb-2"></i>
+          <span>Consultando API de Azure Container Registry...</span>
+        </div>
+
+        <div id="acr-content" class="space-y-6">
+          <div>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Versiones Principales (Recomendadas)</h3>
+            <div id="acr-latest-tags" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <div>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Hotfixes y Compilaciones Recientes</h3>
+            <div id="acr-hf-tags" class="flex flex-wrap gap-2">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------------------------- -->
+    <!-- VIEW 4: Almacenamiento & Snapshots                                   -->
+    <!-- --------------------------------------------------------------------- -->
+    <section id="view-storage" class="space-y-6 hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Volumes Overview -->
+        <div class="lg:col-span-1 bg-slate-900/50 p-6 rounded-2xl border border-slate-800 space-y-4">
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="hard-drive" class="w-5 h-5 text-purple-400"></i>
+            Volúmenes de Persistencia
+          </h2>
+          <p class="text-xs text-slate-400">Almacenamientos independientes creados para Postgres e ICM por ambiente.</p>
+          <div id="volumes-list" class="space-y-2 text-xs">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
+
+        <!-- Snapshots / Backups -->
+        <div class="lg:col-span-2 bg-slate-900/50 p-6 rounded-2xl border border-slate-800 space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="archive" class="w-5 h-5 text-emerald-400"></i>
+                Snapshots & Respaldos de Demos
+              </h2>
+              <p class="text-xs text-slate-400 mt-1">Crea copias exactas del estado de tus demostraciones para congelar datos exitosos o exportar.</p>
+            </div>
+            <button onclick="promptCreateSnapshot()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow">
+              <i data-lucide="camera" class="w-4 h-4"></i> Crear Snapshot
+            </button>
+          </div>
+
+          <div id="snapshots-table-container" class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-300">
+              <thead class="bg-slate-950/60 uppercase font-semibold text-slate-500 border-b border-slate-800">
+                <tr>
+                  <th class="py-2.5 px-3">Nombre</th>
+                  <th class="py-2.5 px-3">Ambiente</th>
+                  <th class="py-2.5 px-3">Fecha</th>
+                  <th class="py-2.5 px-3">Tamaño</th>
+                  <th class="py-2.5 px-3 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="snapshots-tbody" class="divide-y divide-slate-800/60">
+                <!-- Rendered via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------------------------- -->
+    <!-- VIEW 5: Ajustes y Administración                                      -->
+    <!-- --------------------------------------------------------------------- -->
+    <section id="view-settings" class="space-y-6 hidden">
+      <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="key" class="w-5 h-5 text-amber-400"></i>
+            Credenciales de Azure Container Registry & Licencia
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">Configuración global utilizada para descargar imágenes y autenticar con Quadient Flex.</p>
+        </div>
+
+        <form id="settings-form" onsubmit="handleSaveSettings(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Registro de Contenedores (ACR)</label>
+            <input type="text" id="setting-registry" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Usuario de Azure Registry</label>
+              <input type="text" id="setting-username" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Token / Password de Azure</label>
+              <input type="password" id="setting-password" placeholder="••••••••••••••••••••" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+              <span class="text-[10px] text-slate-500">Dejar en blanco para mantener la contraseña actual.</span>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Servidor de Licencia Inspire (CX_LIC_SERVER)</label>
+            <input type="text" id="setting-lic-server" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+          </div>
+
+          <div class="pt-4 flex items-center justify-between border-t border-slate-800">
+            <button type="button" onclick="testAcrConnection()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg text-slate-200 border border-slate-700 flex items-center gap-2">
+              <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i> Probar Conexión ACR
+            </button>
+            <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-xs font-semibold rounded-lg text-white shadow-lg shadow-brand-600/20">
+              Guardar Configuración
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: Onboarding / Asistente Inicial                                    -->
+  <!-- ========================================================================= -->
+  <dialog id="onboarding-modal" class="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl shadow-2xl p-0 w-full max-w-lg backdrop:bg-black/70 backdrop:backdrop-blur-sm">
+    <div class="p-6 space-y-4">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FF4200] to-[#CC3400] flex items-center justify-center text-white shadow-lg shadow-[#FF4200]/25 border border-[#FF6833]/30">
+          <i data-lucide="sparkles" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h2 class="text-base font-bold text-white">Bienvenido a Demo & PoC Studio</h2>
+          <p class="text-xs text-slate-400">Configura tus credenciales de Azure Container Registry para comenzar</p>
+        </div>
+      </div>
+
+      <form id="onboarding-form" onsubmit="handleOnboardingSubmit(event)" class="space-y-3 pt-2">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Azure Registry</label>
+          <input type="text" id="ob-registry" value="quadientdistribution.azurecr.io" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Usuario ACR</label>
+          <input type="text" id="ob-username" required placeholder="ej. usuario-acr" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Password / Token ACR</label>
+          <input type="password" id="ob-password" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Servidor de Licencia Inspire</label>
+          <input type="text" id="ob-lic" placeholder="ej. servidor-licencia.empresa.com/TOKEN" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+        </div>
+
+        <div class="pt-4 flex items-center justify-between border-t border-slate-800">
+          <button type="button" onclick="testOnboardingConnection()" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg text-slate-200 border border-slate-700">
+            Probar Conexión
+          </button>
+          <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold shadow">
+            Guardar y Entrar
+          </button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: Nueva Demo / Ambiente                                             -->
+  <!-- ========================================================================= -->
+  <dialog id="new-env-modal" class="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl shadow-2xl p-0 w-full max-w-lg backdrop:bg-black/70 backdrop:backdrop-blur-sm">
+    <div class="p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="plus-circle" class="w-5 h-5 text-brand-400"></i>
+          Crear Nueva Demo / PoC
+        </h2>
+        <button onclick="closeModal('new-env-modal')" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <form id="new-env-form" onsubmit="handleCreateEnvSubmit(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Vertical de Industria</label>
+          <select id="new-env-vertical" onchange="handleVerticalChange()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+            <option value="insurance" data-name="Seguros">🛡️ Seguros (Pólizas, Siniestros)</option>
+            <option value="financials" data-name="Banca y Finanzas">🏦 Banca y Finanzas (Extractos, Créditos)</option>
+            <option value="telco" data-name="Telecomunicaciones">📡 Telecomunicaciones (Facturación)</option>
+            <option value="healthcare" data-name="Salud">🏥 Salud & Farmacéutica</option>
+            <option value="retail" data-name="Retail & Consumo">🛍️ Retail & Consumo</option>
+            <option value="poc" data-name="PoC Cliente Específico">💼 PoC Cliente Específico</option>
+            <option value="other" data-name="General / Otra">📦 Otra Vertical</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Nombre de la Demostración</label>
+          <input type="text" id="new-env-name" required placeholder="ej. Demo Seguros - Reclamaciones de Autos" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Descripción o Notas de la Presentación</label>
+          <textarea id="new-env-desc" rows="2" placeholder="Plantillas interactivas para agentes y autoservicio..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500"></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Versión de Inspire</label>
+            <input type="text" id="new-env-version" value="17.5-latest" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Puerto Interactive (Host)</label>
+            <input type="number" id="new-env-port" placeholder="Auto (ej. 30711)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+          </div>
+        </div>
+
+        <!-- Custom Storage Directory (Host) -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-semibold text-slate-300 uppercase">Carpeta en el Host para Volúmenes (Opcional)</label>
+            <span class="text-[10px] text-cyan-400 font-mono">Postgres, ICM & Filestore</span>
+          </div>
+          <div class="relative">
+            <input type="text" id="new-env-storage-path" placeholder="/home/usuario/demos o C:\Inspire\Demos (dejar en blanco para volumen estándar)" class="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-brand-500 placeholder:text-slate-600">
+            <i data-lucide="hard-drive" class="w-4 h-4 text-slate-500 absolute left-3 top-2.5"></i>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">
+            Linux: <code>/home/usuario/demos</code> | Windows: <code>C:\Inspire\Demos</code> o <code>C:/Inspire/Demos</code>. Si defines una ruta, los datos de Postgres, ICM y Filestore se guardarán en subcarpetas dentro de este folder físico. Si lo dejas vacío, Docker usará su volumen estándar (<code>/var/lib/docker/volumes/</code>).
+          </p>
+        </div>
+
+        <!-- Componentes & Servicios Opcionales del Stack -->
+        <div class="space-y-3 pt-2 border-t border-slate-800">
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+            Arquitectura de Servicios & Componentes
+          </label>
+
+          <!-- Core Mandatory Note -->
+          <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="font-semibold text-white">PostgreSQL & Inspire ICM</span>
+              <span class="text-[10px] text-slate-400 hidden sm:inline">• Repositorio y configuración central</span>
+            </div>
+            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">Obligatorio</span>
+          </div>
+
+          <!-- GRUPO: INSPIRE INTERACTIVE -->
+          <div class="bg-slate-950/70 border border-emerald-500/30 rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#99E2B4]"></span>
+                <span class="text-xs font-bold text-white uppercase tracking-wider">Grupo Inspire Interactive</span>
+              </div>
+              <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Puertos 30701 / 30354</span>
+            </div>
+
+            <!-- Checkbox Interactive Server -->
+            <div class="flex items-start gap-3">
+              <input type="checkbox" id="new-env-enable-interactive" onchange="toggleNewEnvInteractiveGroup()" checked class="mt-1 w-4 h-4 rounded border-slate-700 text-emerald-600 bg-slate-900 focus:ring-emerald-500 cursor-pointer">
+              <label for="new-env-enable-interactive" class="cursor-pointer">
+                <span class="block text-xs font-semibold text-white">Activar Servidor Inspire Interactive</span>
+                <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Base Server (30701) + Interactive IPS (30354).</span>
+              </label>
+            </div>
+
+            <!-- Demo Mode Checkbox (Inside Interactive group) -->
+            <div id="new-interactive-demo-group" class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-start gap-3 transition">
+              <input type="checkbox" id="new-env-demo-mode" checked class="mt-1 w-4 h-4 rounded border-slate-700 text-emerald-600 bg-slate-950 focus:ring-emerald-500 cursor-pointer">
+              <label for="new-env-demo-mode" class="cursor-pointer">
+                <span class="block text-xs font-semibold text-white flex items-center gap-1.5">
+                  🎭 Activar "Demo Mode" en Interactive
+                  <span class="text-[10px] font-normal px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Recomendado</span>
+                </span>
+                <span class="block text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                  Copia y monta automáticamente la configuración <code>demo-mode</code> (usuarios preconfigurados con contraseñas y avatares por vertical) en el directorio <code>config/demo-mode</code> de Inspire Interactive.
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <!-- GRUPO: INSPIRE SCALER -->
+          <div class="bg-slate-950/70 border border-amber-500/30 rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#FFA64D]"></span>
+                <span class="text-xs font-bold text-white uppercase tracking-wider">Grupo Inspire Scaler</span>
+              </div>
+              <span class="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">Puertos 30600 / 30354</span>
+            </div>
+
+            <!-- Checkbox Scaler Server -->
+            <div class="flex items-start gap-3">
+              <input type="checkbox" id="new-env-enable-scaler" onchange="toggleScalerSharedFolder()" checked class="mt-1 w-4 h-4 rounded border-slate-700 text-amber-600 bg-slate-900 focus:ring-amber-500 cursor-pointer">
+              <label for="new-env-enable-scaler" class="cursor-pointer">
+                <span class="block text-xs font-semibold text-white">Activar Servidor Inspire Scaler</span>
+                <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Scaler Server (30600) + Scaler IPS (30354).</span>
+              </label>
+            </div>
+
+            <!-- Scaler Folders/Volumes Section (Inside Scaler group) -->
+            <div id="scaler-sharedfolder-group" class="space-y-3 pt-1 transition-all">
+              <!-- Scaler sharedfolder input -->
+              <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label for="new-env-scaler-sharedfolder" class="block text-xs font-semibold text-amber-300">
+                    📁 Carpeta Local Compartida (sharedfolder)
+                  </label>
+                  <span class="text-[10px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded">/sharedfolder</span>
+                </div>
+                <input type="text" id="new-env-scaler-sharedfolder" placeholder="/home/usuario/scaler_share o C:\Inspire\sharedfolder (o dejar vacío para volumen estándar)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500 placeholder:text-slate-600">
+                <p class="text-[10px] text-slate-400 leading-relaxed">
+                  Ruta en tu equipo local donde se compartirán archivos bidireccionalmente con el contenedor de Scaler (montado en <code>/sharedfolder</code>).
+                </p>
+              </div>
+
+              <!-- Scaler Jobs Directory input -->
+              <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label for="new-env-scaler-jobs-dir" class="block text-xs font-semibold text-amber-300">
+                    💼 Jobs Directory (/opt/scalerSharedFolder)
+                  </label>
+                  <span class="text-[10px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded">/opt/scalerSharedFolder</span>
+                </div>
+                <input type="text" id="new-env-scaler-jobs-dir" placeholder="/home/usuario/scaler_jobs o C:\Inspire\jobs (o dejar vacío para volumen estándar)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500 placeholder:text-slate-600">
+                <p class="text-[10px] text-slate-400 leading-relaxed">
+                  Ruta en tu equipo local donde se almacenarán los jobs procesados por Scaler (montado en <code>/opt/scalerSharedFolder</code> en el contenedor). Si se deja vacío, se usa el volumen Docker predeterminado.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- GRUPO: SERVICIOS OPCIONALES DE INTEGRACIÓN -->
+          <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+              <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <i data-lucide="cpu" class="w-3.5 h-3.5 text-slate-400"></i>
+                Servicios Opcionales de Integración
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <!-- Kafka Stack Checkbox -->
+              <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-start gap-3 hover:border-slate-700 transition">
+                <input type="checkbox" id="new-env-enable-kafka" class="mt-1 w-4 h-4 rounded border-slate-700 text-brand-600 bg-slate-950 focus:ring-brand-500 cursor-pointer">
+                <label for="new-env-enable-kafka" class="cursor-pointer">
+                  <span class="block text-xs font-semibold text-white">Apache Kafka</span>
+                  <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Broker KRaft (9092) + CSV Studio Web (8080).</span>
+                </label>
+              </div>
+
+              <!-- FTP Server Checkbox -->
+              <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-start gap-3 hover:border-slate-700 transition">
+                <input type="checkbox" id="new-env-enable-ftp" class="mt-1 w-4 h-4 rounded border-slate-700 text-brand-600 bg-slate-950 focus:ring-brand-500 cursor-pointer">
+                <label for="new-env-enable-ftp" class="cursor-pointer">
+                  <span class="block text-xs font-semibold text-white">Servidor FTP (vsftpd)</span>
+                  <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Puerto 21 con usuario por defecto <code>system:Password12345*</code>.</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-4 flex items-center justify-end gap-2 border-t border-slate-800">
+          <button type="button" onclick="closeModal('new-env-modal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg text-slate-300">
+            Cancelar
+          </button>
+          <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold shadow">
+            Crear Ambiente
+          </button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: Configurar / Editar Componentes del Ambiente                      -->
+  <!-- ========================================================================= -->
+  <dialog id="edit-env-modal" class="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl shadow-2xl p-0 w-full max-w-xl backdrop:bg-black/70 backdrop:backdrop-blur-sm">
+    <div class="p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="settings-2" class="w-5 h-5 text-amber-400"></i>
+            Configurar Stacks y Servicios
+          </h2>
+          <p class="text-xs text-slate-400">Habilita o deshabilita stacks y herramientas opcionales para este sandbox</p>
+        </div>
+        <button onclick="closeModal('edit-env-modal')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form onsubmit="handleEditEnvSubmit(event)" class="space-y-4">
+        <input type="hidden" id="edit-env-id">
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Nombre de la Demo</label>
+          <input type="text" id="edit-env-name" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Notas / Descripción</label>
+          <textarea id="edit-env-desc" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500"></textarea>
+        </div>
+
+        <!-- Componentes & Servicios Opcionales del Stack -->
+        <div class="space-y-3 pt-2 border-t border-slate-800">
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+            Arquitectura de Servicios & Componentes
+          </label>
+
+          <!-- Core Mandatory Note -->
+          <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="font-semibold text-white">PostgreSQL & Inspire ICM</span>
+              <span class="text-[10px] text-slate-400 hidden sm:inline">• Core central indispensable</span>
+            </div>
+            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">Obligatorio</span>
+          </div>
+
+          <!-- GRUPO: INSPIRE INTERACTIVE -->
+          <div class="bg-slate-950/70 border border-emerald-500/30 rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#99E2B4]"></span>
+                <span class="text-xs font-bold text-white uppercase tracking-wider">Grupo Inspire Interactive</span>
+              </div>
+              <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Puertos 30701 / 30354</span>
+            </div>
+
+            <!-- Checkbox Interactive Server -->
+            <div class="flex items-start gap-3">
+              <input type="checkbox" id="edit-env-enable-interactive" onchange="toggleEditInteractiveGroup()" class="mt-1 w-4 h-4 rounded border-slate-700 text-emerald-600 bg-slate-900 focus:ring-emerald-500 cursor-pointer">
+              <label for="edit-env-enable-interactive" class="cursor-pointer">
+                <span class="block text-xs font-semibold text-white">Activar Servidor Inspire Interactive</span>
+                <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Base Server (30701) + Interactive IPS (30354).</span>
+              </label>
+            </div>
+
+            <!-- Demo Mode Checkbox (Inside Interactive group) -->
+            <div id="edit-interactive-demo-group" class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-start gap-3 transition">
+              <input type="checkbox" id="edit-env-demo-mode" class="mt-1 w-4 h-4 rounded border-slate-700 text-emerald-600 bg-slate-950 focus:ring-emerald-500 cursor-pointer">
+              <label for="edit-env-demo-mode" class="cursor-pointer">
+                <span class="block text-xs font-semibold text-white flex items-center gap-1.5">
+                  🎭 Activar "Demo Mode" en Interactive
+                </span>
+                <span class="block text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                  Monta automáticamente usuarios preconfigurados con contraseñas y avatares por vertical en <code>config/demo-mode</code>.
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <!-- GRUPO: INSPIRE SCALER -->
+          <div class="bg-slate-950/70 border border-amber-500/30 rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#FFA64D]"></span>
+                <span class="text-xs font-bold text-white uppercase tracking-wider">Grupo Inspire Scaler</span>
+              </div>
+              <span class="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">Puertos 30600 / 30354</span>
+            </div>
+
+            <!-- Checkbox Scaler Server -->
+            <div class="flex items-start gap-3">
+              <input type="checkbox" id="edit-env-enable-scaler" onchange="toggleEditScalerGroup()" class="mt-1 w-4 h-4 rounded border-slate-700 text-amber-600 bg-slate-900 focus:ring-amber-500 cursor-pointer">
+              <label for="edit-env-enable-scaler" class="cursor-pointer">
+                <span class="block text-xs font-semibold text-white">Activar Servidor Inspire Scaler</span>
+                <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Scaler Server (30600) + Scaler IPS (30354).</span>
+              </label>
+            </div>
+
+            <!-- Scaler Folders/Volumes Section (Inside Scaler group) -->
+            <div id="edit-scaler-folders-group" class="space-y-3 pt-1 transition-all">
+              <!-- Scaler sharedfolder input -->
+              <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label for="edit-env-scaler-sharedfolder" class="block text-xs font-semibold text-amber-300">
+                    📁 Carpeta Local Compartida (sharedfolder)
+                  </label>
+                  <span class="text-[10px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded">/sharedfolder</span>
+                </div>
+                <input type="text" id="edit-env-scaler-sharedfolder" placeholder="/home/usuario/scaler_share o C:\Inspire\sharedfolder" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500 placeholder:text-slate-600">
+                <p class="text-[10px] text-slate-400 leading-relaxed">
+                  Ruta en tu equipo local donde se compartirán archivos bidireccionalmente con el contenedor de Scaler (montado en <code>/sharedfolder</code>).
+                </p>
+              </div>
+
+              <!-- Scaler Jobs Directory input -->
+              <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label for="edit-env-scaler-jobs-dir" class="block text-xs font-semibold text-amber-300">
+                    💼 Jobs Directory (/opt/scalerSharedFolder)
+                  </label>
+                  <span class="text-[10px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded">/opt/scalerSharedFolder</span>
+                </div>
+                <input type="text" id="edit-env-scaler-jobs-dir" placeholder="/home/usuario/scaler_jobs o C:\Inspire\jobs (o dejar vacío para volumen estándar)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500 placeholder:text-slate-600">
+                <p class="text-[10px] text-slate-400 leading-relaxed">
+                  Ruta en tu equipo local donde se almacenarán los jobs procesados por Scaler (montado en <code>/opt/scalerSharedFolder</code> en el contenedor). Si se deja vacío, se usa el volumen Docker predeterminado.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- GRUPO: SERVICIOS OPCIONALES DE INTEGRACIÓN -->
+          <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+              <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <i data-lucide="cpu" class="w-3.5 h-3.5 text-slate-400"></i>
+                Servicios Opcionales de Integración
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <!-- Kafka Stack Checkbox -->
+              <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-start gap-3 hover:border-slate-700 transition">
+                <input type="checkbox" id="edit-env-enable-kafka" class="mt-1 w-4 h-4 rounded border-slate-700 text-brand-600 bg-slate-950 focus:ring-brand-500 cursor-pointer">
+                <label for="edit-env-enable-kafka" class="cursor-pointer">
+                  <span class="block text-xs font-semibold text-white">Apache Kafka</span>
+                  <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Broker KRaft (9092) + CSV Studio (8080).</span>
+                </label>
+              </div>
+
+              <!-- FTP Server Checkbox -->
+              <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-start gap-3 hover:border-slate-700 transition">
+                <input type="checkbox" id="edit-env-enable-ftp" class="mt-1 w-4 h-4 rounded border-slate-700 text-brand-600 bg-slate-950 focus:ring-brand-500 cursor-pointer">
+                <label for="edit-env-enable-ftp" class="cursor-pointer">
+                  <span class="block text-xs font-semibold text-white">Servidor FTP (vsftpd)</span>
+                  <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Puerto 21 con usuario <code>system:Password12345*</code>.</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-4 flex items-center justify-end gap-2 border-t border-slate-800">
+          <button type="button" onclick="closeModal('edit-env-modal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg text-slate-300">
+            Cancelar
+          </button>
+          <button type="submit" class="px-5 py-2 bg-[#CC3400] hover:bg-[#FF4200] text-white rounded-lg text-xs font-semibold shadow">
+            Guardar Cambios
+          </button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: Visor de Logs en Vivo                                             -->
+  <!-- ========================================================================= -->
+  <dialog id="logs-modal" class="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl shadow-2xl p-0 w-full max-w-4xl backdrop:bg-black/70 backdrop:backdrop-blur-sm">
+    <div class="p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="terminal" class="w-5 h-5 text-emerald-400"></i>
+            Logs del Contenedor: <span id="logs-container-name" class="font-mono text-brand-400">--</span>
+          </h2>
+          <p id="logs-container-subtitle" class="text-xs text-slate-400">Últimos registros de ejecución</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="refreshCurrentLogs()" class="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 hover:text-white" title="Refrescar">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+          </button>
+          <button onclick="closeModal('logs-modal')" class="p-1.5 text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+      </div>
+
+      <pre id="logs-viewer-content" class="bg-black/90 p-4 rounded-xl font-mono text-xs text-emerald-400/90 h-96 overflow-y-auto whitespace-pre-wrap select-all border border-slate-800">Cargando logs...</pre>
+    </div>
+  </dialog>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: Ubicación de Volúmenes y Almacenamiento                           -->
+  <!-- ========================================================================= -->
+  <dialog id="volume-locations-modal" class="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl shadow-2xl p-0 w-full max-w-2xl backdrop:bg-black/70 backdrop:backdrop-blur-sm">
+    <div class="p-6 space-y-5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-[#05B9F0]/15 border border-[#05B9F0]/30 flex items-center justify-center text-[#05B9F0]">
+            <i data-lucide="hard-drive" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              Ubicación Física de Volúmenes: <span id="vol-modal-env-name" class="text-brand-400 font-semibold">--</span>
+            </h2>
+            <p id="vol-modal-env-subtitle" class="text-xs text-slate-400 font-mono">ID: --</p>
+          </div>
+        </div>
+        <button onclick="closeModal('volume-locations-modal')" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <!-- Storage Type Summary Banner -->
+      <div id="vol-modal-type-banner" class="p-3.5 rounded-xl border flex items-center justify-between text-xs">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Volumes Table -->
+      <div class="space-y-2">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+          <i data-lucide="layers" class="w-3.5 h-3.5 text-slate-400"></i> Rutas en tu Sistema de Archivos Físico (Host)
+        </h3>
+        <div id="vol-modal-list" class="space-y-2 text-xs">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- Quick Command Tip -->
+      <div class="p-3 bg-slate-950 rounded-xl border border-slate-800/80 text-xs space-y-1.5">
+        <span class="text-slate-400 flex items-center gap-1.5 font-medium">
+          <i data-lucide="terminal" class="w-3.5 h-3.5 text-emerald-400"></i> Comando rápido para inspeccionar en tu terminal:
+        </span>
+        <div class="flex items-center justify-between bg-black/60 px-3 py-1.5 rounded-lg border border-slate-800 font-mono text-[11px] text-emerald-400">
+          <span id="vol-modal-cli-cmd" class="truncate">ls -la ...</span>
+          <button onclick="copyVolCliCmd()" class="text-slate-400 hover:text-white ml-2 flex-shrink-0" title="Copiar comando">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="pt-2 flex justify-end border-t border-slate-800">
+        <button onclick="closeModal('volume-locations-modal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg text-slate-300">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Application Logic -->
+  <script src="/static/app.js"></script>
+</body>
+</html>
