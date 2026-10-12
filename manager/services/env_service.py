@@ -10,6 +10,7 @@ import shutil
 from datetime import datetime
 import time
 import socket
+import threading
 from typing import Dict, List, Optional, Any, Tuple
 from .docker_service import DockerService
 from .acr_service import ACRService
@@ -66,6 +67,18 @@ class EnvService:
             self.root_env = os.path.join(self.base_dir, ".quadient_credentials.env")
         os.makedirs(self.data_dir, exist_ok=True)
         os.makedirs(self.envs_dir, exist_ok=True)
+        # In-flight activations: env_id -> {"step", "total", "label"}; polled by the UI
+        self._progress: Dict[str, Dict[str, Any]] = {}
+        self._progress_lock = threading.Lock()
+
+    def get_progress(self, env_id: str) -> Optional[Dict[str, Any]]:
+        with self._progress_lock:
+            p = self._progress.get(env_id)
+            return dict(p) if p else None
+
+    def _set_progress(self, env_id: str, step: int, total: int, label: str):
+        with self._progress_lock:
+            self._progress[env_id] = {"step": step, "total": total, "label": label}
 
     def _ensure_default_env(self):
         """Deprecated: environments are now created explicitly by the user."""
@@ -132,9 +145,12 @@ class EnvService:
                     running_count = sum(1 for c in filtered_containers if c.get("state") == "running")
                     total_count = len(filtered_containers)
                     if running_count > 0:
-                        env["status"] = "running" if running_count >= 3 else "partial"
+                        # "running" only when every service is up; one exited container
+                        # (e.g. Interactive) must not look healthy during a demo
+                        env["status"] = "running" if running_count == total_count else "partial"
                     else:
                         env["status"] = "stopped"
+                    env["activation"] = self.get_progress(env_id)
                     env["active_containers"] = running_count
                     env["total_containers"] = total_count
 
@@ -171,6 +187,7 @@ class EnvService:
             item.pop("status", None)
             item.pop("active_containers", None)
             item.pop("total_containers", None)
+            item.pop("activation", None)
             clean_envs.append(item)
         tmp_file = self.envs_file + ".tmp"
         with open(tmp_file, "w", encoding="utf-8") as f:
@@ -688,6 +705,17 @@ class EnvService:
         return results
 
     def activate_demo(self, env_id: str, exclusive: bool = True) -> Tuple[bool, str]:
+        with self._progress_lock:
+            if env_id in self._progress:
+                return False, "Este ambiente ya se está activando. Espera a que termine."
+            self._progress[env_id] = {"step": 0, "total": 1, "label": "Preparando activación"}
+        try:
+            return self._activate_demo(env_id, exclusive)
+        finally:
+            with self._progress_lock:
+                self._progress.pop(env_id, None)
+
+    def _activate_demo(self, env_id: str, exclusive: bool) -> Tuple[bool, str]:
         """
         Activates a Demo environment.
         If exclusive=True (RAM-saving mode), stops all other environments first.
@@ -718,6 +746,11 @@ class EnvService:
         if not ok_login:
             return False, f"Fallo al autenticar Docker con Azure Container Registry: {msg_login}"
 
+        # Steps: stop others, [5 init steps], start services
+        needs_init = not target.get("initialized")
+        total = 2 + (5 if needs_init else 0)
+        self._set_progress(env_id, 1, total, "Liberando recursos de otras demos" if exclusive else "Preparando activación")
+
         stopped_others = []
         if exclusive:
             for other in envs:
@@ -731,13 +764,16 @@ class EnvService:
 
         # Check if environment needs initialization (new sandbox or uninitialized ICM)
         if not target.get("initialized"):
-            ok_init, msg_init = self._initialize_environment(target)
+            ok_init, msg_init = self._initialize_environment(
+                target, lambda step, label: self._set_progress(env_id, 1 + step, total, label)
+            )
             if not ok_init:
                 return False, f"Fallo al inicializar el ambiente: {msg_init}"
             target["initialized"] = True
             self._save_environments(envs)
 
         # Start target environment
+        self._set_progress(env_id, total, total, "Iniciando servicios")
         ok, msg = DockerService.compose_up(target["compose_file"], target["env_file"], target["project_name"])
         if ok:
             target["last_active"] = datetime.now().isoformat()
@@ -755,7 +791,7 @@ class EnvService:
         ok, msg = DockerService.compose_stop(env["compose_file"], env["project_name"])
         return ok, msg
 
-    def _initialize_environment(self, target: Dict[str, Any]) -> Tuple[bool, str]:
+    def _initialize_environment(self, target: Dict[str, Any], report=lambda step, label: None) -> Tuple[bool, str]:
         """
         Initializes an environment for the first time:
         1. Starts PostgreSQL and waits until healthy.
@@ -781,6 +817,7 @@ class EnvService:
         lic_server = creds.get("CX_LIC_SERVER", "")
 
         # 1. Start postgres
+        report(1, "Iniciando PostgreSQL")
         ok, msg = DockerService.compose_up(compose_file, env_file, project_name, services=["postgres"])
         if not ok:
             return False, f"Error iniciando PostgreSQL: {msg}"
@@ -816,6 +853,7 @@ class EnvService:
                 return False, msg_demo
 
         # 2. Insert admin 'system' into ICM
+        report(2, "Creando usuario administrador en ICM")
         net_name = f"{project_name}_default"
         insert_cmd = (
             f"docker run --rm --network {net_name} "
@@ -828,6 +866,7 @@ class EnvService:
         DockerService._run_cmd(insert_cmd, timeout=60)
 
         # 3. Start ICM service
+        report(3, "Iniciando ICM")
         ok, msg = DockerService.compose_up(compose_file, env_file, project_name, services=["icm"])
         if not ok:
             return False, f"Error iniciando ICM: {msg}"
@@ -844,6 +883,7 @@ class EnvService:
         time.sleep(6)
 
         # 4. Grant impersonation permissions via grant_impersonation.java
+        report(4, "Asignando permisos en ICM")
         grant_script = os.path.join(self.base_dir, "grant_impersonation.java")
         if os.path.exists(grant_script):
             with open(grant_script, "r", encoding="utf-8") as f:
@@ -868,6 +908,7 @@ class EnvService:
 
         # 5. Run scaler-prepare (if scaler is enabled)
         if target.get("enable_scaler", True):
+            report(5, "Preparando bases de datos de Scaler (puede tardar varios minutos)")
             ok, msg = DockerService.compose_up(compose_file, env_file, project_name, services=["scaler-prepare"])
             if not ok:
                 return False, f"Error iniciando scaler-prepare: {msg}"

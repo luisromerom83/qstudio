@@ -12,44 +12,58 @@
       theme: {
         extend: {
           colors: {
+            // Sober palette: Quadient orange kept as the only accent, status
+            // colors desaturated so nothing "glows" on the dark background.
             brand: {
-              50: '#fff7ed',
-              100: '#ffedd5',
-              200: '#fed7aa',
-              300: '#fdba74',
-              400: '#FF6833',
-              500: '#FF4200', /* Primary q-Orange (#FF4200) */
-              600: '#CC3400', /* Accessible q-Orange for buttons with white text (#CC3400) */
-              700: '#992600',
-              800: '#661900',
-              900: '#330d00',
+              50: '#fbf3ef',
+              100: '#f6e2d8',
+              200: '#ecc2ae',
+              300: '#e3a183',
+              400: '#E07A50',
+              500: '#D9541F',
+              600: '#C2410C', /* Primary buttons with white text */
+              700: '#9A3412',
+              800: '#6b2410',
+              900: '#3b150a',
             },
-            qorange: {
-              DEFAULT: '#FF4200',
-              accessible: '#CC3400',
-              light: '#FF6833',
-              hover: '#E03A00',
+            slate: {
+              50: '#f6f7f9', 100: '#eceef1', 200: '#d5d9df', 300: '#b4bac3',
+              400: '#8b929d', 500: '#6b727d', 600: '#4b525c', 700: '#353b44',
+              800: '#252a31', 900: '#181c21', 950: '#101317',
             },
-            qgraphite: {
-              DEFAULT: '#374151',
-              light: '#5C6371',
-              subtle: '#D1D5DB',
-              border: '#4B5563',
-              dark: '#1F2937',
-              darker: '#111827',
+            emerald: {
+              200: '#c4e0d0', 300: '#a3cdb6', 400: '#7fb89a', 500: '#5a9c7b', 600: '#467f63', 700: '#36624d',
             },
-            qviolet: {
-              DEFAULT: '#7536F0',
-              light: '#915DF3',
-              dark: '#5824C4',
-              subtle: 'rgba(117, 54, 240, 0.15)',
+            amber: {
+              200: '#eadbb8', 300: '#dcc493', 400: '#cca86a', 500: '#b58d4c', 600: '#957239', 700: '#73582c',
             },
-            qblue: {
-              DEFAULT: '#05B9F0',
-              light: '#38BDF8',
-              dark: '#0284C7',
-              subtle: 'rgba(5, 185, 240, 0.15)',
-            }
+            rose: {
+              200: '#ecc6c6', 300: '#dfa5a5', 400: '#d08484', 500: '#b96464', 600: '#9c4e4e', 900: '#3d2222',
+            },
+            red: {
+              300: '#dfa5a5', 400: '#d08484', 500: '#b96464', 600: '#9c4e4e',
+            },
+            cyan: {
+              300: '#a9c4da', 400: '#88aac8', 500: '#668fb3', 600: '#507596',
+            },
+            sky: {
+              300: '#a9c4da', 400: '#88aac8', 500: '#668fb3', 600: '#507596',
+            },
+            blue: {
+              300: '#a9c4da', 400: '#88aac8', 500: '#668fb3', 600: '#507596',
+            },
+            teal: {
+              300: '#a6cbc4', 400: '#80b2a9', 500: '#5d958b', 600: '#4a7a71',
+            },
+            indigo: {
+              300: '#b7b6d6', 400: '#9a98c3', 500: '#7e7bab', 600: '#67648f',
+            },
+            purple: {
+              300: '#b7b6d6', 400: '#9a98c3', 500: '#7e7bab', 600: '#67648f',
+            },
+            violet: {
+              300: '#b7b6d6', 400: '#9a98c3', 500: '#7e7bab', 600: '#67648f',
+            },
           }
         }
       }
@@ -64,60 +78,74 @@
   <!-- ========================================================================= -->
   <!-- Top Navigation Bar                                                        -->
   <!-- ========================================================================= -->
-  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      
-      <!-- Brand & Title -->
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF4200] to-[#CC3400] flex items-center justify-center shadow-lg shadow-[#FF4200]/25 text-white font-extrabold text-xl tracking-tight border border-[#FF6833]/30">
-          Q
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <h1 class="text-base font-bold text-white tracking-tight">Quadient Inspire Flex</h1>
-            <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#7536F0]/15 text-[#915DF3] border border-[#7536F0]/30">Studio Demos & PoC</span>
-          </div>
-          <p class="text-xs text-slate-400 hidden sm:block">Gestor de Ambientes y Demostraciones por Vertical</p>
-        </div>
-      </div>
+  <header class="border-b border-slate-800 bg-slate-900/95 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="h-14 flex items-center justify-between gap-4">
 
-      <!-- Navigation Tabs -->
-      <nav class="hidden md:flex items-center gap-1 bg-slate-950/60 p-1 rounded-xl border border-slate-800 text-sm">
-        <button onclick="switchTab('catalog')" id="tab-catalog" class="tab-btn active px-3.5 py-1.5 rounded-lg font-medium transition flex items-center gap-2 text-white bg-slate-800 shadow-sm border border-slate-700">
-          <i data-lucide="layout-grid" class="w-4 h-4 text-brand-400"></i>
-          Catálogo Demos
+        <!-- Brand & Title -->
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-8 h-8 shrink-0 rounded-lg bg-[#C2410C] flex items-center justify-center text-white font-bold text-base">
+            Q
+          </div>
+          <div class="min-w-0 flex items-baseline gap-2">
+            <h1 class="text-sm font-semibold text-white tracking-tight whitespace-nowrap">Inspire Flex Studio</h1>
+            <span class="hidden sm:inline text-xs text-slate-400 whitespace-nowrap">Demos y PoC</span>
+          </div>
+        </div>
+
+        <!-- Navigation Tabs (wide screens) -->
+        <nav aria-label="Secciones" class="hidden xl:flex items-center gap-1 text-sm">
+        <button type="button" onclick="switchTab('catalog')" data-tab="catalog" aria-current="page" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-white bg-slate-800 border-slate-700">
+          <i data-lucide="layout-grid" class="w-4 h-4 opacity-80"></i>
+          Catálogo
         </button>
-        <button onclick="switchTab('services')" id="tab-services" class="tab-btn px-3.5 py-1.5 rounded-lg font-medium transition flex items-center gap-2 text-slate-400 hover:text-slate-200 border border-transparent">
-          <i data-lucide="server" class="w-4 h-4 text-emerald-400"></i>
-          Servicios & Logs
+        <button type="button" onclick="switchTab('services')" data-tab="services" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
+          <i data-lucide="server" class="w-4 h-4 opacity-80"></i>
+          Servicios y logs
         </button>
-        <button onclick="switchTab('acr')" id="tab-acr" class="tab-btn px-3.5 py-1.5 rounded-lg font-medium transition flex items-center gap-2 text-slate-400 hover:text-slate-200 border border-transparent">
-          <i data-lucide="cloud-download" class="w-4 h-4 text-[#05B9F0]"></i>
-          Versiones Azure
+        <button type="button" onclick="switchTab('acr')" data-tab="acr" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
+          <i data-lucide="cloud-download" class="w-4 h-4 opacity-80"></i>
+          Versiones
         </button>
-        <button onclick="switchTab('storage')" id="tab-storage" class="tab-btn px-3.5 py-1.5 rounded-lg font-medium transition flex items-center gap-2 text-slate-400 hover:text-slate-200 border border-transparent">
-          <i data-lucide="hard-drive" class="w-4 h-4 text-[#7536F0]"></i>
+        <button type="button" onclick="switchTab('storage')" data-tab="storage" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
+          <i data-lucide="hard-drive" class="w-4 h-4 opacity-80"></i>
           Almacenamiento
         </button>
-        <button onclick="switchTab('settings')" id="tab-settings" class="tab-btn px-3.5 py-1.5 rounded-lg font-medium transition flex items-center gap-2 text-slate-400 hover:text-slate-200 border border-transparent">
-          <i data-lucide="settings" class="w-4 h-4 text-amber-400"></i>
+        <button type="button" onclick="switchTab('settings')" data-tab="settings" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
+          <i data-lucide="settings" class="w-4 h-4 opacity-80"></i>
+          Ajustes
+        </button>
+        </nav>
+
+        <button type="button" onclick="openNewEnvModal()" class="shrink-0 inline-flex items-center gap-2 bg-[#C2410C] hover:bg-[#9A3412] text-white text-sm font-medium px-3.5 py-1.5 rounded-md transition whitespace-nowrap">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          <span>Nueva demo</span>
+        </button>
+      </div>
+
+      <!-- Navigation Tabs (narrow screens): scrollable row so every section stays reachable -->
+      <nav aria-label="Secciones" class="xl:hidden flex items-center gap-1 text-sm overflow-x-auto pb-2 -mx-1 px-1">
+        <button type="button" onclick="switchTab('catalog')" data-tab="catalog" aria-current="page" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-white bg-slate-800 border-slate-700">
+          <i data-lucide="layout-grid" class="w-4 h-4 opacity-80"></i>
+          Catálogo
+        </button>
+        <button type="button" onclick="switchTab('services')" data-tab="services" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
+          <i data-lucide="server" class="w-4 h-4 opacity-80"></i>
+          Servicios y logs
+        </button>
+        <button type="button" onclick="switchTab('acr')" data-tab="acr" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
+          <i data-lucide="cloud-download" class="w-4 h-4 opacity-80"></i>
+          Versiones
+        </button>
+        <button type="button" onclick="switchTab('storage')" data-tab="storage" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
+          <i data-lucide="hard-drive" class="w-4 h-4 opacity-80"></i>
+          Almacenamiento
+        </button>
+        <button type="button" onclick="switchTab('settings')" data-tab="settings" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
+          <i data-lucide="settings" class="w-4 h-4 opacity-80"></i>
           Ajustes
         </button>
       </nav>
-
-      <!-- Right Actions: RAM Saver & New Demo -->
-      <div class="flex items-center gap-3">
-        <!-- RAM Saver Indicator -->
-        <div class="hidden lg:flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg text-xs" title="Modo On-Demand activo: al iniciar una demo se pausan las demás para liberar RAM y CPU">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span class="text-emerald-300 font-medium">Ahorro de RAM: On-Demand</span>
-        </div>
-
-        <button onclick="openNewEnvModal()" class="inline-flex items-center gap-2 bg-[#CC3400] hover:bg-[#FF4200] text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-lg shadow-[#CC3400]/25 transition active:scale-95">
-          <i data-lucide="plus-circle" class="w-4 h-4"></i>
-          <span>Nueva Demo</span>
-        </button>
-      </div>
     </div>
   </header>
 
@@ -127,12 +155,12 @@
   <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
     <!-- Global Notification Banner -->
-    <div id="alert-banner" class="hidden p-4 rounded-xl border flex items-center justify-between text-sm transition-all duration-300">
+    <div id="alert-banner" role="status" aria-live="polite" class="hidden p-4 rounded-xl border flex items-center justify-between text-sm transition-all duration-300">
       <div class="flex items-center gap-3">
         <i id="alert-icon" data-lucide="info" class="w-5 h-5 flex-shrink-0"></i>
         <span id="alert-text">Mensaje</span>
       </div>
-      <button onclick="dismissAlert()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+      <button type="button" onclick="dismissAlert()" aria-label="Cerrar notificación" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
     </div>
 
     <!-- --------------------------------------------------------------------- -->
@@ -140,36 +168,21 @@
     <!-- --------------------------------------------------------------------- -->
     <section id="view-catalog" class="space-y-6">
       
-      <!-- Section Header with Quadient Brand Accent Bar -->
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <div class="w-1.5 h-7 rounded-full bg-gradient-to-b from-[#FF4200] to-[#CC3400]"></div>
-          <div>
-            <h2 class="text-lg font-bold text-white tracking-tight">Catálogo de Demostraciones</h2>
-            <p class="text-xs text-slate-400">Ambientes aislados por vertical de industria y casos de uso de Quadient Inspire Flex</p>
-          </div>
-        </div>
+      <div>
+        <h2 class="text-lg font-semibold text-white tracking-tight">Catálogo de demostraciones</h2>
+        <p class="text-sm text-slate-400 mt-0.5">Ambientes aislados de Inspire Flex por sector. Al activar una demo se detienen las demás para liberar memoria.</p>
       </div>
 
       <!-- Filter Bar & Search -->
-      <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
-        <!-- Vertical Pills -->
-        <div class="flex flex-wrap gap-1.5" id="vertical-filter-pills">
-          <button onclick="filterVertical('all')" class="vertical-pill active px-3 py-1 rounded-lg text-xs font-semibold bg-[#CC3400] text-white border border-[#FF4200] shadow-sm shadow-[#CC3400]/20">Todos</button>
-          <button onclick="filterVertical('insurance')" class="vertical-pill px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800">🛡️ Seguros</button>
-          <button onclick="filterVertical('financials')" class="vertical-pill px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800">🏦 Banca y Finanzas</button>
-          <button onclick="filterVertical('telco')" class="vertical-pill px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800">📡 Telecom</button>
-          <button onclick="filterVertical('healthcare')" class="vertical-pill px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800">🏥 Salud</button>
-          <button onclick="filterVertical('poc')" class="vertical-pill px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800">💼 PoCs de Cliente</button>
+      <div class="flex items-center justify-between gap-3">
+        <!-- Vertical Pills: horizontal scroll on narrow screens -->
+        <div class="flex gap-1.5 overflow-x-auto sm:flex-wrap -mx-1 px-1 pb-1 sm:pb-0" id="vertical-filter-pills">
+          <!-- Rendered from /api/config verticals -->
         </div>
-
-        <div class="text-xs text-slate-400 flex items-center gap-2">
-          <span>Total Ambientes: <strong id="env-count" class="text-white">0</strong></span>
-          <span class="text-slate-600">•</span>
-          <button onclick="loadEnvironments()" class="hover:text-brand-400 flex items-center gap-1">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refrescar
-          </button>
-        </div>
+        <span id="env-count" class="hidden"></span>
+        <button type="button" onclick="lastEnvSnapshot = ''; loadEnvironments()" class="shrink-0 text-xs text-slate-400 hover:text-slate-200 inline-flex items-center gap-1.5 whitespace-nowrap">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refrescar
+        </button>
       </div>
 
       <!-- Environments Grid -->
@@ -189,18 +202,18 @@
             <!-- Dynamic options -->
           </select>
         </div>
-        <div class="flex items-center gap-2">
-          <button onclick="editSelectedEnvironment()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/30 flex items-center gap-1.5 transition" title="Configurar Stacks y Servicios Opcionales">
-            <i data-lucide="settings-2" class="w-3.5 h-3.5"></i> Configurar Stacks
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" onclick="editSelectedEnvironment()" class="whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/30 flex items-center gap-1.5 transition" title="Configurar Stacks y Servicios Opcionales">
+            <i data-lucide="settings-2" class="w-3.5 h-3.5"></i> Configurar servicios
           </button>
-          <button onclick="startSelectedEnvironment()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 flex items-center gap-1.5 transition">
-            <i data-lucide="play" class="w-3.5 h-3.5"></i> Iniciar Todo
+          <button type="button" onclick="startSelectedEnvironment()" class="whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 flex items-center gap-1.5 transition">
+            <i data-lucide="play" class="w-3.5 h-3.5"></i> Iniciar todo
           </button>
-          <button onclick="stopSelectedEnvironment()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600/30 flex items-center gap-1.5 transition">
-            <i data-lucide="square" class="w-3.5 h-3.5"></i> Detener Todo
+          <button type="button" onclick="stopSelectedEnvironment()" class="whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600/30 flex items-center gap-1.5 transition">
+            <i data-lucide="square" class="w-3.5 h-3.5"></i> Detener todo
           </button>
-          <button onclick="deleteSelectedEnvironment()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 flex items-center gap-1.5 transition" title="Eliminar ambiente seleccionado">
-            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Eliminar Ambiente
+          <button type="button" onclick="deleteSelectedEnvironment()" class="whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 flex items-center gap-1.5 transition" title="Eliminar ambiente seleccionado">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Eliminar ambiente
           </button>
         </div>
       </div>
@@ -345,7 +358,7 @@
             <button type="button" onclick="testAcrConnection()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg text-slate-200 border border-slate-700 flex items-center gap-2">
               <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i> Probar Conexión ACR
             </button>
-            <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-xs font-semibold rounded-lg text-white shadow-lg shadow-brand-600/20">
+            <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-xs font-semibold rounded-lg text-white shadow-lg">
               Guardar Configuración
             </button>
           </div>
@@ -361,7 +374,7 @@
   <dialog id="onboarding-modal" class="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl shadow-2xl p-0 w-full max-w-lg backdrop:bg-black/70 backdrop:backdrop-blur-sm">
     <div class="p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FF4200] to-[#CC3400] flex items-center justify-center text-white shadow-lg shadow-[#FF4200]/25 border border-[#FF6833]/30">
+        <div class="w-12 h-12 rounded-xl bg-[#C2410C] flex items-center justify-center text-white shadow-lg border border-[#E07A50]/30">
           <i data-lucide="sparkles" class="w-6 h-6"></i>
         </div>
         <div>
@@ -417,13 +430,13 @@
         <div>
           <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Vertical de Industria</label>
           <select id="new-env-vertical" onchange="handleVerticalChange()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
-            <option value="insurance" data-name="Seguros">🛡️ Seguros (Pólizas, Siniestros)</option>
-            <option value="financials" data-name="Banca y Finanzas">🏦 Banca y Finanzas (Extractos, Créditos)</option>
-            <option value="telco" data-name="Telecomunicaciones">📡 Telecomunicaciones (Facturación)</option>
-            <option value="healthcare" data-name="Salud">🏥 Salud & Farmacéutica</option>
-            <option value="retail" data-name="Retail & Consumo">🛍️ Retail & Consumo</option>
-            <option value="poc" data-name="PoC Cliente Específico">💼 PoC Cliente Específico</option>
-            <option value="other" data-name="General / Otra">📦 Otra Vertical</option>
+            <option value="insurance" data-name="Seguros">Seguros (Pólizas, Siniestros)</option>
+            <option value="financials" data-name="Banca y Finanzas">Banca y Finanzas (Extractos, Créditos)</option>
+            <option value="telco" data-name="Telecomunicaciones">Telecomunicaciones (Facturación)</option>
+            <option value="healthcare" data-name="Salud">Salud & Farmacéutica</option>
+            <option value="retail" data-name="Retail & Consumo">Retail & Consumo</option>
+            <option value="poc" data-name="PoC Cliente Específico">PoC Cliente Específico</option>
+            <option value="other" data-name="General / Otra">Otra Vertical</option>
           </select>
         </div>
 
@@ -483,7 +496,7 @@
           <div class="bg-slate-950/70 border border-emerald-500/30 rounded-xl p-4 space-y-3">
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
               <div class="flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-[#99E2B4]"></span>
+                <span class="w-2.5 h-2.5 rounded-full bg-[#8FB8A0]"></span>
                 <span class="text-xs font-bold text-white uppercase tracking-wider">Grupo Inspire Interactive</span>
               </div>
               <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Puertos 30701 / 30354</span>
@@ -503,7 +516,7 @@
               <input type="checkbox" id="new-env-demo-mode" checked class="mt-1 w-4 h-4 rounded border-slate-700 text-emerald-600 bg-slate-950 focus:ring-emerald-500 cursor-pointer">
               <label for="new-env-demo-mode" class="cursor-pointer">
                 <span class="block text-xs font-semibold text-white flex items-center gap-1.5">
-                  🎭 Activar "Demo Mode" en Interactive
+                  Activar "Demo Mode" en Interactive
                   <span class="text-[10px] font-normal px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Recomendado</span>
                 </span>
                 <span class="block text-[11px] text-slate-400 mt-0.5 leading-relaxed">
@@ -517,7 +530,7 @@
           <div class="bg-slate-950/70 border border-amber-500/30 rounded-xl p-4 space-y-3">
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
               <div class="flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-[#FFA64D]"></span>
+                <span class="w-2.5 h-2.5 rounded-full bg-[#C99A62]"></span>
                 <span class="text-xs font-bold text-white uppercase tracking-wider">Grupo Inspire Scaler</span>
               </div>
               <span class="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">Puertos 30600 / 30354</span>
@@ -538,7 +551,7 @@
               <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-1.5">
                 <div class="flex items-center justify-between">
                   <label for="new-env-scaler-sharedfolder" class="block text-xs font-semibold text-amber-300">
-                    📁 Carpeta Local Compartida (sharedfolder)
+                    Carpeta Local Compartida (sharedfolder)
                   </label>
                   <span class="text-[10px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded">/sharedfolder</span>
                 </div>
@@ -552,7 +565,7 @@
               <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-1.5">
                 <div class="flex items-center justify-between">
                   <label for="new-env-scaler-jobs-dir" class="block text-xs font-semibold text-amber-300">
-                    💼 Jobs Directory (/opt/scalerSharedFolder)
+                    Jobs Directory (/opt/scalerSharedFolder)
                   </label>
                   <span class="text-[10px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded">/opt/scalerSharedFolder</span>
                 </div>
@@ -658,7 +671,7 @@
           <div class="bg-slate-950/70 border border-emerald-500/30 rounded-xl p-4 space-y-3">
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
               <div class="flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-[#99E2B4]"></span>
+                <span class="w-2.5 h-2.5 rounded-full bg-[#8FB8A0]"></span>
                 <span class="text-xs font-bold text-white uppercase tracking-wider">Grupo Inspire Interactive</span>
               </div>
               <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Puertos 30701 / 30354</span>
@@ -678,7 +691,7 @@
               <input type="checkbox" id="edit-env-demo-mode" class="mt-1 w-4 h-4 rounded border-slate-700 text-emerald-600 bg-slate-950 focus:ring-emerald-500 cursor-pointer">
               <label for="edit-env-demo-mode" class="cursor-pointer">
                 <span class="block text-xs font-semibold text-white flex items-center gap-1.5">
-                  🎭 Activar "Demo Mode" en Interactive
+                  Activar "Demo Mode" en Interactive
                 </span>
                 <span class="block text-[11px] text-slate-400 mt-0.5 leading-relaxed">
                   Monta automáticamente usuarios preconfigurados con contraseñas y avatares por vertical en <code>config/demo-mode</code>.
@@ -691,7 +704,7 @@
           <div class="bg-slate-950/70 border border-amber-500/30 rounded-xl p-4 space-y-3">
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
               <div class="flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-[#FFA64D]"></span>
+                <span class="w-2.5 h-2.5 rounded-full bg-[#C99A62]"></span>
                 <span class="text-xs font-bold text-white uppercase tracking-wider">Grupo Inspire Scaler</span>
               </div>
               <span class="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">Puertos 30600 / 30354</span>
@@ -712,7 +725,7 @@
               <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-1.5">
                 <div class="flex items-center justify-between">
                   <label for="edit-env-scaler-sharedfolder" class="block text-xs font-semibold text-amber-300">
-                    📁 Carpeta Local Compartida (sharedfolder)
+                    Carpeta Local Compartida (sharedfolder)
                   </label>
                   <span class="text-[10px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded">/sharedfolder</span>
                 </div>
@@ -726,7 +739,7 @@
               <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-1.5">
                 <div class="flex items-center justify-between">
                   <label for="edit-env-scaler-jobs-dir" class="block text-xs font-semibold text-amber-300">
-                    💼 Jobs Directory (/opt/scalerSharedFolder)
+                    Jobs Directory (/opt/scalerSharedFolder)
                   </label>
                   <span class="text-[10px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded">/opt/scalerSharedFolder</span>
                 </div>
@@ -773,7 +786,7 @@
           <button type="button" onclick="closeModal('edit-env-modal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg text-slate-300">
             Cancelar
           </button>
-          <button type="submit" class="px-5 py-2 bg-[#CC3400] hover:bg-[#FF4200] text-white rounded-lg text-xs font-semibold shadow">
+          <button type="submit" class="px-5 py-2 bg-[#C2410C] hover:bg-[#9A3412] text-white rounded-lg text-xs font-semibold shadow">
             Guardar Cambios
           </button>
         </div>
@@ -813,7 +826,7 @@
     <div class="p-6 space-y-5">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-[#05B9F0]/15 border border-[#05B9F0]/30 flex items-center justify-center text-[#05B9F0]">
+          <div class="w-10 h-10 rounded-xl bg-[#668fb3]/15 border border-[#668fb3]/30 flex items-center justify-center text-[#668fb3]">
             <i data-lucide="hard-drive" class="w-5 h-5"></i>
           </div>
           <div>

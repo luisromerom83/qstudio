@@ -172,6 +172,10 @@ def activate_demo(env_id):
     ok, msg = env_service.activate_demo(env_id, exclusive=exclusive)
     return jsonify({"success": ok, "message": msg})
 
+@app.route("/api/environments/<env_id>/progress", methods=["GET"])
+def activation_progress(env_id):
+    return jsonify({"success": True, "progress": env_service.get_progress(env_id)})
+
 @app.route("/api/environments/<env_id>/stop", methods=["POST"])
 def stop_demo(env_id):
     ok, msg = env_service.stop_demo(env_id)
@@ -267,4 +271,5 @@ def get_env_volumes(env_id):
 if __name__ == "__main__":
     port = int(os.environ.get("STUDIO_PORT", 8090))
     print(f"[*] Iniciando Quadient Demo & PoC Studio en http://0.0.0.0:{port}")
-    app.run(host="0.0.0.0", port=port, debug=False)
+    # threaded: activations block for minutes while the UI polls their progress
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)

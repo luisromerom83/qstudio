@@ -6,6 +6,22 @@ let allEnvironments = [];
 let currentFilter = "all";
 let activeContainerForLogs = null;
 let logPollInterval = null;
+let verticals = [];             // from /api/config
+const busyEnvs = new Map();     // envId -> {kind: "activate"|"stop", label, step, total}
+let lastEnvSnapshot = "";
+
+const ENV_REFRESH_MS = 15000;
+const PROGRESS_POLL_MS = 2000;
+
+const VERTICAL_ICONS = {
+  insurance: "shield-check",
+  financials: "landmark",
+  telco: "signal",
+  healthcare: "heart-pulse",
+  retail: "shopping-bag",
+  poc: "briefcase",
+  other: "layers"
+};
 
 // Initialization
 document.addEventListener("DOMContentLoaded", () => {
@@ -17,25 +33,32 @@ async function initApp() {
   await checkConfigAndOnboarding();
   await loadEnvironments();
   loadVolumes();
+
+  // Keep card status current (containers can change outside the UI)
+  setInterval(() => {
+    if (document.visibilityState === "visible" && !document.querySelector("dialog[open]")) {
+      loadEnvironments();
+    }
+  }, ENV_REFRESH_MS);
 }
 
 // ------------------------------------------------------------------------------
 // Navigation & Tabs
 // ------------------------------------------------------------------------------
 function switchTab(tabId) {
-  const tabs = ["catalog", "services", "acr", "storage", "settings"];
-  tabs.forEach(t => {
-    const viewEl = document.getElementById(`view-${t}`);
-    const btnEl = document.getElementById(`tab-${t}`);
-    if (t === tabId) {
-      viewEl.classList.remove("hidden");
-      btnEl.classList.add("text-white", "bg-slate-800", "shadow-sm", "border-slate-700");
-      btnEl.classList.remove("text-slate-400", "border-transparent");
-    } else {
-      viewEl.classList.add("hidden");
-      btnEl.classList.remove("text-white", "bg-slate-800", "shadow-sm", "border-slate-700");
-      btnEl.classList.add("text-slate-400", "border-transparent");
-    }
+  ["catalog", "services", "acr", "storage", "settings"].forEach(t => {
+    document.getElementById(`view-${t}`).classList.toggle("hidden", t !== tabId);
+  });
+  // Desktop and mobile navs share the same data-tab buttons
+  document.querySelectorAll(".tab-btn[data-tab]").forEach(btn => {
+    const active = btn.dataset.tab === tabId;
+    btn.classList.toggle("text-white", active);
+    btn.classList.toggle("bg-slate-800", active);
+    btn.classList.toggle("border-slate-700", active);
+    btn.classList.toggle("text-slate-400", !active);
+    btn.classList.toggle("border-transparent", !active);
+    if (active) btn.setAttribute("aria-current", "page");
+    else btn.removeAttribute("aria-current");
   });
 
   if (tabId === "acr") {
@@ -61,6 +84,8 @@ async function checkConfigAndOnboarding() {
     
     // Populate settings form
     const creds = data.credentials || {};
+    verticals = data.verticals || [];
+    renderFilterPills();
     document.getElementById("setting-registry").value = creds.registry || "quadientdistribution.azurecr.io";
     document.getElementById("setting-username").value = creds.username || "";
     document.getElementById("setting-lic-server").value = creds.license_server || "";
@@ -180,27 +205,125 @@ async function loadEnvironments() {
     const res = await fetch("/api/environments");
     const data = await res.json();
     allEnvironments = (data.environments || []).filter(e => e.id !== "default");
+
+    // Resume progress tracking for activations started elsewhere (or before a reload)
+    allEnvironments.forEach(e => {
+      if (e.activation && !busyEnvs.has(e.id)) trackRemoteActivation(e.id, e.activation);
+    });
+
     document.getElementById("env-count").innerText = allEnvironments.length;
-    renderEnvironments();
     populateServicesSelect();
+
+    // Skip re-rendering when nothing changed (auto-refresh runs every few seconds)
+    const snapshot = JSON.stringify(allEnvironments.map(e => [e.id, e.name, e.status, e.version, e.description, e.vertical_id, e.demo_mode, e.storage_path, e.ports, e.enable_interactive, e.enable_scaler]));
+    if (snapshot !== lastEnvSnapshot) {
+      lastEnvSnapshot = snapshot;
+      renderFilterPills();
+      renderEnvironments();
+    }
   } catch (err) {
     console.error("Error al cargar ambientes:", err);
   }
 }
 
+function verticalIcon(verticalId) {
+  return VERTICAL_ICONS[verticalId] || VERTICAL_ICONS.other;
+}
+
+function renderFilterPills() {
+  const box = document.getElementById("vertical-filter-pills");
+  if (!box) return;
+  const counts = {};
+  allEnvironments.forEach(e => {
+    const id = e.vertical_id || "other";
+    counts[id] = (counts[id] || 0) + 1;
+  });
+  // Only sectors that have demos (plus the active filter) to keep the bar compact
+  const items = [{ id: "all", name: "Todos" }, ...verticals.filter(v => counts[v.id] || v.id === currentFilter)];
+  box.innerHTML = items.map(v => {
+    const active = v.id === currentFilter;
+    const count = v.id === "all" ? allEnvironments.length : (counts[v.id] || 0);
+    return `
+      <button type="button" onclick="filterVertical('${v.id}')" aria-pressed="${active}"
+        class="vertical-pill inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition whitespace-nowrap ${active ? "bg-slate-700 text-white border-slate-600" : "text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-slate-800"}">
+        ${v.id !== "all" ? `<i data-lucide="${verticalIcon(v.id)}" class="w-3.5 h-3.5 opacity-80"></i>` : ""}
+        ${escapeHtml(v.name)}
+        <span class="${active ? "text-slate-300" : "text-slate-500"}">${count}</span>
+      </button>`;
+  }).join("");
+  lucide.createIcons();
+}
+
 function filterVertical(catId) {
   currentFilter = catId;
-  const pills = document.querySelectorAll(".vertical-pill");
-  pills.forEach(p => {
-    if (p.getAttribute("onclick").includes(`'${catId}'`)) {
-      p.classList.add("active", "bg-[#CC3400]", "text-white", "border-[#FF4200]", "shadow-sm", "shadow-[#CC3400]/20");
-      p.classList.remove("text-slate-400", "border-slate-800");
-    } else {
-      p.classList.remove("active", "bg-[#CC3400]", "text-white", "border-[#FF4200]", "shadow-sm", "shadow-[#CC3400]/20");
-      p.classList.add("text-slate-400", "border-slate-800");
-    }
-  });
+  renderFilterPills();
   renderEnvironments();
+}
+
+function statusBadge(env, busy) {
+  if (busy) {
+    return `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-300 whitespace-nowrap">
+      <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>${busy.kind === "stop" ? "Deteniendo" : "Activando"}</span>`;
+  }
+  if (env.status === "running") {
+    return `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300 whitespace-nowrap">
+      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Activa</span>`;
+  }
+  if (env.status === "partial") {
+    return `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-300 whitespace-nowrap" title="Algunos servicios no están en ejecución. Revisa la pestaña Servicios y logs.">
+      <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Parcial</span>`;
+  }
+  return `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 whitespace-nowrap">
+    <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>Detenida</span>`;
+}
+
+function progressBlock(envId, busy) {
+  if (busy.kind === "stop") {
+    return `<div id="progress-${envId}" class="rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-xs text-slate-300">Deteniendo contenedores…</div>`;
+  }
+  const total = busy.total || 1;
+  const pct = Math.round(((busy.step || 0) / total) * 100);
+  return `
+    <div id="progress-${envId}" class="rounded-md border border-slate-800 bg-slate-950/60 p-3" role="status" aria-live="polite">
+      <div class="flex items-center justify-between gap-2 text-xs text-slate-300">
+        <span data-role="label">${escapeHtml(busy.label || "Preparando activación")}</span>
+        <span data-role="step" class="font-mono text-slate-500 whitespace-nowrap">${busy.step || 0}/${total}</span>
+      </div>
+      <div class="mt-2 h-1 rounded-full bg-slate-800 overflow-hidden">
+        <div data-role="bar" class="h-full bg-brand-600 transition-all duration-500" style="width:${pct}%"></div>
+      </div>
+      <p class="mt-2 text-[11px] text-slate-500">La primera activación puede tardar varios minutos.</p>
+    </div>`;
+}
+
+function updateProgressUI(envId) {
+  const busy = busyEnvs.get(envId);
+  const box = document.getElementById(`progress-${envId}`);
+  if (!busy || !box || busy.kind !== "activate") return;
+  const total = busy.total || 1;
+  box.querySelector('[data-role="label"]').textContent = busy.label || "";
+  box.querySelector('[data-role="step"]').textContent = `${busy.step || 0}/${total}`;
+  box.querySelector('[data-role="bar"]').style.width = `${Math.round(((busy.step || 0) / total) * 100)}%`;
+}
+
+function iconButton(icon, label, onclick, { danger = false, disabled = false } = {}) {
+  return `
+    <button type="button" onclick="${onclick}" title="${label}" aria-label="${label}" ${disabled ? "disabled" : ""}
+      class="p-1.5 rounded-md text-slate-400 transition disabled:opacity-30 disabled:pointer-events-none ${danger ? "hover:text-rose-300 hover:bg-rose-500/10" : "hover:text-slate-100 hover:bg-slate-800"}">
+      <i data-lucide="${icon}" class="w-4 h-4"></i>
+    </button>`;
+}
+
+function serviceLink(label, url, port, enabled) {
+  const base = "flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm transition";
+  if (!enabled) {
+    return `<span class="${base} border-slate-800 text-slate-500" aria-disabled="true" title="Disponible cuando la demo esté activa">
+      <span class="inline-flex items-center gap-2 font-medium"><i data-lucide="external-link" class="w-3.5 h-3.5"></i>${label}</span>
+      <span class="font-mono text-xs">:${port}</span></span>`;
+  }
+  return `<a href="${url}" target="_blank" rel="noopener" class="${base} border-slate-700 text-slate-100 hover:bg-slate-800 hover:border-slate-600" title="Abrir ${label} en una pestaña nueva">
+    <span class="inline-flex items-center gap-2 font-medium"><i data-lucide="external-link" class="w-3.5 h-3.5"></i>${label}</span>
+    <span class="font-mono text-xs text-slate-400">:${port}</span></a>`;
 }
 
 function renderEnvironments() {
@@ -209,14 +332,12 @@ function renderEnvironments() {
 
   if (allEnvironments.length === 0) {
     container.innerHTML = `
-      <div class="col-span-full py-16 text-center bg-slate-900/40 rounded-2xl border border-dashed border-slate-800">
-        <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-[#FF4200]/10 border border-[#FF4200]/20 flex items-center justify-center text-[#FF4200]">
-          <i data-lucide="plus-circle" class="w-7 h-7"></i>
-        </div>
-        <h3 class="text-base font-bold text-white mb-1">Aún no hay ambientes creados</h3>
-        <p class="text-xs text-slate-400 max-w-sm mx-auto mb-4">Configura tus credenciales y crea tu primer sandbox personalizado para comenzar.</p>
-        <button onclick="openNewEnvModal()" class="px-4 py-2 bg-[#CC3400] hover:bg-[#FF4200] text-white rounded-xl text-xs font-semibold shadow-lg shadow-[#CC3400]/25 inline-flex items-center gap-2 transition active:scale-95">
-          <i data-lucide="plus" class="w-4 h-4"></i> Crear Primer Ambiente
+      <div class="col-span-full py-16 text-center bg-slate-900/40 rounded-xl border border-dashed border-slate-800">
+        <i data-lucide="layout-grid" class="w-8 h-8 mx-auto mb-3 text-slate-500"></i>
+        <h3 class="text-base font-semibold text-white mb-1">Aún no hay ambientes creados</h3>
+        <p class="text-sm text-slate-400 max-w-sm mx-auto mb-4">Configura tus credenciales y crea tu primer sandbox para comenzar.</p>
+        <button type="button" onclick="openNewEnvModal()" class="px-4 py-2 bg-[#C2410C] hover:bg-[#9A3412] text-white rounded-md text-sm font-medium inline-flex items-center gap-2 transition">
+          <i data-lucide="plus" class="w-4 h-4"></i> Crear primer ambiente
         </button>
       </div>
     `;
@@ -225,117 +346,95 @@ function renderEnvironments() {
   }
 
   const filtered = allEnvironments.filter(e => {
-    if (e.id === "default") return false;
     if (currentFilter === "all") return true;
-    return (e.vertical_id || "").toLowerCase() === currentFilter.toLowerCase();
+    return (e.vertical_id || "other").toLowerCase() === currentFilter.toLowerCase();
   });
 
   if (filtered.length === 0) {
     container.innerHTML = `
-      <div class="col-span-full py-16 text-center text-slate-500 bg-slate-900/30 rounded-2xl border border-dashed border-slate-800">
-        <i data-lucide="folder-search" class="w-10 h-10 mx-auto mb-2 text-slate-600"></i>
-        <p class="text-sm">No hay demostraciones registradas en esta categoría.</p>
-        <button onclick="openNewEnvModal()" class="mt-3 text-xs text-[#FF6833] hover:underline">+ Crear nueva demostración</button>
+      <div class="col-span-full py-16 text-center text-slate-400 bg-slate-900/30 rounded-xl border border-dashed border-slate-800">
+        <i data-lucide="folder-search" class="w-8 h-8 mx-auto mb-2 text-slate-500"></i>
+        <p class="text-sm">No hay demostraciones en esta categoría.</p>
+        <button type="button" onclick="openNewEnvModal()" class="mt-3 text-sm text-brand-400 hover:underline">Crear nueva demostración</button>
       </div>
     `;
     lucide.createIcons();
     return;
   }
 
+  const host = window.location.hostname || "localhost";
+
   filtered.forEach(env => {
+    const busy = busyEnvs.get(env.id);
     const isRunning = env.status === "running" || env.status === "partial";
-    const portInter = env.ports ? env.ports.interactive : 30701;
-    const portScaler = env.ports ? env.ports.scaler : 30600;
+    const ports = env.ports || {};
+    const portInter = ports.interactive || 30701;
+    const portScaler = ports.scaler || 30600;
+    const customStorage = env.storage_path && env.storage_path !== "docker_default";
+    const storageLabel = customStorage ? env.storage_path : "Volúmenes gestionados por Docker";
+
+    let primaryAction;
+    if (busy) {
+      primaryAction = `<button type="button" disabled class="px-3 py-1.5 rounded-md text-sm font-medium inline-flex items-center gap-1.5 bg-slate-800 text-slate-400 cursor-wait">
+        <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>${busy.kind === "stop" ? "Deteniendo…" : "Activando…"}</button>`;
+    } else if (isRunning) {
+      primaryAction = `<button type="button" onclick="stopDemo('${env.id}')" class="px-3 py-1.5 rounded-md text-sm font-medium inline-flex items-center gap-1.5 border border-slate-700 text-slate-200 hover:bg-slate-800 transition">
+        <i data-lucide="square" class="w-3.5 h-3.5"></i>Detener</button>`;
+    } else {
+      primaryAction = `<button type="button" onclick="activateDemo('${env.id}', true)" class="px-3.5 py-1.5 rounded-md text-sm font-medium inline-flex items-center gap-1.5 bg-[#C2410C] hover:bg-[#9A3412] text-white transition">
+        <i data-lucide="play" class="w-3.5 h-3.5"></i>Activar</button>`;
+    }
+
+    const links = [];
+    if (env.enable_interactive !== false) {
+      links.push(serviceLink("Interactive", `http://${host}:${portInter}/interactive`, portInter, isRunning && !busy));
+    }
+    if (env.enable_scaler !== false) {
+      links.push(serviceLink("Scaler", `http://${host}:${portScaler}/`, portScaler, isRunning && !busy));
+    }
 
     const card = document.createElement("div");
-    card.className = `bg-slate-900/70 border rounded-2xl p-5 flex flex-col justify-between transition-all duration-200 hover:border-slate-700 ${isRunning ? "card-active border-[#FF4200]/50" : "border-slate-800"}`;
+    card.className = `bg-slate-900 border rounded-xl p-5 flex flex-col justify-between transition-colors hover:border-slate-700 ${busy ? "border-slate-800" : env.status === "running" ? "card-active" : env.status === "partial" ? "card-partial" : "border-slate-800"}`;
 
     card.innerHTML = `
       <div class="space-y-3">
-        <!-- Header: Badge & Status -->
-        <div class="flex items-start justify-between gap-2">
-          <div class="flex items-center gap-2">
-            <span class="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-slate-200 border border-slate-700 flex items-center gap-1.5">
-              ${getVerticalIcon(env.vertical_id)} ${env.vertical || 'General'}
-            </span>
-            <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-950 text-slate-400 border border-slate-800">
-              v${env.version || '17.5'}
-            </span>
-            ${env.demo_mode ? `
-              <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#7536F0]/15 text-[#915DF3] border border-[#7536F0]/30 flex items-center gap-1" title="Demo Mode activo con avatares y usuarios">
-                🎭 Demo Mode
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400">
+              <span class="inline-flex items-center gap-1 whitespace-nowrap">
+                <i data-lucide="${verticalIcon(env.vertical_id)}" class="w-3.5 h-3.5"></i>${escapeHtml(env.vertical || "General")}
               </span>
-            ` : ''}
+              <span class="text-slate-600" aria-hidden="true">·</span>
+              <span class="font-mono whitespace-nowrap">v${escapeHtml(env.version || "17.5")}</span>
+              ${env.demo_mode ? `<span class="text-slate-600" aria-hidden="true">·</span><span class="whitespace-nowrap" title="Demo Mode activo con usuarios y avatares de ejemplo">Demo Mode</span>` : ""}
+            </div>
+            <h3 class="mt-1.5 text-base font-semibold text-white line-clamp-2 break-words" title="${escapeHtml(env.name)}">${escapeHtml(env.name)}</h3>
           </div>
-          <div>
-            ${isRunning ? `
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Activa
-              </span>
-            ` : `
-              <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-800 text-slate-400">
-                ○ En Pausa
-              </span>
-            `}
-          </div>
+          ${statusBadge(env, busy)}
         </div>
 
-        <!-- Title & Description -->
-        <div>
-          <h3 class="text-base font-bold text-white tracking-tight">${escapeHtml(env.name)}</h3>
-          <p class="text-xs text-slate-400 line-clamp-2 mt-1">${escapeHtml(env.description || 'Sin notas de presentación.')}</p>
-          <div class="mt-2.5 flex items-center justify-between">
-            <button onclick="openVolumeLocationModal('${env.id}')" class="group/storage inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md border transition ${env.storage_path && env.storage_path !== 'docker_default' ? 'bg-[#05B9F0]/10 border-[#05B9F0]/30 text-[#05B9F0] hover:bg-[#05B9F0]/20' : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:border-slate-700'}" title="Ver ubicación física en disco host">
-              <i data-lucide="${env.storage_path && env.storage_path !== 'docker_default' ? 'folder-check' : 'hard-drive'}" class="w-3 h-3 flex-shrink-0"></i>
-              <span class="truncate max-w-[170px] font-mono">${env.storage_path && env.storage_path !== 'docker_default' ? escapeHtml(env.storage_path) : 'Docker Managed'}</span>
-              <i data-lucide="chevron-right" class="w-2.5 h-2.5 opacity-60 group-hover/storage:translate-x-0.5 transition-transform"></i>
-            </button>
-          </div>
-        </div>
+        <p class="text-sm text-slate-400 line-clamp-2">${escapeHtml(env.description || "Sin notas de presentación.")}</p>
 
-        <!-- Quick Access Launch Buttons: Interactive & Scaler -->
-        <div class="pt-2.5 border-t border-slate-800/80 grid grid-cols-2 gap-2">
-          <a href="http://${window.location.hostname || 'localhost'}:${portInter}/interactive" target="_blank" class="inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-semibold transition ${isRunning ? 'bg-[#FF4200]/15 text-[#FF6833] hover:bg-[#FF4200]/25 hover:text-white border border-[#FF4200]/30 shadow-sm' : 'bg-slate-800/40 text-slate-500 border border-slate-800/60 pointer-events-none'}" title="Abrir Inspire Interactive">
-            <i data-lucide="external-link" class="w-3.5 h-3.5 flex-shrink-0"></i>
-            <span class="truncate">Interactive (:${portInter})</span>
-          </a>
-          <a href="http://${window.location.hostname || 'localhost'}:${portScaler}/" target="_blank" class="inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-semibold transition ${isRunning ? 'bg-[#05B9F0]/15 text-[#38BDF8] hover:bg-[#05B9F0]/25 hover:text-white border border-[#05B9F0]/30 shadow-sm' : 'bg-slate-800/40 text-slate-500 border border-slate-800/60 pointer-events-none'}" title="Abrir Inspire Scaler">
-            <i data-lucide="external-link" class="w-3.5 h-3.5 flex-shrink-0"></i>
-            <span class="truncate">Scaler (:${portScaler})</span>
-          </a>
-        </div>
+        ${busy ? progressBlock(env.id, busy) : ""}
+
+        ${links.length ? `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${links.join("")}</div>` : ""}
+
+        <button type="button" onclick="openVolumeLocationModal('${env.id}')" title="${escapeHtml(storageLabel)}" aria-label="Ver ubicación de los volúmenes: ${escapeHtml(storageLabel)}"
+          class="w-full inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition min-w-0">
+          <i data-lucide="${customStorage ? "folder" : "database"}" class="w-3.5 h-3.5 shrink-0"></i>
+          <span class="truncate ${customStorage ? "font-mono" : ""}">${escapeHtml(storageLabel)}</span>
+          <i data-lucide="chevron-right" class="w-3 h-3 shrink-0 opacity-60"></i>
+        </button>
       </div>
 
-      <!-- Footer Actions -->
-      <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
-        <div>
-          ${isRunning ? `
-            <button onclick="stopDemo('${env.id}')" class="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
-              <i data-lucide="square" class="w-3.5 h-3.5"></i> Pausar
-            </button>
-          ` : `
-            <button onclick="activateDemo('${env.id}', true)" class="px-3.5 py-1.5 bg-[#CC3400] hover:bg-[#FF4200] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-[#CC3400]/25 transition active:scale-95">
-              <i data-lucide="play" class="w-3.5 h-3.5"></i> Activar Demo
-            </button>
-          `}
-        </div>
-
-        <div class="flex items-center gap-1">
-          <button onclick="openEditEnvModal('${env.id}')" class="p-1.5 text-slate-400 hover:text-amber-400 rounded-lg hover:bg-slate-800 transition" title="Configurar Stacks y Servicios">
-            <i data-lucide="settings-2" class="w-4 h-4"></i>
-          </button>
-          <button onclick="openVolumeLocationModal('${env.id}')" class="p-1.5 text-slate-400 hover:text-[#05B9F0] rounded-lg hover:bg-slate-800 transition" title="Ubicación Física de Volúmenes en el Host">
-            <i data-lucide="hard-drive" class="w-4 h-4"></i>
-          </button>
-          <button onclick="viewEnvServices('${env.id}')" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition" title="Ver Servicios">
-            <i data-lucide="server" class="w-4 h-4"></i>
-          </button>
-          <button onclick="createSnapshotForEnv('${env.id}')" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition" title="Crear Snapshot de Demo">
-            <i data-lucide="camera" class="w-4 h-4"></i>
-          </button>
-          <button onclick="deleteEnvironment('${env.id}')" class="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition" title="Eliminar Ambiente">
-            <i data-lucide="trash-2" class="w-4 h-4"></i>
-          </button>
+      <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+        ${primaryAction}
+        <div class="flex items-center gap-0.5">
+          ${iconButton("settings-2", "Configurar servicios", `openEditEnvModal('${env.id}')`, { disabled: !!busy })}
+          ${iconButton("server", "Ver servicios y logs", `viewEnvServices('${env.id}')`)}
+          ${iconButton("camera", "Crear snapshot", `createSnapshotForEnv('${env.id}')`, { disabled: !!busy })}
+          <span class="w-px h-4 bg-slate-800 mx-1" aria-hidden="true"></span>
+          ${iconButton("trash-2", "Eliminar ambiente", `deleteEnvironment('${env.id}')`, { danger: true, disabled: !!busy })}
         </div>
       </div>
     `;
@@ -346,23 +445,35 @@ function renderEnvironments() {
   lucide.createIcons();
 }
 
-function getVerticalIcon(verticalId) {
-  switch (verticalId) {
-    case 'insurance': return '🛡️';
-    case 'financials': return '🏦';
-    case 'telco': return '📡';
-    case 'healthcare': return '🏥';
-    case 'retail': return '🛍️';
-    case 'poc': return '💼';
-    default: return '📦';
-  }
-}
-
 // ------------------------------------------------------------------------------
 // Demo Activation & Lifecycle
 // ------------------------------------------------------------------------------
+function envName(envId) {
+  const env = allEnvironments.find(e => e.id === envId);
+  return env ? env.name : envId;
+}
+
+async function fetchProgress(envId) {
+  const res = await fetch(`/api/environments/${envId}/progress`);
+  const data = await res.json();
+  return data.progress;
+}
+
 async function activateDemo(envId, exclusive = true) {
-  showAlert("info", `Activando ambiente '${envId}' en modo On-Demand...`);
+  if (busyEnvs.has(envId)) return;  // guard against double clicks
+  busyEnvs.set(envId, { kind: "activate", label: "Preparando activación", step: 0, total: 1 });
+  renderEnvironments();
+
+  const poller = setInterval(async () => {
+    try {
+      const progress = await fetchProgress(envId);
+      if (progress && busyEnvs.has(envId)) {
+        Object.assign(busyEnvs.get(envId), progress);
+        updateProgressUI(envId);
+      }
+    } catch (_) { /* transient; next tick retries */ }
+  }, PROGRESS_POLL_MS);
+
   try {
     const res = await fetch(`/api/environments/${envId}/activate`, {
       method: "POST",
@@ -371,42 +482,73 @@ async function activateDemo(envId, exclusive = true) {
     });
     const data = await res.json();
     showAlert(data.success ? "success" : "error", data.message);
-    await loadEnvironments();
   } catch (err) {
     showAlert("error", "Error al activar: " + err.message);
+  } finally {
+    clearInterval(poller);
+    busyEnvs.delete(envId);
+    lastEnvSnapshot = "";
+    await loadEnvironments();
   }
 }
 
+function trackRemoteActivation(envId, progress) {
+  busyEnvs.set(envId, { kind: "activate", ...progress });
+  const poller = setInterval(async () => {
+    try {
+      const p = await fetchProgress(envId);
+      if (!p) {
+        clearInterval(poller);
+        busyEnvs.delete(envId);
+        lastEnvSnapshot = "";
+        loadEnvironments();
+      } else if (busyEnvs.has(envId)) {
+        Object.assign(busyEnvs.get(envId), p);
+        updateProgressUI(envId);
+      }
+    } catch (_) { /* transient; next tick retries */ }
+  }, PROGRESS_POLL_MS);
+}
+
 async function stopDemo(envId) {
-  showAlert("info", `Deteniendo ambiente '${envId}'...`);
+  if (busyEnvs.has(envId)) return;
+  busyEnvs.set(envId, { kind: "stop" });
+  renderEnvironments();
   try {
     const res = await fetch(`/api/environments/${envId}/stop`, {
       method: "POST"
     });
     const data = await res.json();
-    showAlert(data.success ? "success" : "error", data.message);
-    await loadEnvironments();
+    showAlert(data.success ? "success" : "error", data.success ? `Ambiente '${envName(envId)}' detenido.` : data.message);
   } catch (err) {
     showAlert("error", "Error: " + err.message);
+  } finally {
+    busyEnvs.delete(envId);
+    lastEnvSnapshot = "";
+    await loadEnvironments();
   }
 }
 
 async function deleteEnvironment(envId) {
-  if (envId === "default") {
-    showAlert("error", "No se puede eliminar el ambiente base predeterminado.");
-    return;
-  }
-  const env = allEnvironments.find(e => e.id === envId);
-  const envName = env ? env.name : envId;
+  const name = envName(envId);
+  const { action } = await openActionDialog({
+    title: "Eliminar ambiente",
+    message: `
+      <p>Se detendrán y eliminarán los contenedores de <strong class="text-white">${escapeHtml(name)}</strong>.</p>
+      <p class="text-slate-400">Puedes conservar los datos (bases de datos, paquetes ICM y archivos) para recrearlo después, o borrarlos definitivamente.</p>`,
+    input: {
+      label: `Para borrar también los datos, escribe <strong class="text-slate-200">${escapeHtml(name)}</strong>`,
+      match: name
+    },
+    actions: [
+      { id: "keep", label: "Eliminar y conservar datos", style: "dangerOutline" },
+      { id: "all", label: "Eliminar todo", style: "danger", gate: "match" }
+    ]
+  });
+  if (!action) return;
+  const removeVols = action === "all";
 
-  if (!confirm(`¿Estás seguro de que deseas eliminar por completo el ambiente '${envName}'? Se detendrán y removerán todos sus contenedores.`)) return;
-  const removeVols = confirm(
-    `¿Deseas ELIMINAR también definitivamente todos los volúmenes de datos asociados (PostgreSQL, ICM, archivos)?\n\n` +
-    `• Presiona [Aceptar] = BORRAR definitivamente todos los datos del ambiente.\n` +
-    `• Presiona [Cancelar] = CONSERVAR los volúmenes de datos en disco.`
-  );
-  
-  showAlert("info", `Eliminando ambiente '${envName}'...`);
+  showAlert("info", `Eliminando ambiente '${name}'...`);
   try {
     const res = await fetch(`/api/environments/${envId}?remove_volumes=${removeVols}`, {
       method: "DELETE"
@@ -775,7 +917,7 @@ function renderNodeBox({ title, container, defaultPort, internalPort, type, env 
         <!-- Node Title & State -->
         <div class="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
           <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full ${isUp ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}"></span>
+            <span class="w-2 h-2 rounded-full ${isUp ? 'bg-emerald-400' : 'bg-slate-500'}"></span>
             <h4 class="text-xs font-mono font-bold text-white tracking-wide truncate" title="${escapeHtml(title)}">
               ${escapeHtml(title)}
             </h4>
@@ -837,13 +979,13 @@ function renderNodeBox({ title, container, defaultPort, internalPort, type, env 
         ${portInfo.accessUrl ? `
           <div class="pt-1">
             <a href="${portInfo.accessUrl}" target="_blank" rel="noopener noreferrer" 
-               class="inline-flex items-center justify-between w-full px-3 py-2 rounded-lg text-xs font-semibold ${isUp ? (type === 'studio' ? 'bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 hover:text-white border border-indigo-500/40 shadow-sm' : 'bg-[#CC3400]/20 text-[#FF6833] hover:bg-[#CC3400]/30 hover:text-white border border-[#FF4200]/40 shadow-sm') : 'bg-slate-800/40 text-slate-500 border border-slate-800 pointer-events-none'} transition group"
+               class="inline-flex items-center justify-between w-full px-3 py-2 rounded-lg text-xs font-semibold ${isUp ? (type === 'studio' ? 'bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 hover:text-white border border-indigo-500/40 shadow-sm' : 'bg-[#C2410C]/20 text-[#E07A50] hover:bg-[#C2410C]/30 hover:text-white border border-[#D9541F]/40 shadow-sm') : 'bg-slate-800/40 text-slate-500 border border-slate-800 pointer-events-none'} transition group"
                title="${escapeHtml(portInfo.urlLabel)}">
               <span class="flex items-center gap-2 truncate">
                 <i data-lucide="external-link" class="w-3.5 h-3.5 ${type === 'studio' ? 'text-indigo-400' : 'text-brand-400'} group-hover:scale-110 transition-transform flex-shrink-0"></i>
                 <span class="font-mono text-[11px] truncate text-slate-200 group-hover:text-white">${escapeHtml(portInfo.accessUrl)}</span>
               </span>
-              <span class="text-[10px] uppercase font-bold text-white ${type === 'studio' ? 'bg-indigo-600' : 'bg-[#CC3400]'} px-2 py-0.5 rounded shadow-sm flex-shrink-0 ml-1.5">Abrir</span>
+              <span class="text-[10px] uppercase font-bold text-white ${type === 'studio' ? 'bg-indigo-600' : 'bg-[#C2410C]'} px-2 py-0.5 rounded shadow-sm flex-shrink-0 ml-1.5">Abrir</span>
             </a>
           </div>
         ` : ''}
@@ -980,7 +1122,7 @@ function renderServicesView() {
   const renderInteractiveGroup = () => `
     <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
       <!-- Header Banner (Mint Green as in groups.png) -->
-      <div class="bg-[#99E2B4] text-slate-950 font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
+      <div class="bg-[#8FB8A0] text-slate-950 font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
         <span>INTERACTIVE</span>
       </div>
 
@@ -1018,7 +1160,7 @@ function renderServicesView() {
   const renderScalerGroup = () => `
     <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
       <!-- Header Banner (Orange as in groups.png) -->
-      <div class="bg-[#FFA64D] text-slate-950 font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2 flex-wrap">
+      <div class="bg-[#C99A62] text-slate-950 font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2 flex-wrap">
         <span>SCALER NODE</span>
         ${(env.scaler_sharedfolder || env.volume_locations?.sharedfolder) ? `
           <span class="text-[10px] font-mono font-bold bg-slate-950 text-amber-300 px-2 py-0.5 rounded-full border border-slate-800 lowercase tracking-normal flex items-center gap-1 shadow-inner" title="Volumen: ${escapeHtml(env.volume_locations?.sharedfolder || env.scaler_sharedfolder)}">
@@ -1069,7 +1211,7 @@ function renderServicesView() {
       <!-- Header: Architecture Breadcrumb & Group Color Legend -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800/80 gap-3">
         <div class="flex items-center gap-3">
-          <div class="w-2.5 h-2.5 rounded-full ${isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}"></div>
+          <div class="w-2.5 h-2.5 rounded-full ${isRunning ? 'bg-emerald-400' : 'bg-slate-500'}"></div>
           <div>
             <h3 class="text-sm font-bold text-white tracking-wide uppercase">Topología del Ambiente: <span class="text-brand-400 font-mono">${escapeHtml(env.name)}</span></h3>
             <p class="text-[11px] text-slate-400">Estructura modular Quadient Inspire Flex</p>
@@ -1078,29 +1220,29 @@ function renderServicesView() {
         <div class="flex flex-wrap items-center gap-3 text-xs">
           ${hasInteractive ? `
             <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
-              <span class="w-3 h-3 rounded-sm bg-[#99E2B4] inline-block border border-slate-700"></span>
+              <span class="w-3 h-3 rounded-sm bg-[#8FB8A0] inline-block border border-slate-700"></span>
               <span class="font-bold text-slate-200">INTERACTIVE</span>
             </span>
           ` : ''}
           ${hasScaler ? `
             <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
-              <span class="w-3 h-3 rounded-sm bg-[#FFA64D] inline-block border border-slate-700"></span>
+              <span class="w-3 h-3 rounded-sm bg-[#C99A62] inline-block border border-slate-700"></span>
               <span class="font-bold text-slate-200">SCALER NODE</span>
             </span>
           ` : ''}
           <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
-            <span class="w-3 h-3 rounded-sm bg-[#9CA3AF] inline-block border border-slate-700"></span>
+            <span class="w-3 h-3 rounded-sm bg-[#8b929d] inline-block border border-slate-700"></span>
             <span class="font-bold text-slate-200">ICM / POSTGRES</span>
           </span>
           ${hasKafka ? `
             <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
-              <span class="w-3 h-3 rounded-sm bg-[#6366F1] inline-block border border-slate-700"></span>
+              <span class="w-3 h-3 rounded-sm bg-[#6E6CA3] inline-block border border-slate-700"></span>
               <span class="font-bold text-slate-200">KAFKA</span>
             </span>
           ` : ''}
           ${hasFtp ? `
             <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
-              <span class="w-3 h-3 rounded-sm bg-[#0D9488] inline-block border border-slate-700"></span>
+              <span class="w-3 h-3 rounded-sm bg-[#3F7F76] inline-block border border-slate-700"></span>
               <span class="font-bold text-slate-200">FTP</span>
             </span>
           ` : ''}
@@ -1234,7 +1376,7 @@ function renderServicesView() {
   html += `
       <!-- ICM BOX (Inspire Configuration Manager) -->
       <div class="w-full max-w-2xl mx-auto group-box rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
-        <div class="bg-[#9CA3AF] text-slate-950 font-black tracking-widest text-center py-2 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm">
+        <div class="bg-[#8b929d] text-slate-950 font-black tracking-widest text-center py-2 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm">
           <span>ICM</span>
         </div>
         <div class="p-4 sm:p-5 bg-slate-900/60">
@@ -1261,7 +1403,7 @@ function renderServicesView() {
 
       <!-- POSTGRES DATABASE BOX (Mandatory) -->
       <div class="w-full max-w-2xl mx-auto group-box rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
-        <div class="bg-[#9CA3AF] text-slate-950 font-black tracking-widest text-center py-2 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm">
+        <div class="bg-[#8b929d] text-slate-950 font-black tracking-widest text-center py-2 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm">
           <span>POSTGRES DATABASE</span>
         </div>
         <div class="p-4 sm:p-5 bg-slate-900/60">
@@ -1293,7 +1435,7 @@ function renderServicesView() {
             <!-- KAFKA STREAMING & CSV STUDIO GROUP -->
             <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
               <!-- Header Banner (Indigo/Purple) -->
-              <div class="bg-[#6366F1] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
+              <div class="bg-[#6E6CA3] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
                 <i data-lucide="radio" class="w-4 h-4 text-white"></i>
                 <span>KAFKA STREAMING & CSV STUDIO</span>
               </div>
@@ -1332,7 +1474,7 @@ function renderServicesView() {
             <!-- FTP SERVER GROUP -->
             <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
               <!-- Header Banner (Teal) -->
-              <div class="bg-[#0D9488] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
+              <div class="bg-[#3F7F76] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
                 <i data-lucide="folder-sync" class="w-4 h-4 text-white"></i>
                 <span>FTP SERVER (vsftpd)</span>
               </div>
@@ -1552,7 +1694,12 @@ async function loadAcrVersions() {
 async function applyVersionToActiveEnv(tag) {
   const select = document.getElementById("service-env-select");
   const envId = select ? select.value : "default";
-  if (!confirm(`¿Deseas asignar la versión '${tag}' al ambiente '${envId}'?`)) return;
+  const { action } = await openActionDialog({
+    title: "Cambiar versión",
+    message: `<p>¿Asignar la versión <span class="font-mono text-white">${escapeHtml(tag)}</span> al ambiente <strong class="text-white">${escapeHtml(envName(envId))}</strong>?</p>`,
+    actions: [{ id: "ok", label: "Asignar versión", style: "primary" }]
+  });
+  if (!action) return;
 
   try {
     const res = await fetch(`/api/environments/${envId}`, {
@@ -1593,7 +1740,7 @@ async function loadVolumes() {
         <div class="flex items-center justify-between gap-2">
           <span class="font-mono text-slate-200 font-semibold truncate text-xs" title="${escapeHtml(v.name)}">${escapeHtml(v.name)}</span>
           <div class="flex items-center gap-1.5 flex-shrink-0">
-            <span class="text-[10px] ${v.is_custom ? 'bg-[#05B9F0]/15 text-[#05B9F0] border border-[#05B9F0]/30 font-semibold' : 'bg-slate-900 text-slate-400'} px-2 py-0.5 rounded">
+            <span class="text-[10px] ${v.is_custom ? 'bg-[#668fb3]/15 text-[#668fb3] border border-[#668fb3]/30 font-semibold' : 'bg-slate-900 text-slate-400'} px-2 py-0.5 rounded">
               ${v.is_custom ? 'Host Bind' : escapeHtml(v.driver)}
             </span>
             <button onclick="deleteVolume('${escapeHtml(v.name)}')" class="p-1 text-slate-500 hover:text-rose-400 rounded transition" title="Eliminar volumen de Docker">
@@ -1603,7 +1750,7 @@ async function loadVolumes() {
         </div>
         ${displayPath ? `
           <div class="flex items-center justify-between gap-1 text-[11px] font-mono bg-black/50 px-2 py-1 rounded border border-slate-800/80">
-            <span class="truncate ${v.is_custom ? 'text-[#05B9F0]' : 'text-slate-400'}" title="${escapeHtml(displayPath)}">
+            <span class="truncate ${v.is_custom ? 'text-[#668fb3]' : 'text-slate-400'}" title="${escapeHtml(displayPath)}">
               ${escapeHtml(displayPath)}
             </span>
             <button onclick="copyVolPath('${escapeHtml(displayPath)}')" class="text-slate-400 hover:text-white flex-shrink-0 ml-1.5" title="Copiar ruta">
@@ -1621,7 +1768,13 @@ async function loadVolumes() {
 }
 
 async function deleteVolume(volumeName) {
-  if (!confirm(`¿Deseas eliminar definitivamente el volumen '${volumeName}' de Docker?\n\nSi pertenece a un ambiente activo, esto borrará sus datos.`)) return;
+  const { action } = await openActionDialog({
+    title: "Eliminar volumen",
+    message: `<p>Se eliminará definitivamente el volumen <span class="font-mono text-white break-all">${escapeHtml(volumeName)}</span>.</p>
+      <p class="text-slate-400">Si pertenece a un ambiente, sus datos se perderán.</p>`,
+    actions: [{ id: "ok", label: "Eliminar volumen", style: "danger" }]
+  });
+  if (!action) return;
   showAlert("info", `Eliminando volumen '${volumeName}'...`);
   try {
     const res = await fetch(`/api/volumes/${encodeURIComponent(volumeName)}`, { method: "DELETE" });
@@ -1663,7 +1816,7 @@ async function openVolumeLocationModal(envId) {
 
     const isCustom = env && env.storage_path && env.storage_path !== "docker_default";
     if (isCustom) {
-      bannerEl.className = "p-3.5 rounded-xl border bg-[#05B9F0]/10 border-[#05B9F0]/30 text-[#05B9F0] flex items-center justify-between text-xs";
+      bannerEl.className = "p-3.5 rounded-xl border bg-[#668fb3]/10 border-[#668fb3]/30 text-[#668fb3] flex items-center justify-between text-xs";
       bannerEl.innerHTML = `
         <div class="flex items-center gap-2">
           <i data-lucide="folder-check" class="w-4 h-4 flex-shrink-0"></i>
@@ -1672,7 +1825,7 @@ async function openVolumeLocationModal(envId) {
             <span class="font-mono ml-1 text-white">${escapeHtml(env.storage_path)}</span>
           </div>
         </div>
-        <button onclick="copyVolPath('${escapeHtml(env.storage_path)}')" class="px-2.5 py-1 bg-[#05B9F0]/20 hover:bg-[#05B9F0]/30 text-white rounded text-[11px] font-semibold flex items-center gap-1 transition">
+        <button onclick="copyVolPath('${escapeHtml(env.storage_path)}')" class="px-2.5 py-1 bg-[#668fb3]/20 hover:bg-[#668fb3]/30 text-white rounded text-[11px] font-semibold flex items-center gap-1 transition">
           <i data-lucide="copy" class="w-3 h-3"></i> Copiar Ruta Base
         </button>
       `;
@@ -1711,13 +1864,13 @@ async function openVolumeLocationModal(envId) {
           <div class="space-y-0.5 min-w-0">
             <div class="flex items-center gap-2">
               <span class="font-semibold text-white">${escapeHtml(v.component)}</span>
-              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded ${v.is_custom ? 'bg-[#05B9F0]/15 text-[#05B9F0] border border-[#05B9F0]/30' : 'bg-slate-800 text-slate-400'}">
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded ${v.is_custom ? 'bg-[#668fb3]/15 text-[#668fb3] border border-[#668fb3]/30' : 'bg-slate-800 text-slate-400'}">
                 ${escapeHtml(v.volume_name)}
               </span>
             </div>
             <div class="flex items-center gap-1.5 text-slate-400 font-mono text-[11px] truncate">
               <i data-lucide="corner-down-right" class="w-3 h-3 flex-shrink-0 text-slate-500"></i>
-              <span class="truncate ${v.is_custom ? 'text-[#05B9F0] font-medium' : 'text-slate-400'}" title="${escapeHtml(v.host_path || 'No disponible')}">
+              <span class="truncate ${v.is_custom ? 'text-[#668fb3] font-medium' : 'text-slate-400'}" title="${escapeHtml(v.host_path || 'No disponible')}">
                 ${escapeHtml(v.host_path || 'Ruta interna de Docker')}
               </span>
             </div>
@@ -1814,8 +1967,13 @@ function promptCreateSnapshot() {
 }
 
 async function createSnapshotForEnv(envId) {
-  const name = prompt(`Ingresa un nombre descriptivo para el Snapshot de '${envId}':`, `Demo ${envId} - Estado Listo`);
-  if (!name) return;
+  const { action, value: name } = await openActionDialog({
+    title: "Crear snapshot",
+    message: `<p>Se guardará una copia de las bases de datos de <strong class="text-white">${escapeHtml(envName(envId))}</strong>.</p>`,
+    input: { label: "Nombre del snapshot", value: `${envId}-listo` },
+    actions: [{ id: "ok", label: "Crear snapshot", style: "primary", gate: "value", default: true }]
+  });
+  if (!action || !name) return;
   showAlert("info", `Generando Snapshot para '${envId}' (dump de bases de datos)...`);
   try {
     const res = await fetch(`/api/environments/${envId}/snapshots`, {
@@ -1832,7 +1990,12 @@ async function createSnapshotForEnv(envId) {
 }
 
 async function deleteSnapshot(filename) {
-  if (!confirm(`¿Eliminar el snapshot '${filename}'?`)) return;
+  const { action } = await openActionDialog({
+    title: "Eliminar snapshot",
+    message: `<p>¿Eliminar el snapshot <span class="font-mono text-white break-all">${escapeHtml(filename)}</span>?</p>`,
+    actions: [{ id: "ok", label: "Eliminar snapshot", style: "danger" }]
+  });
+  if (!action) return;
   try {
     const res = await fetch(`/api/snapshots/${filename}`, { method: "DELETE" });
     const data = await res.json();
@@ -1846,6 +2009,79 @@ async function deleteSnapshot(filename) {
 // ------------------------------------------------------------------------------
 // Helpers & Utilities
 // ------------------------------------------------------------------------------
+const DIALOG_BUTTON_STYLES = {
+  primary: "bg-[#C2410C] hover:bg-[#9A3412] text-white",
+  danger: "bg-rose-600 hover:bg-rose-500 text-white",
+  dangerOutline: "border border-rose-500/40 text-rose-300 hover:bg-rose-500/10"
+};
+
+/**
+ * In-app replacement for confirm()/prompt().
+ * `message` and `input.label` are HTML: callers must escape user data.
+ * Actions may be gated on the input: gate "match" (equals input.match) or "value" (non-empty).
+ * Resolves to {action, value}; action is null when cancelled (button, Esc or backdrop).
+ */
+function openActionDialog({ title, message, actions, input }) {
+  return new Promise(resolve => {
+    let dlg = document.getElementById("action-dialog");
+    if (!dlg) {
+      dlg = document.createElement("dialog");
+      dlg.id = "action-dialog";
+      dlg.className = "bg-slate-900 border border-slate-700 text-slate-100 rounded-xl shadow-2xl p-0 w-[calc(100%-2rem)] max-w-lg";
+      document.body.appendChild(dlg);
+    }
+    dlg.innerHTML = `
+      <form method="dialog" class="p-6 space-y-4">
+        <h2 class="text-base font-semibold text-white">${escapeHtml(title)}</h2>
+        <div class="text-sm text-slate-300 space-y-2">${message}</div>
+        ${input ? `
+          <div>
+            <label for="action-dialog-input" class="block text-xs text-slate-400 mb-1.5">${input.label}</label>
+            <input id="action-dialog-input" type="text" autocomplete="off" spellcheck="false" value="${escapeHtml(input.value || "")}"
+              class="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+          </div>` : ""}
+        <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
+          <button value="" class="whitespace-nowrap px-3.5 py-2 rounded-md text-sm font-medium text-slate-300 border border-slate-700 hover:bg-slate-800">Cancelar</button>
+          ${actions.map(a => `
+            <button value="${a.id}" data-gate="${a.gate || ""}"
+              class="whitespace-nowrap px-3.5 py-2 rounded-md text-sm font-medium transition disabled:opacity-40 disabled:cursor-not-allowed ${DIALOG_BUTTON_STYLES[a.style] || DIALOG_BUTTON_STYLES.primary}">${escapeHtml(a.label)}</button>`).join("")}
+        </div>
+      </form>`;
+
+    const field = dlg.querySelector("#action-dialog-input");
+    const syncGates = () => {
+      const val = field ? field.value.trim() : "";
+      dlg.querySelectorAll("[data-gate]").forEach(btn => {
+        if (btn.dataset.gate === "match") btn.disabled = val !== (input.match || "").trim();
+        else if (btn.dataset.gate === "value") btn.disabled = !val;
+      });
+    };
+    if (field) {
+      field.addEventListener("input", syncGates);
+      // Enter would submit the first button (Cancelar); route it to the default action instead
+      field.addEventListener("keydown", ev => {
+        if (ev.key !== "Enter") return;
+        ev.preventDefault();
+        const def = actions.find(a => a.default);
+        const btn = def && dlg.querySelector(`button[value="${def.id}"]`);
+        if (btn && !btn.disabled) btn.click();
+      });
+    }
+    syncGates();
+
+    // Backdrop click cancels
+    dlg.onclick = ev => { if (ev.target === dlg) dlg.close(""); };
+    dlg.addEventListener("close", () => {
+      resolve({ action: dlg.returnValue || null, value: field ? field.value.trim() : "" });
+    }, { once: true });
+
+    dlg.returnValue = "";
+    dlg.showModal();
+    if (field) { field.focus(); field.select(); }
+    else dlg.querySelector('button[value=""]').focus();  // safe default for destructive prompts
+  });
+}
+
 function closeModal(dialogId) {
   const modal = document.getElementById(dialogId);
   if (modal) modal.close();
