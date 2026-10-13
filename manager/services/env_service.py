@@ -32,6 +32,21 @@ ENV_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 VERSION_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$")
 
 
+FIREBASE_WEB_KEYS = ("apiKey", "authDomain", "projectId", "storageBucket", "messagingSenderId", "appId", "measurementId")
+
+
+def _parse_firebase_web_config(raw: str) -> Dict[str, str]:
+    """Accepts either JSON or the `const firebaseConfig = {...}` snippet copied from Firebase Console."""
+    try:
+        data = json.loads(raw)
+        if isinstance(data, dict):
+            return {k: str(data[k]) for k in FIREBASE_WEB_KEYS if data.get(k)}
+    except ValueError:
+        pass
+    pairs = dict(re.findall(r"""(\w+)\s*:\s*["']([^"']*)["']""", raw))
+    return {k: pairs[k] for k in FIREBASE_WEB_KEYS if pairs.get(k)}
+
+
 def _is_windows_path(path: str) -> bool:
     return bool(re.match(r"^[a-zA-Z]:[/\\]", path)) or path.startswith("\\\\")
 
@@ -64,6 +79,7 @@ class EnvService:
         self.envs_dir = os.path.join(self.base_dir, "manager", "environments")
         self.root_compose = os.path.join(self.base_dir, "docker-compose.yml")
         self.firebase_key_file = os.path.join(self.data_dir, "firebase-service-account.json")
+        self.firebase_web_file = os.path.join(self.data_dir, "firebase-web.json")
         self.root_env = os.path.join(self.data_dir, ".quadient_credentials.env")
         if not os.path.exists(self.root_env) and os.path.exists(os.path.join(self.base_dir, ".quadient_credentials.env")):
             self.root_env = os.path.join(self.base_dir, ".quadient_credentials.env")
@@ -73,41 +89,89 @@ class EnvService:
         self._progress: Dict[str, Dict[str, Any]] = {}
         self._progress_lock = threading.Lock()
 
-    def get_firebase_status(self) -> Dict[str, Any]:
-        """Reports whether a Firebase service account is stored, without exposing the key."""
+    def _read_json(self, path: str) -> Optional[Dict[str, Any]]:
         try:
-            with open(self.firebase_key_file, "r", encoding="utf-8") as f:
-                key = json.load(f)
-            return {"configured": True, "project_id": key.get("project_id", ""), "client_email": key.get("client_email", "")}
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else None
         except (OSError, ValueError):
-            return {"configured": False, "project_id": "", "client_email": ""}
+            return None
 
-    def save_firebase_key(self, raw: str) -> Tuple[bool, str]:
-        """Validates and stores the Firebase Admin service account used by the push inbox."""
-        try:
-            key = json.loads(raw)
-        except ValueError:
-            return False, "El contenido no es un JSON válido"
-        if not isinstance(key, dict) or key.get("type") != "service_account" or not key.get("private_key") or not key.get("client_email"):
-            return False, "El JSON no corresponde a una cuenta de servicio de Firebase (falta type, private_key o client_email)"
-        with open(self.firebase_key_file, "w", encoding="utf-8") as f:
-            json.dump(key, f)
-        os.chmod(self.firebase_key_file, 0o600)
-        # Running environments only see the new key after their next activation
+    def _write_secret_json(self, path: str, data: Dict[str, Any]) -> None:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        os.chmod(path, 0o600)
+
+    def get_firebase_status(self) -> Dict[str, Any]:
+        """Reports which Firebase settings are stored for the push inbox, without exposing secrets."""
+        key = self._read_json(self.firebase_key_file) or {}
+        web = self._read_json(self.firebase_web_file) or {}
+        web_config = web.get("config") or {}
+        return {
+            "configured": bool(key and web_config and web.get("vapid_key")),
+            "service_account": bool(key),
+            "project_id": key.get("project_id", ""),
+            "client_email": key.get("client_email", ""),
+            "web_config": bool(web_config),
+            "web_project_id": web_config.get("projectId", ""),
+            "vapid_key": bool(web.get("vapid_key")),
+        }
+
+    def save_firebase_settings(self, service_account: str, web_config: str, vapid_key: str) -> Tuple[bool, str]:
+        """Validates and stores the user's own Firebase project for the push inbox.
+
+        Empty fields keep the stored value, so a single piece can be replaced later."""
+        key = self._read_json(self.firebase_key_file)
+        web = self._read_json(self.firebase_web_file) or {}
+
+        if service_account:
+            try:
+                key = json.loads(service_account)
+            except ValueError:
+                return False, "La cuenta de servicio no es un JSON válido"
+            if not isinstance(key, dict) or key.get("type") != "service_account" or not key.get("private_key") or not key.get("client_email"):
+                return False, "El JSON no corresponde a una cuenta de servicio de Firebase (falta type, private_key o client_email)"
+
+        if web_config:
+            parsed = _parse_firebase_web_config(web_config)
+            missing = [k for k in ("apiKey", "projectId", "messagingSenderId", "appId") if not parsed.get(k)]
+            if missing:
+                return False, f"A la configuración web le faltan campos: {', '.join(missing)}"
+            web["config"] = parsed
+
+        if vapid_key:
+            if not re.match(r"^[A-Za-z0-9_-]{80,100}$", vapid_key):
+                return False, "La VAPID key no tiene el formato esperado (clave pública de Cloud Messaging > Web Push certificates)"
+            web["vapid_key"] = vapid_key
+
+        if not key or not web.get("config") or not web.get("vapid_key"):
+            return False, "Faltan datos: se necesitan la cuenta de servicio, la configuración web y la VAPID key"
+        if key.get("project_id") != web["config"].get("projectId"):
+            return False, (f"La cuenta de servicio es del proyecto '{key.get('project_id')}' pero la configuración web "
+                           f"es de '{web['config'].get('projectId')}'; deben ser del mismo proyecto de Firebase")
+
+        self._write_secret_json(self.firebase_key_file, key)
+        self._write_secret_json(self.firebase_web_file, web)
+        # Running environments only see the new settings after their next activation
         for env in self.list_environments():
             if env.get("enable_inbox") and env.get("compose_file"):
                 self._write_inbox_env(os.path.dirname(env["compose_file"]))
-        return True, f"Cuenta de servicio de Firebase guardada (proyecto {key.get('project_id', '?')})"
+        return True, f"Firebase configurado con el proyecto {key.get('project_id')}"
 
     def _write_inbox_env(self, target_dir: str) -> None:
-        """Writes inbox.env for the push-inbox service; empty when no key is stored so compose still starts."""
-        content = "# Generated by Studio Manager\n"
+        """Writes inbox.env for the push-inbox service; empty when Firebase is not set up so compose still starts."""
+        lines = ["# Generated by Studio Manager"]
         if os.path.exists(self.firebase_key_file):
             with open(self.firebase_key_file, "rb") as f:
-                content += "FIREBASE_SERVICE_ACCOUNT_KEY=" + base64.b64encode(f.read()).decode("ascii") + "\n"
+                lines.append("FIREBASE_SERVICE_ACCOUNT_KEY=" + base64.b64encode(f.read()).decode("ascii"))
+        web = self._read_json(self.firebase_web_file) or {}
+        if web.get("config"):
+            lines.append("FIREBASE_WEB_CONFIG=" + base64.b64encode(json.dumps(web["config"]).encode("utf-8")).decode("ascii"))
+        if web.get("vapid_key"):
+            lines.append("FIREBASE_VAPID_KEY=" + web["vapid_key"])
         path = os.path.join(target_dir, "inbox.env")
         with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
+            f.write("\n".join(lines) + "\n")
         os.chmod(path, 0o600)
 
     def get_progress(self, env_id: str) -> Optional[Dict[str, Any]]:

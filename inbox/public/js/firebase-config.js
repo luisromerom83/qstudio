@@ -6,19 +6,20 @@
  * la cual las guardará de forma segura en el LocalStorage de tu navegador.
  */
 
-// Credenciales activas de Firebase
-const DEFAULT_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyADWBBgbALAnf1yFUzK2wKmYM4ptlqHpJ4",
-  authDomain: "quadient-latam-app-demo.firebaseapp.com",
-  projectId: "quadient-latam-app-demo",
-  storageBucket: "quadient-latam-app-demo.firebasestorage.app",
-  messagingSenderId: "342103810833",
-  appId: "1:342103810833:web:10f01ce15c8682f5ba62b0",
-  measurementId: "G-9W4L1WDWGS"
+// Credenciales de Firebase entregadas por el servidor (/js/runtime-config.js, desde variables de entorno)
+const RUNTIME_FIREBASE = window.__FIREBASE_RUNTIME__ || {};
+
+const DEFAULT_FIREBASE_CONFIG = RUNTIME_FIREBASE.config || {
+  apiKey: "TU_API_KEY",
+  authDomain: "TU_PROYECTO.firebaseapp.com",
+  projectId: "TU_PROYECTO",
+  storageBucket: "TU_PROYECTO.firebasestorage.app",
+  messagingSenderId: "",
+  appId: ""
 };
 
 // Clave pública VAPID para Web Push
-const DEFAULT_VAPID_KEY = "BI8LfcRgoaF0c3nUSNkjitD2Pn-ONPheA85LyfHcmRBKevI7j9jIezB10_l7ef6u28mU3UTNhR1wShVxObVx1mg";
+const DEFAULT_VAPID_KEY = RUNTIME_FIREBASE.vapidKey || "TU_VAPID_PUBLIC_KEY";
 
 /**
  * Obtener configuración activa (localStorage o defecto)

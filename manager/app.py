@@ -110,7 +110,11 @@ def update_config():
 @app.route("/api/config/firebase", methods=["POST"])
 def update_firebase_config():
     data = request.json or {}
-    ok, msg = env_service.save_firebase_key((data.get("service_account") or "").strip())
+    ok, msg = env_service.save_firebase_settings(
+        (data.get("service_account") or "").strip(),
+        (data.get("web_config") or "").strip(),
+        (data.get("vapid_key") or "").strip()
+    )
     return jsonify({"success": ok, "message": msg, "firebase": env_service.get_firebase_status()}), (200 if ok else 400)
 
 @app.route("/api/config/test", methods=["POST"])

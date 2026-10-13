@@ -10,14 +10,8 @@ importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-com
 const urlParams = new URLSearchParams(self.location.search);
 const configParam = urlParams.get('config');
 
-let firebaseConfig = {
-  apiKey: "AIzaSyADWBBgbALAnf1yFUzK2wKmYM4ptlqHpJ4",
-  authDomain: "quadient-latam-app-demo.firebaseapp.com",
-  projectId: "quadient-latam-app-demo",
-  storageBucket: "quadient-latam-app-demo.firebasestorage.app",
-  messagingSenderId: "342103810833",
-  appId: "1:342103810833:web:10f01ce15c8682f5ba62b0"
-};
+// fcm.js siempre registra el Service Worker con ?config=...; sin él no hay proyecto que usar
+let firebaseConfig = {};
 
 if (configParam) {
   try {

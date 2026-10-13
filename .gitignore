@@ -20,4 +20,5 @@ __pycache__/
 
 # Firebase Admin key for the push inbox (pasted in Settings)
 manager/data/firebase-service-account.json
+manager/data/firebase-web.json
 inbox.env

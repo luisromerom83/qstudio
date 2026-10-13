@@ -183,24 +183,37 @@ async function handleSaveSettings(e) {
 function renderFirebaseStatus(fb) {
   const el = document.getElementById("firebase-status");
   if (!el) return;
-  el.textContent = fb && fb.configured
-    ? `Configurada: proyecto ${fb.project_id} (${fb.client_email}). Pega un JSON nuevo para reemplazarla.`
-    : "Sin configurar: el inbox arrancará, pero no podrá guardar mensajes ni enviar notificaciones.";
+  if (fb && fb.configured) {
+    el.textContent = `Configurado: proyecto ${fb.project_id} (${fb.client_email}).`;
+  } else {
+    const missing = [
+      !(fb && fb.service_account) && "cuenta de servicio",
+      !(fb && fb.web_config) && "configuración web",
+      !(fb && fb.vapid_key) && "VAPID key"
+    ].filter(Boolean);
+    el.textContent = `Sin configurar (falta: ${missing.join(", ")}). El inbox arrancará, pero no podrá iniciar sesión, guardar mensajes ni enviar notificaciones.`;
+  }
 }
 
 async function handleSaveFirebase(e) {
   e.preventDefault();
-  const input = document.getElementById("setting-firebase-key");
+  const fields = {
+    service_account: document.getElementById("setting-firebase-key"),
+    web_config: document.getElementById("setting-firebase-web"),
+    vapid_key: document.getElementById("setting-firebase-vapid")
+  };
+  const payload = {};
+  Object.entries(fields).forEach(([k, el]) => { payload[k] = el.value.trim(); });
   try {
     const res = await fetch("/api/config/firebase", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ service_account: input.value })
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
     showAlert(data.success ? "success" : "error", data.message);
     if (data.success) {
-      input.value = "";
+      Object.values(fields).forEach(el => { el.value = ""; });
       renderFirebaseStatus(data.firebase);
     }
   } catch (err) {

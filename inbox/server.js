@@ -12,6 +12,25 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+/**
+ * Configuración web de Firebase para el navegador, tomada de variables de entorno
+ * (FIREBASE_WEB_CONFIG en JSON o Base64, FIREBASE_VAPID_KEY). Debe ir antes de express.static.
+ */
+app.get('/js/runtime-config.js', (req, res) => {
+  let config = null;
+  const rawConfig = (process.env.FIREBASE_WEB_CONFIG || '').trim();
+  if (rawConfig) {
+    try {
+      config = JSON.parse(rawConfig.startsWith('{') ? rawConfig : Buffer.from(rawConfig, 'base64').toString('utf8'));
+    } catch (err) {
+      console.error('❌ FIREBASE_WEB_CONFIG no es un JSON válido:', err.message);
+    }
+  }
+  const runtime = { config, vapidKey: (process.env.FIREBASE_VAPID_KEY || '').trim() || null };
+  res.type('application/javascript').set('Cache-Control', 'no-store');
+  res.send(`window.__FIREBASE_RUNTIME__ = ${JSON.stringify(runtime).replace(/</g, '\\u003c')};`);
+});
+
 // Servir archivos estáticos del frontend
 app.use(express.static(path.join(__dirname, 'public')));
 
