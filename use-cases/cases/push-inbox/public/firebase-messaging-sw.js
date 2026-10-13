@@ -47,8 +47,8 @@ try {
 
       const notificationOptions = {
         body: payload.data?.pushBody || payload.data?.body || 'Tienes un nuevo contenido disponible.',
-        icon: '/assets/icon-192.png',
-        badge: '/assets/badge-72.png',
+        icon: 'assets/icon-192.png',
+        badge: 'assets/badge-72.png',
         data: {
           inboxId: inboxId,
           url: targetUrl
@@ -75,17 +75,17 @@ self.addEventListener('notificationclick', function(event) {
   const fcmData = fcmMsg.data || {};
 
   const inboxId = notifData.inboxId || fcmData.inboxId || notifData.id || fcmData.id || '';
-  let targetUrl = notifData.url || fcmData.url || (inboxId ? '/?inboxId=' + inboxId : '/');
+  let targetUrl = notifData.url || fcmData.url || (inboxId ? './?inboxId=' + inboxId : './');
 
   // Convertir a URL absoluta
-  const fullTargetUrl = new URL(targetUrl, self.location.origin).href;
+  const fullTargetUrl = new URL(targetUrl, self.registration.scope).href;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       // 1. Si ya hay una ventana/pestaña abierta de la app, enfocarla y enviarle el mensaje
       for (let i = 0; i < windowClients.length; i++) {
         const client = windowClients[i];
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
+        if (client.url.startsWith(self.registration.scope) && 'focus' in client) {
           if (inboxId) {
             client.postMessage({
               type: 'OPEN_INBOX_ITEM',

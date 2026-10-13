@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Casos de Uso</title>
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <main class="page">
+    <header class="page-header">
+      <h1>Casos de uso</h1>
+      <p>Aplicaciones demo de este ambiente de Inspire Flex. Cada una simula el sistema del cliente que genera o recibe las comunicaciones.</p>
+    </header>
+
+    <section id="cases" class="cases" aria-live="polite">
+      <p class="empty">Cargando casos de uso…</p>
+    </section>
+  </main>
+
+  <script>
+    const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
+    async function loadCases() {
+      const container = document.getElementById('cases');
+      try {
+        const res = await fetch('api/cases');
+        const cases = await res.json();
+        if (!cases.length) {
+          container.innerHTML = '<p class="empty">No hay casos de uso habilitados en este ambiente. Actívalos desde Studio Manager.</p>';
+          return;
+        }
+        container.innerHTML = cases.map(c => `
+          <a class="case" href="${escapeHtml(c.path)}">
+            <span class="case-icon" aria-hidden="true">${escapeHtml(c.icon || '📄')}</span>
+            <span class="case-body">
+              <span class="case-name">${escapeHtml(c.name)}</span>
+              <span class="case-desc">${escapeHtml(c.description)}</span>
+              <span class="case-status ${c.status && c.status.ready ? 'ok' : 'warn'}">${escapeHtml(c.status ? c.status.message || 'Listo' : 'Listo')}</span>
+            </span>
+            <span class="case-path">${escapeHtml(c.path)}</span>
+          </a>`).join('');
+      } catch (err) {
+        container.innerHTML = `<p class="empty">No se pudo cargar la lista de casos: ${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    loadCases();
+  </script>
+</body>
+</html>

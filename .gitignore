@@ -22,3 +22,7 @@ __pycache__/
 manager/data/firebase-service-account.json
 manager/data/firebase-web.json
 inbox.env
+use-cases.env
+
+# Node
+node_modules/

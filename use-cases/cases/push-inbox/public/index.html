@@ -15,10 +15,10 @@
   <!-- Bootstrap Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <!-- PWA Manifest & Theme Color -->
-  <link rel="manifest" href="/manifest.json">
+  <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0d6efd">
   <!-- Estilos personalizados -->
-  <link href="/css/styles.css" rel="stylesheet">
+  <link href="css/styles.css" rel="stylesheet">
 </head>
 <body>
 
@@ -308,7 +308,7 @@
                   <i class="bi bi-send-check me-2"></i>Simulador de Envío desde App Externa
                 </h5>
                 <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
-                  POST /api/inbox/send
+                  POST /push-inbox/api/inbox/send
                 </span>
               </div>
               <p class="text-muted small">
@@ -463,7 +463,7 @@
               </thead>
               <tbody>
                 <tr>
-                  <td><span class="badge bg-success">POST</span> <code>/api/inbox/send</code></td>
+                  <td><span class="badge bg-success">POST</span> <code>/push-inbox/api/inbox/send</code></td>
                   <td><code>Content-Type: application/json</code></td>
                   <td>Crea el elemento en el Inbox del usuario en Firestore y envía la Notificación Push por FCM a todos sus dispositivos activos.</td>
                 </tr>
@@ -599,7 +599,7 @@
 
           <div class="alert alert-info small mt-3 mb-0">
             <i class="bi bi-info-circle-fill me-1"></i>
-            <strong>Nota para el Servidor (Backend):</strong> Para habilitar el envío de push desde el servidor, recuerda colocar tu archivo <code>serviceAccountKey.json</code> descargado de Firebase en la raíz del proyecto.
+            <strong>Nota para el Servidor (Backend):</strong> Para habilitar el envío de push desde el servidor, configura la cuenta de servicio de Firebase en Studio Manager (Configuración &gt; Firebase).
           </div>
         </div>
         <div class="modal-footer">
@@ -642,12 +642,12 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <!-- Módulos de la Aplicación -->
-  <script src="/js/runtime-config.js"></script>
-  <script src="/js/firebase-config.js"></script>
-  <script src="/js/auth.js"></script>
-  <script src="/js/fcm.js"></script>
-  <script src="/js/inbox.js"></script>
-  <script src="/js/api-tester.js"></script>
+  <script src="js/runtime-config.js"></script>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/fcm.js"></script>
+  <script src="js/inbox.js"></script>
+  <script src="js/api-tester.js"></script>
 
   <!-- Script para el modal de configuración de Firebase -->
   <script>

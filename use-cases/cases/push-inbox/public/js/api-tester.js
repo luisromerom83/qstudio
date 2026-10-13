@@ -188,7 +188,7 @@ function updateApiExamples() {
   const pushBody = document.getElementById('tester-push-body')?.value || 'Tu factura está lista.';
   const html = document.getElementById('tester-html')?.value || '<h1>Factura</h1>';
 
-  const host = window.location.origin;
+  const endpoint = new URL('api/inbox/send', window.location.href).href;
 
   const payload = {
     userEmail: userEmail,
@@ -201,7 +201,7 @@ function updateApiExamples() {
   // 1. Snippet cURL
   if (testerSnippetCurl) {
     const escapedJson = JSON.stringify(payload, null, 2);
-    testerSnippetCurl.textContent = `curl -X POST "${host}/api/inbox/send" \\
+    testerSnippetCurl.textContent = `curl -X POST "${endpoint}" \\
   -H "Content-Type: application/json" \\
   -d '${escapedJson.replace(/'/g, "'\\''")}'`;
   }
@@ -209,7 +209,7 @@ function updateApiExamples() {
   // 2. Snippet JavaScript
   if (testerSnippetJs) {
     testerSnippetJs.textContent = `// Enviar HTML y Push desde cualquier app JS / Node
-await fetch("${host}/api/inbox/send", {
+await fetch("${endpoint}", {
   method: "POST",
   headers: {
     "Content-Type": "application/json"
@@ -226,7 +226,7 @@ import requests
 payload = ${JSON.stringify(payload, null, 4)}
 
 response = requests.post(
-    "${host}/api/inbox/send",
+    "${endpoint}",
     json=payload
 )
 print(response.json())`;
@@ -264,7 +264,7 @@ if (formApiTester) {
       btnSubmit.disabled = true;
       btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando a la API...';
 
-      const response = await fetch('/api/inbox/send', {
+      const response = await fetch('api/inbox/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

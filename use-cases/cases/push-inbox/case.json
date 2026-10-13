@@ -1,0 +1,8 @@
+{
+  "id": "push-inbox",
+  "name": "Push Notifications Inbox",
+  "description": "App web con login, bandeja de mensajes HTML y notificaciones push (Firebase). Recibe documentos vía POST /push-inbox/api/inbox/send.",
+  "icon": "🔔",
+  "requires": ["firebase"],
+  "order": 20
+}

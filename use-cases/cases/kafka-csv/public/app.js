@@ -1,7 +1,7 @@
 // ==========================================================================
-// VIVO KAFKA DATA PRODUCER STUDIO - JAVASCRIPT CLIENT (pt-BR)
-// Gerenciamento de casos de uso estruturados (Fatura Digital e Telefonia),
-// notificação push, atribuição de user_id por integração e publicação no Kafka.
+// FORMULARIOS A KAFKA - CLIENTE
+// Formularios de negocio (factura digital y solicitud de contacto),
+// notificación push, user_id por integración y publicación en Kafka.
 // ==========================================================================
 
 let currentScreen = 'data';
@@ -9,9 +9,13 @@ let currentUseCase = 1;
 let statsTotalSent = 0;
 let statsTotalErrors = 0;
 let statsTotalTime = 0;
+let defaultUserIds = {
+  '3rd Party': 'quadientlatam@gmail.com',
+  'Quadient Inspire DAS': 'xbaGznvBRTbXKT0YOVEH30959486'
+};
 
 // ==========================================
-// Navegação entre Telas (Seção 1 vs 2)
+// Navegación entre pantallas (sección 1 y 2)
 // ==========================================
 function switchMainScreen(screenId) {
   currentScreen = screenId;
@@ -33,13 +37,28 @@ function switchMainScreen(screenId) {
     screenKafkaView.style.display = 'block';
   }
 
-  logToConsole(`Navegação: ${screenId === 'data' ? 'Seção 1 (Casos de Uso)' : 'Seção 2 (Servidor Kafka, JSON & Logs)'}`);
+  logToConsole(`Navegación: ${screenId === 'data' ? 'Sección 1 (formulario)' : 'Sección 2 (servidor Kafka, JSON y logs)'}`);
   updateLivePreview();
 }
 
 // ==========================================
-// Seletor de Casos de Uso (1 vs 2)
+// Selector de formulario (1 y 2)
 // ==========================================
+const USE_CASE_PRESETS = {
+  1: {
+    title: 'Factura / Recibo digital',
+    useCase: 'Factura / Recibo Digital',
+    pushTitle: 'Tu factura de septiembre está disponible',
+    pushContent: 'Estimado cliente, tu factura digital de septiembre por $ 1,450.00 fue generada correctamente.'
+  },
+  2: {
+    title: 'Solicitud de contacto comercial',
+    useCase: 'Solicitud de Contacto Comercial',
+    pushTitle: 'Confirmación de solicitud comercial',
+    pushContent: 'Recibimos tu solicitud de contacto. Un asesor se comunicará contigo en breve.'
+  }
+};
+
 function switchUseCase(caseNum) {
   currentUseCase = caseNum;
 
@@ -53,72 +72,52 @@ function switchUseCase(caseNum) {
   const pushContentInput = document.getElementById('push_content');
   const useCaseInput = document.getElementById('use_case');
 
-  if (caseNum === 1) {
-    btn1.classList.add('active');
-    btn2.classList.remove('active');
-    panel1.style.display = 'block';
-    panel2.style.display = 'none';
-    heading.textContent = 'Formulário do Caso de Uso: Fatura / Recibo Digital';
-    if (useCaseInput) useCaseInput.value = 'Fatura / Recibo Digital';
+  const preset = USE_CASE_PRESETS[caseNum];
+  const other = USE_CASE_PRESETS[caseNum === 1 ? 2 : 1];
 
-    // Sugestão contextual do push se não foi editada manualmente ou se coincide com a do outro caso
-    if (pushTitleInput.value === 'Confirmação de Solicitação Comercial' || !pushTitleInput.value.trim()) {
-      pushTitleInput.value = 'Sua Fatura de Setembro está disponível';
-    }
-    if (pushContentInput.value.includes('solicitação de contato') || pushContentInput.value.includes('solicitud de contacto') || !pushContentInput.value.trim()) {
-      pushContentInput.value = 'Prezado cliente, sua fatura digital de Setembro no valor de R$ 1.450,00 foi gerada com sucesso.';
-    }
+  btn1.classList.toggle('active', caseNum === 1);
+  btn2.classList.toggle('active', caseNum === 2);
+  panel1.style.display = caseNum === 1 ? 'block' : 'none';
+  panel2.style.display = caseNum === 2 ? 'block' : 'none';
+  heading.textContent = `Formulario: ${preset.title}`;
+  if (useCaseInput) useCaseInput.value = preset.useCase;
 
-    logToConsole('Caso de uso selecionado: [Caso 1] Fatura / Recibo Digital Corporativo');
-  } else {
-    btn1.classList.remove('active');
-    btn2.classList.add('active');
-    panel1.style.display = 'none';
-    panel2.style.display = 'block';
-    heading.textContent = 'Formulário do Caso de Uso: Solicitação de Contato Telefonia Vivo';
-    if (useCaseInput) useCaseInput.value = 'Solicitação de Contato Telefonia';
-
-    if (pushTitleInput.value === 'Sua Fatura de Setembro está disponível' || !pushTitleInput.value.trim()) {
-      pushTitleInput.value = 'Confirmação de Solicitação Comercial';
-    }
-    if (pushContentInput.value.includes('fatura digital') || pushContentInput.value.includes('factura digital') || !pushContentInput.value.trim()) {
-      pushContentInput.value = 'Recebemos sua solicitação de contato para telefonia Vivo. Um consultor entrará em contato em breve.';
-    }
-
-    logToConsole('Caso de uso selecionado: [Caso 2] Solicitação de Contato Comercial Telefonia Vivo');
+  // Sugerir el push del formulario salvo que el usuario lo haya editado
+  if (!pushTitleInput.value.trim() || pushTitleInput.value === other.pushTitle) {
+    pushTitleInput.value = preset.pushTitle;
   }
+  if (!pushContentInput.value.trim() || pushContentInput.value === other.pushContent) {
+    pushContentInput.value = preset.pushContent;
+  }
+
+  logToConsole(`Formulario seleccionado: [${caseNum}] ${preset.title}`);
 
   updateLivePreview();
 }
 
 // ==========================================
-// Seletor de Integração & Atribuição de user_id
+// Selector de integración y user_id por defecto
 // ==========================================
 function selectIntegration(integrationValue) {
   const intInput = document.getElementById('integration');
   const userIdInput = document.getElementById('user_id');
-  const card3rd = document.getElementById('card-int-3rd');
-  const cardDas = document.getElementById('card-int-das');
+  const previousDefault = defaultUserIds[intInput.value];
 
   intInput.value = integrationValue;
+  document.getElementById('card-int-3rd').classList.toggle('active', integrationValue === '3rd Party');
+  document.getElementById('card-int-das').classList.toggle('active', integrationValue !== '3rd Party');
 
-  if (integrationValue === '3rd Party') {
-    userIdInput.value = 'quadientlatam@gmail.com';
-    card3rd.classList.add('active');
-    cardDas.classList.remove('active');
-    logToConsole('Destino de integração: "3rd Party" &bull; ID de usuário atribuído: quadientlatam@gmail.com');
-  } else {
-    userIdInput.value = 'xbaGznvBRTbXKT0YOVEH30959486';
-    card3rd.classList.remove('active');
-    cardDas.classList.add('active');
-    logToConsole('Destino de integração: "Quadient Inspire DAS" &bull; ID de usuário atribuído: xbaGznvBRTbXKT0YOVEH30959486');
+  // Solo se reemplaza el user_id si no fue editado a mano
+  if (!userIdInput.value.trim() || userIdInput.value === previousDefault) {
+    userIdInput.value = defaultUserIds[integrationValue] || '';
   }
+  logToConsole(`Destino de integración: "${integrationValue}" • user_id: ${userIdInput.value}`);
 
   updateLivePreview();
 }
 
 // ==========================================
-// Extração de Dados do Caso de Uso Ativo
+// Datos del formulario activo
 // ==========================================
 function collectUseCaseContent() {
   if (currentUseCase === 1) {
@@ -154,7 +153,7 @@ function collectUseCaseContent() {
 }
 
 // ==========================================
-// Geração do Objeto Final para o Kafka
+// Mensaje final para Kafka
 // ==========================================
 function buildFullPayloadObject() {
   const contentObj = collectUseCaseContent();
@@ -176,7 +175,7 @@ function buildFullPayloadObject() {
 }
 
 // ==========================================
-// Atualização Reativa da Visualização
+// Vista previa reactiva
 // ==========================================
 function handleFieldChange() {
   updateLivePreview();
@@ -186,13 +185,6 @@ function updateLivePreview() {
   const payload = buildFullPayloadObject();
   const jsonStr = JSON.stringify(payload, null, 2);
 
-  // Sincronizar campo oculto content com o JSON do formulário
-  const hiddenContent = document.getElementById('content');
-  if (hiddenContent) {
-    hiddenContent.value = JSON.stringify(payload.content);
-  }
-
-  // Visualização de código
   const codeElem = document.getElementById('preview-envelope-code');
   if (codeElem) {
     codeElem.textContent = jsonStr;
@@ -204,28 +196,53 @@ function handleGeneratePreview() {
   const alertBox = document.getElementById('quick-preview-alert');
   const alertText = document.getElementById('quick-preview-text');
   if (alertBox) {
-    alertText.textContent = `Visualização atualizada para [Caso ${currentUseCase}]. Pronto para envio.`;
+    alertText.textContent = `Vista previa actualizada para el formulario ${currentUseCase}. Lista para enviar.`;
     alertBox.style.display = 'flex';
   }
-  logToConsole(`Visualização gerada para o Caso de Uso ${currentUseCase}.`);
+  logToConsole(`Vista previa generada para el formulario ${currentUseCase}.`);
 }
 
 // ==========================================
-// Envio do Formulário para o Kafka
+// Envío del formulario a Kafka
 // ==========================================
-document.addEventListener('DOMContentLoaded', () => {
-  // Inicializar estado padrão
-  selectIntegration('3rd Party');
-  switchUseCase(1);
-
+document.addEventListener('DOMContentLoaded', async () => {
   const form = document.getElementById('kafka-form');
   if (form) {
     form.addEventListener('submit', handleFormSubmit);
   }
 
-  logToConsole('Sistema Vivo Kafka Data Producer Studio inicializado.');
-  logToConsole('Servidor web pronto para transmitir mensagens estruturadas.');
+  await loadServerConfig();
+  selectIntegration('3rd Party');
+  switchUseCase(1);
+
+  logToConsole('Formularios a Kafka inicializado.');
 });
+
+async function loadServerConfig() {
+  try {
+    const res = await fetch('api/config');
+    const cfg = await res.json();
+    if (cfg.default_user_ids) defaultUserIds = cfg.default_user_ids;
+    document.getElementById('topic').value = cfg.kafka_topic || '';
+    const broker = cfg.kafka_bootstrap_servers || (cfg.kafka_host ? `${cfg.kafka_host}:${cfg.kafka_port}` : '');
+    document.getElementById('host-hint').textContent = broker
+      ? `Vacío: usa el broker del ambiente (${broker})`
+      : 'Este ambiente no tiene broker de Kafka: indica host y puerto';
+    if (!broker) setStatus(false, 'Sin broker configurado');
+  } catch (err) {
+    setStatus(false, 'Servidor no disponible');
+    logToConsole(`[ERROR] No se pudo leer la configuración: ${err.message}`);
+  }
+  document.getElementById('default-user-3rd').textContent = defaultUserIds['3rd Party'] || '';
+  document.getElementById('default-user-das').textContent = defaultUserIds['Quadient Inspire DAS'] || '';
+}
+
+function setStatus(ok, text) {
+  const pill = document.getElementById('status-indicator');
+  pill.classList.toggle('status-online', ok);
+  pill.classList.toggle('status-offline', !ok);
+  document.getElementById('status-text').textContent = text;
+}
 
 async function handleFormSubmit(e) {
   e.preventDefault();
@@ -233,41 +250,39 @@ async function handleFormSubmit(e) {
   const topicInput = document.getElementById('topic');
   const topic = (topicInput.value || "").trim();
   if (!topic) {
-    showBanner('error', 'Informação obrigatória ausente', 'Por favor, informe o nome do Tópico do Kafka na Seção 2.');
+    showBanner('error', 'Falta un dato obligatorio', 'Indica el nombre del tópico de Kafka en la sección 2.');
     switchMainScreen('kafka');
     topicInput.focus();
     return;
   }
 
-  // Garantir payload sincronizado
   updateLivePreview();
 
   const payload = buildFullPayloadObject();
-  const formData = new FormData();
-  formData.append('topic', topic);
-  formData.append('host', (document.getElementById('host').value || "").trim());
-  formData.append('port', (document.getElementById('port').value || "").trim());
-  formData.append('data_type', 'json');
-  formData.append('type_field', 'type');
-  formData.append('content_field', 'content');
-  formData.append('integration_field', 'integration');
-  formData.append('integration', payload.integration);
-  formData.append('user_id', payload.user_id);
-  formData.append('push_title', payload.push_title);
-  formData.append('push_content', payload.push_content);
-  formData.append('use_case', payload.use_case);
-  formData.append('content', JSON.stringify(payload.content));
+  const body = {
+    topic,
+    host: (document.getElementById('host').value || "").trim(),
+    port: (document.getElementById('port').value || "").trim(),
+    data_type: 'json',
+    integration: payload.integration,
+    user_id: payload.user_id,
+    push_title: payload.push_title,
+    push_content: payload.push_content,
+    use_case: payload.use_case,
+    content: payload.content
+  };
 
   setSendingState(true);
-  logToConsole(`Iniciando envio para o Kafka no tópico '${topic}'...`);
+  logToConsole(`Enviando a Kafka en el tópico '${topic}'...`);
   logToConsole(`Caso de uso: "${payload.use_case}" | Destino: "${payload.integration}" | user_id: "${payload.user_id}"`);
 
   const startTime = performance.now();
 
   try {
-    const response = await fetch('/api/send', {
+    const response = await fetch('api/send', {
       method: 'POST',
-      body: formData
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
     });
 
     const elapsedSeconds = ((performance.now() - startTime) / 1000).toFixed(2);
@@ -281,27 +296,26 @@ async function handleFormSubmit(e) {
 
       updateMetrics(statsTotalSent, statsTotalTime, sentCount > 0 ? (sentCount / Math.max(elapsedSeconds, 0.01)).toFixed(1) : '0', statsTotalErrors);
 
-      const successTitle = 'Publicação com Sucesso no Apache Kafka';
-      const successMsg = `1 mensagem com estrutura JSON (Caso ${currentUseCase}) foi publicada no tópico '${topic}' em '${data.bootstrap_servers}'.`;
+      const successTitle = 'Publicado en Apache Kafka';
+      const successMsg = `Se publicó 1 mensaje JSON (formulario ${currentUseCase}) en el tópico '${topic}' de '${data.bootstrap_servers}'.`;
       showBanner('success', successTitle, successMsg);
-      logToConsole(`[SUCESSO] ${successMsg} Tempo: ${elapsedSeconds}s`);
+      logToConsole(`[OK] ${successMsg} Tiempo: ${elapsedSeconds}s`);
 
-      // Abrir tela de visualização se não estava ativa
       switchMainScreen('kafka');
     } else {
       statsTotalErrors++;
       updateMetrics(statsTotalSent, statsTotalTime, '0', statsTotalErrors);
-      const errMsg = data.error || 'Erro desconhecido ao processar a solicitação.';
-      showBanner('error', 'Erro ao enviar para o Kafka', errMsg);
-      logToConsole(`[ERRO] Falha no envio para o Kafka: ${errMsg}`);
+      const errMsg = data.error || 'Error desconocido al procesar la solicitud.';
+      showBanner('error', 'Error al enviar a Kafka', errMsg);
+      logToConsole(`[ERROR] Falló el envío a Kafka: ${errMsg}`);
       switchMainScreen('kafka');
     }
   } catch (err) {
     statsTotalErrors++;
     updateMetrics(statsTotalSent, statsTotalTime, '0', statsTotalErrors);
-    const errMsg = err.message || 'Erro de comunicação de rede com o servidor.';
-    showBanner('error', 'Erro de Rede / Conexão', errMsg);
-    logToConsole(`[ERRO] Exceção de rede: ${errMsg}`);
+    const errMsg = err.message || 'Error de comunicación con el servidor.';
+    showBanner('error', 'Error de red / conexión', errMsg);
+    logToConsole(`[ERROR] Excepción de red: ${errMsg}`);
     switchMainScreen('kafka');
   } finally {
     setSendingState(false);
@@ -309,7 +323,7 @@ async function handleFormSubmit(e) {
 }
 
 // ==========================================
-// Estado de Envio e Indicadores de Carregamento
+// Estado de envío
 // ==========================================
 function setSendingState(isSending) {
   const btnSend = document.getElementById('btn-send');
@@ -321,11 +335,11 @@ function setSendingState(isSending) {
   if (btnSend2) btnSend2.disabled = isSending;
 
   if (spinner) spinner.style.display = isSending ? 'inline-block' : 'none';
-  if (btnText) btnText.textContent = isSending ? 'Enviando para o Kafka...' : '🚀 Enviar para o Kafka';
+  if (btnText) btnText.textContent = isSending ? 'Enviando a Kafka...' : '🚀 Enviar a Kafka';
 }
 
 // ==========================================
-// Banner de Resultados
+// Banner de resultado
 // ==========================================
 function showBanner(type, title, text) {
   const banner = document.getElementById('result-banner');
@@ -364,17 +378,17 @@ function updateMetrics(sent, time, rate, errors) {
 }
 
 // ==========================================
-// Console de Logs
+// Consola de logs
 // ==========================================
 function logToConsole(message) {
   const consoleOutput = document.getElementById('console-output');
   if (!consoleOutput) return;
 
   const now = new Date();
-  const timeStr = now.toLocaleTimeString('pt-BR', { hour12: false });
+  const timeStr = now.toLocaleTimeString('es', { hour12: false });
   const logLine = `[${timeStr}] ${message}\n`;
 
-  if (consoleOutput.textContent === 'Aguardando ações do usuário...') {
+  if (consoleOutput.textContent === 'Esperando acciones del usuario...') {
     consoleOutput.textContent = logLine;
   } else {
     consoleOutput.textContent += logLine;
@@ -385,7 +399,7 @@ function logToConsole(message) {
 function clearConsole() {
   const consoleOutput = document.getElementById('console-output');
   if (consoleOutput) {
-    consoleOutput.textContent = 'Aguardando ações do usuário...';
+    consoleOutput.textContent = 'Esperando acciones del usuario...';
   }
 }
 
@@ -394,8 +408,8 @@ function copyConsoleLogs() {
   if (!consoleOutput) return;
 
   navigator.clipboard.writeText(consoleOutput.textContent).then(() => {
-    alert('Logs copiados para a área de transferência.');
+    alert('Logs copiados al portapapeles.');
   }).catch(err => {
-    console.error('Erro ao copiar logs:', err);
+    console.error('Error al copiar logs:', err);
   });
 }

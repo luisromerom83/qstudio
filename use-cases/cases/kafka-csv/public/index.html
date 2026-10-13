@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Formularios a Kafka</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Encabezado -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">⚡</div>
+        <div class="brand-headings">
+          <h1>Formularios a Kafka</h1>
+          <p class="subtitle">Captura de datos de negocio y publicación del mensaje con la notificación push en Apache Kafka</p>
+        </div>
+      </div>
+      <div class="header-badges">
+        <a class="btn btn-sm btn-ghost" href="../">⯇ Casos de uso</a>
+        <span class="status-pill status-online" id="status-indicator">
+          <span class="status-dot"></span> <span id="status-text">Servidor listo</span>
+        </span>
+      </div>
+    </header>
+
+    <form id="kafka-form">
+      <!-- Navegación principal en dos secciones -->
+      <nav class="screens-nav" aria-label="Navegación de secciones">
+        <button type="button" class="screen-tab-btn active" id="tab-btn-data" onclick="switchMainScreen('data')">
+          <span class="screen-tab-icon">📋</span>
+          <div class="screen-tab-meta">
+            <span class="screen-tab-title">Formulario y notificación push</span>
+            <span class="screen-tab-sub">Selección del caso, datos del formulario y destino de integración</span>
+          </div>
+          <span class="screen-tab-pill" id="screen-data-pill">Sección 1</span>
+        </button>
+
+        <button type="button" class="screen-tab-btn" id="tab-btn-kafka" onclick="switchMainScreen('kafka')">
+          <span class="screen-tab-icon">⚡</span>
+          <div class="screen-tab-meta">
+            <span class="screen-tab-title">Servidor Kafka, JSON y logs</span>
+            <span class="screen-tab-sub">Tópico de destino, payload final en tiempo real y consola de eventos</span>
+          </div>
+          <span class="screen-tab-pill" id="screen-kafka-pill">Sección 2</span>
+        </button>
+      </nav>
+
+      <!-- ========================================================================= -->
+      <!-- PANTALLA 1: FORMULARIO, NOTIFICACIÓN PUSH Y DESTINO DE INTEGRACIÓN          -->
+      <!-- ========================================================================= -->
+      <div id="screen-data-view" class="view-screen active">
+        <section class="card screen-card">
+
+          <!-- ================= SELECTOR DE FORMULARIO ================= -->
+          <div class="usecase-selector-container">
+            <div class="usecase-selector-header">
+              <span class="usecase-badge">Selecciona el formulario</span>
+              <h2 class="usecase-main-title">Formularios de negocio</h2>
+              <p class="section-desc">
+                Elige el flujo de datos a procesar. Los datos capturados se envían como objeto JSON en el campo <code>content</code> del mensaje publicado en Kafka.
+              </p>
+            </div>
+
+            <div class="usecase-tabs-grid">
+              <button type="button" class="usecase-tab-card active" id="btn-usecase-1" onclick="switchUseCase(1)">
+                <div class="usecase-tab-icon">🧾</div>
+                <div class="usecase-tab-info">
+                  <div class="usecase-tab-badge">Formulario 1</div>
+                  <div class="usecase-tab-title">Factura / Recibo digital</div>
+                  <div class="usecase-tab-desc">Emisión y confirmación de una factura digital corporativa con detalle de conceptos</div>
+                </div>
+              </button>
+
+              <button type="button" class="usecase-tab-card" id="btn-usecase-2" onclick="switchUseCase(2)">
+                <div class="usecase-tab-icon">📞</div>
+                <div class="usecase-tab-info">
+                  <div class="usecase-tab-badge">Formulario 2</div>
+                  <div class="usecase-tab-title">Solicitud de contacto comercial</div>
+                  <div class="usecase-tab-desc">Captura de un prospecto interesado en planes y servicios empresariales</div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- ================= A) NOTIFICACIÓN PUSH ================= -->
+          <div class="step-card push-card">
+            <div class="step-header">
+              <div class="step-badge">A</div>
+              <div>
+                <h3 class="step-title">Notificación push</h3>
+                <p class="step-desc">Define el título y el contenido de la notificación push que acompaña al payload.</p>
+              </div>
+            </div>
+
+            <div class="grid-2-col" style="margin-top: 1.1rem;">
+              <div class="form-group">
+                <label for="push_title">
+                  <span class="label-icon">🏷️</span> Título de la notificación <span class="required">*</span>
+                </label>
+                <input type="text" id="push_title" name="push_title" value="" placeholder="ej. Tu factura de septiembre está disponible" oninput="handleFieldChange()">
+                <span class="hint">Título breve que se muestra en la notificación móvil</span>
+              </div>
+
+              <div class="form-group">
+                <label for="push_content">
+                  <span class="label-icon">💬</span> Contenido del push <span class="required">*</span>
+                </label>
+                <textarea id="push_content" name="push_content" rows="2" placeholder="ej. Tu factura por $ 1,450.00 fue generada." oninput="handleFieldChange()"></textarea>
+                <span class="hint">Mensaje principal de la notificación push</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ================= B) FORMULARIO DEL CASO ================= -->
+          <div class="step-card usecase-form-card">
+            <div class="step-header">
+              <div class="step-badge">B</div>
+              <div>
+                <h3 class="step-title" id="usecase-form-heading">Formulario: Factura / Recibo digital</h3>
+                <p class="step-desc">Completa o modifica los datos. Estos campos se agrupan dentro de <code>"content": { ... }</code>.</p>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 1.1rem; margin-bottom: 1.25rem;">
+              <label for="use_case">
+                <span class="label-icon">📂</span> Tipo de caso de uso en el JSON <span class="badge-opt">Campo raíz</span>
+              </label>
+              <input type="text" id="use_case" name="use_case" value="Factura / Recibo Digital" placeholder="ej. Factura / Recibo Digital" oninput="handleFieldChange()">
+              <span class="hint">Identificador enviado en el campo raíz <code>"use_case"</code> del mensaje en Kafka</span>
+            </div>
+
+            <!-- Panel formulario 1: Factura digital -->
+            <div id="panel-usecase-1" class="usecase-panel active">
+              <div class="form-subheading">Información general de la factura</div>
+              <div class="grid-3-col">
+                <div class="form-group">
+                  <label for="f_billing_period">Periodo de facturación</label>
+                  <input type="text" id="f_billing_period" value="Septiembre 2026" oninput="handleFieldChange()">
+                  <span class="hint">Clave: BILLING_PERIOD</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_company_name">Razón social / Empresa</label>
+                  <input type="text" id="f_company_name" value="Compañía Demo S.A." oninput="handleFieldChange()">
+                  <span class="hint">Clave: COMPANY_NAME</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_rfc">Identificación fiscal</label>
+                  <input type="text" id="f_rfc" value="DEM-010101-AB1" oninput="handleFieldChange()">
+                  <span class="hint">Clave: RFC</span>
+                </div>
+              </div>
+
+              <div class="grid-4-col" style="margin-top: 1rem;">
+                <div class="form-group">
+                  <label for="f_folio">Número de factura / Folio</label>
+                  <input type="text" id="f_folio" value="9A8B7C-6543" oninput="handleFieldChange()">
+                  <span class="hint">Clave: FOLIO_FISCAL</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_status">Estado de la factura</label>
+                  <input type="text" id="f_status" value="PAGADA" oninput="handleFieldChange()">
+                  <span class="hint">Clave: STATUS_BADGE</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_currency">Moneda</label>
+                  <input type="text" id="f_currency" value="USD" oninput="handleFieldChange()">
+                  <span class="hint">Clave: CURRENCY</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_total">Importe total</label>
+                  <input type="text" id="f_total" value="$ 1,450.00" oninput="handleFieldChange()">
+                  <span class="hint">Clave: TOTAL_AMOUNT</span>
+                </div>
+              </div>
+
+              <div class="form-subheading" style="margin-top: 1.5rem;">Detalle de conceptos</div>
+              <div class="grid-3-col">
+                <div class="form-group">
+                  <label for="f_item1_name">Concepto 1 - Descripción</label>
+                  <input type="text" id="f_item1_name" value="Suscripción plan corporativo en la nube" oninput="handleFieldChange()">
+                  <span class="hint">Clave: ITEM_1_NAME</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_item1_price">Concepto 1 - Precio</label>
+                  <input type="text" id="f_item1_price" value="$ 1,250.00" oninput="handleFieldChange()">
+                  <span class="hint">Clave: ITEM_1_PRICE</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_item1_qty">Concepto 1 - Cantidad</label>
+                  <input type="text" id="f_item1_qty" value="1" oninput="handleFieldChange()">
+                  <span class="hint">Clave: ITEM_1_QTY</span>
+                </div>
+              </div>
+
+              <div class="grid-3-col" style="margin-top: 0.75rem;">
+                <div class="form-group">
+                  <label for="f_item2_name">Concepto 2 - Descripción</label>
+                  <input type="text" id="f_item2_name" value="Servicio de notificaciones push adicionales" oninput="handleFieldChange()">
+                  <span class="hint">Clave: ITEM_2_NAME</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_item2_price">Concepto 2 - Precio</label>
+                  <input type="text" id="f_item2_price" value="$ 200.00" oninput="handleFieldChange()">
+                  <span class="hint">Clave: ITEM_2_PRICE</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_item2_qty">Concepto 2 - Cantidad</label>
+                  <input type="text" id="f_item2_qty" value="1" oninput="handleFieldChange()">
+                  <span class="hint">Clave: ITEM_2_QTY</span>
+                </div>
+              </div>
+
+              <div class="grid-2-col" style="margin-top: 1rem;">
+                <div class="form-group">
+                  <label for="f_tax">Desglose de impuestos</label>
+                  <input type="text" id="f_tax" value="Impuestos incluidos" oninput="handleFieldChange()">
+                  <span class="hint">Clave: TAX_DISCLAIMER</span>
+                </div>
+                <div class="form-group">
+                  <label for="f_support_email">Correo de soporte</label>
+                  <input type="email" id="f_support_email" value="soporte@compania-demo.com" oninput="handleFieldChange()">
+                  <span class="hint">Clave: SUPPORT_EMAIL</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Panel formulario 2: Solicitud de contacto comercial -->
+            <div id="panel-usecase-2" class="usecase-panel" style="display: none;">
+              <div class="form-subheading">Datos del solicitante</div>
+              <div class="grid-3-col">
+                <div class="form-group">
+                  <label for="c_customer_name">Nombre completo <span class="required">*</span></label>
+                  <input type="text" id="c_customer_name" value="Ana María Torres" placeholder="Nombre y apellido" oninput="handleFieldChange()">
+                  <span class="hint">Clave: CUSTOMER_NAME</span>
+                </div>
+                <div class="form-group">
+                  <label for="c_customer_phone">Teléfono de contacto <span class="required">*</span></label>
+                  <input type="text" id="c_customer_phone" value="+1 555 010 4321" placeholder="+1 555..." oninput="handleFieldChange()">
+                  <span class="hint">Clave: CUSTOMER_PHONE</span>
+                </div>
+                <div class="form-group">
+                  <label for="c_customer_email">Correo de contacto <span class="required">*</span></label>
+                  <input type="email" id="c_customer_email" value="ana.torres@empresa-demo.com" placeholder="correo@empresa.com" oninput="handleFieldChange()">
+                  <span class="hint">Clave: CUSTOMER_EMAIL</span>
+                </div>
+              </div>
+
+              <div class="form-subheading" style="margin-top: 1.5rem;">Detalle del interés</div>
+              <div class="grid-3-col">
+                <div class="form-group">
+                  <label for="c_service_type">Plan / Servicio de interés</label>
+                  <select id="c_service_type" onchange="handleFieldChange()">
+                    <option value="Plan móvil empresarial 5G ilimitado" selected>Plan móvil empresarial 5G ilimitado</option>
+                    <option value="Internet de fibra empresarial dedicado">Internet de fibra empresarial dedicado</option>
+                    <option value="Paquete móvil + internet fijo">Paquete móvil + internet fijo</option>
+                    <option value="Telefonía IP y conmutador virtual">Telefonía IP y conmutador virtual</option>
+                  </select>
+                  <span class="hint">Clave: SERVICE_TYPE</span>
+                </div>
+                <div class="form-group">
+                  <label for="c_request_type">Tipo de solicitud</label>
+                  <select id="c_request_type" onchange="handleFieldChange()">
+                    <option value="Portabilidad de líneas" selected>Portabilidad de líneas</option>
+                    <option value="Contratación de nueva línea">Contratación de nueva línea</option>
+                    <option value="Renovación / mejora de plan">Renovación / mejora de plan</option>
+                  </select>
+                  <span class="hint">Clave: REQUEST_TYPE</span>
+                </div>
+                <div class="form-group">
+                  <label for="c_contact_time">Horario preferido de contacto</label>
+                  <select id="c_contact_time" onchange="handleFieldChange()">
+                    <option value="Por la mañana (09:00 - 12:00)">Por la mañana (09:00 - 12:00)</option>
+                    <option value="Por la tarde (13:00 - 18:00)" selected>Por la tarde (13:00 - 18:00)</option>
+                    <option value="Inmediato / lo antes posible">Inmediato / lo antes posible</option>
+                  </select>
+                  <span class="hint">Clave: PREFERRED_CONTACT_TIME</span>
+                </div>
+              </div>
+
+              <div class="grid-2-col" style="margin-top: 1rem;">
+                <div class="form-group">
+                  <label for="c_location_city">Ciudad / Estado</label>
+                  <input type="text" id="c_location_city" value="Ciudad Demo" oninput="handleFieldChange()">
+                  <span class="hint">Clave: LOCATION_CITY</span>
+                </div>
+                <div class="form-group">
+                  <label for="c_notes">Observaciones / requisitos adicionales</label>
+                  <input type="text" id="c_notes" value="Interés en migrar 15 líneas corporativas con roaming internacional" oninput="handleFieldChange()">
+                  <span class="hint">Clave: NOTES</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ================= C) DESTINO DE INTEGRACIÓN ================= -->
+          <div class="step-card integration-step-card">
+            <div class="step-header">
+              <div class="step-badge">C</div>
+              <div>
+                <h3 class="step-title">Destino de integración</h3>
+                <p class="step-desc">Selecciona la plataforma de destino. El <code>user_id</code> se completa con el valor por defecto de cada opción y puedes cambiarlo.</p>
+              </div>
+            </div>
+
+            <div class="integration-cards-grid" style="margin-top: 1.1rem;">
+              <!-- Opción 1: 3rd Party -->
+              <div class="integration-card active" id="card-int-3rd" onclick="selectIntegration('3rd Party')">
+                <div class="int-card-radio-mark">
+                  <span class="int-radio-dot"></span>
+                </div>
+                <div class="int-card-icon-wrap push-gradient">
+                  <span>🔔</span>
+                </div>
+                <div class="int-card-body">
+                  <div class="int-card-header-row">
+                    <h4 class="int-card-title">3rd Party</h4>
+                    <span class="int-tag int-tag-push">Third Party</span>
+                  </div>
+                  <p class="int-card-desc">
+                    Integración con servicios de mensajería externos y terceros (por ejemplo, el Push Notifications Inbox).
+                  </p>
+                  <div class="assigned-user-id-box">
+                    <span>ID de usuario por defecto:</span>
+                    <code id="default-user-3rd"></code>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Opción 2: Quadient Inspire DAS -->
+              <div class="integration-card" id="card-int-das" onclick="selectIntegration('Quadient Inspire DAS')">
+                <div class="int-card-radio-mark">
+                  <span class="int-radio-dot"></span>
+                </div>
+                <div class="int-card-icon-wrap das-gradient">
+                  <span>🏛️</span>
+                </div>
+                <div class="int-card-body">
+                  <div class="int-card-header-row">
+                    <h4 class="int-card-title">Quadient Inspire DAS</h4>
+                    <span class="int-tag int-tag-das">Quadient DAS</span>
+                  </div>
+                  <p class="int-card-desc">
+                    Procesamiento mediante Quadient Inspire Digital Advantage Suite (DAS).
+                  </p>
+                  <div class="assigned-user-id-box">
+                    <span>ID de usuario por defecto:</span>
+                    <code id="default-user-das"></code>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 1rem;">
+              <label for="user_id">
+                <span class="label-icon">👤</span> ID de usuario destinatario <span class="badge-opt">user_id</span>
+              </label>
+              <input type="text" id="user_id" name="user_id" value="" oninput="handleFieldChange()">
+              <span class="hint">Correo o UID del usuario que recibirá la comunicación (por ejemplo, el usuario con sesión en el inbox)</span>
+            </div>
+          </div>
+
+          <input type="hidden" id="integration" name="integration" value="3rd Party">
+
+          <!-- Alerta rápida -->
+          <div id="quick-preview-alert" class="quick-alert" style="display: none;">
+            <div class="quick-alert-content">
+              <span class="quick-alert-icon">📋</span>
+              <div class="quick-alert-text" id="quick-preview-text">Vista previa del JSON generada.</div>
+            </div>
+            <button type="button" class="btn btn-sm btn-accent" onclick="switchMainScreen('kafka')">
+              Ver JSON y logs ➔
+            </button>
+          </div>
+
+          <!-- Acciones de la pantalla 1 -->
+          <div class="actions-bar">
+            <button type="button" class="btn btn-secondary" id="btn-preview" onclick="handleGeneratePreview()">
+              👁️ Ver JSON
+            </button>
+            <button type="submit" class="btn btn-primary" id="btn-send">
+              <span id="btn-send-spinner" class="spinner" style="display: none;"></span>
+              <span id="btn-send-text">🚀 Enviar a Kafka</span>
+            </button>
+            <button type="button" class="btn btn-ghost" onclick="switchMainScreen('kafka')">
+              ⚡ Ir a servidor Kafka y logs ➔
+            </button>
+          </div>
+
+        </section>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- PANTALLA 2: CONFIGURACIÓN DE KAFKA, VISTA PREVIA Y ACTIVIDAD                -->
+      <!-- ========================================================================= -->
+      <div id="screen-kafka-view" class="view-screen" style="display: none;">
+
+        <section class="card config-card">
+          <div class="card-header-flex">
+            <div class="section-title" style="margin-bottom: 0;">
+              <span class="icon">⚡</span> Configuración del servidor Kafka
+            </div>
+            <div class="card-header-actions">
+              <button type="button" class="btn btn-sm btn-ghost" onclick="switchMainScreen('data')">
+                ⯇ Volver al formulario
+              </button>
+            </div>
+          </div>
+
+          <div class="grid-3-col" style="margin-top: 1.25rem;">
+            <div class="form-group">
+              <label for="host">IP o host de Kafka</label>
+              <input type="text" id="host" name="host" placeholder="ej. 192.168.1.50 o localhost">
+              <span class="hint" id="host-hint">Vacío: usa el broker del ambiente</span>
+            </div>
+            <div class="form-group">
+              <label for="port">Puerto</label>
+              <input type="number" id="port" name="port" placeholder="9092">
+              <span class="hint">Solo se usa si indicas un host</span>
+            </div>
+            <div class="form-group">
+              <label for="topic">Tópico de destino <span class="required">*</span></label>
+              <input type="text" id="topic" name="topic" placeholder="ej. demo-events" required>
+              <span class="hint">Variable: KAFKA_TOPIC</span>
+            </div>
+          </div>
+
+          <div class="actions-bar" style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+            <button type="button" class="btn btn-secondary" onclick="handleGeneratePreview()">
+              👁️ Actualizar vista previa
+            </button>
+            <button type="submit" class="btn btn-primary" id="btn-send-screen2">
+              <span>🚀 Publicar en Kafka</span>
+            </button>
+            <span class="hint" style="margin-left: auto; align-self: center;">
+              Publica el mensaje estructurado en este tópico de Kafka.
+            </span>
+          </div>
+        </section>
+
+        <div class="kafka-workspace-grid" style="margin-top: 1.5rem;">
+
+          <!-- Columna A: vista previa del JSON -->
+          <section class="card results-card">
+
+            <div id="result-banner" class="banner banner-idle">
+              <div class="banner-icon" id="banner-icon">ℹ️</div>
+              <div class="banner-body">
+                <div class="banner-title" id="banner-title">Listo para enviar</div>
+                <div class="banner-text" id="banner-text">Revisa el JSON final y publícalo en Kafka para ver el resultado en tiempo real.</div>
+              </div>
+            </div>
+
+            <div class="metrics-grid" id="metrics-panel">
+              <div class="metric-item">
+                <div class="metric-val" id="metric-sent">0</div>
+                <div class="metric-label">Mensajes enviados</div>
+              </div>
+              <div class="metric-item">
+                <div class="metric-val" id="metric-time">0.00s</div>
+                <div class="metric-label">Tiempo total</div>
+              </div>
+              <div class="metric-item">
+                <div class="metric-val" id="metric-rate">0 /s</div>
+                <div class="metric-label">Tasa media</div>
+              </div>
+              <div class="metric-item">
+                <div class="metric-val" id="metric-errors">0</div>
+                <div class="metric-label">Errores</div>
+              </div>
+            </div>
+
+            <div class="preview-container">
+              <div class="preview-header">
+                <h3>📬 Payload JSON para Kafka</h3>
+                <span class="badge" id="preview-count-badge">Formato JSON</span>
+              </div>
+
+              <div class="envelope-wrapper" id="envelope-wrapper">
+                <div class="envelope-header">
+                  <span class="envelope-title">Estructura exacta del mensaje publicado:</span>
+                </div>
+                <pre class="json-code-box"><code id="preview-envelope-code"></code></pre>
+              </div>
+            </div>
+
+          </section>
+
+          <!-- Columna B: consola de actividad -->
+          <section class="card console-card">
+            <div class="console-section" style="margin-top: 0; height: 100%; display: flex; flex-direction: column;">
+              <div class="console-header">
+                <span>📟 Registro de actividad</span>
+                <div style="display: flex; gap: 0.5rem;">
+                  <button type="button" class="btn-link" onclick="copyConsoleLogs()">Copiar</button>
+                  <button type="button" class="btn-link" onclick="clearConsole()">Limpiar</button>
+                </div>
+              </div>
+              <pre class="console-output" id="console-output" style="flex: 1; min-height: 480px;">Esperando acciones del usuario...</pre>
+            </div>
+          </section>
+
+        </div>
+
+      </div>
+
+    </form>
+
+    <footer class="app-footer">
+      <span>Formularios a Kafka &bull; Caso de uso demo</span>
+      <span>API: <code>POST /kafka-csv/api/send</code></span>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

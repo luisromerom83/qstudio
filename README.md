@@ -43,6 +43,24 @@ Desde el panel de control podrás:
 
 ---
 
+## 🧩 Casos de Uso
+
+Las apps demo que simulan los sistemas del cliente (formularios, inbox de notificaciones, etc.) viven en un solo contenedor, `use-cases`, con un solo puerto. Al crear o editar un ambiente se marca cada caso de uso por separado; el portal en `http://localhost:<puerto>/` lista los habilitados y cada uno responde en su propia ruta:
+
+| Caso | Ruta | Requiere |
+|------|------|----------|
+| Formularios a Kafka | `/kafka-csv/` | Apache Kafka (servicio opcional del ambiente) |
+| Push Notifications Inbox | `/push-inbox/` | Proyecto de Firebase (Configuración) |
+
+Para agregar un caso nuevo, crea `use-cases/cases/<id>/` con:
+- `case.json`: `name`, `description`, `icon`, `requires` (`kafka`, `firebase`) y `order`.
+- `router.js`: exporta `{ router }` (un `express.Router` con sus APIs y `express.static` de su carpeta `public/`) y, opcionalmente, `status()` para indicar en el portal si le falta configuración.
+- `public/`: el frontend, con rutas relativas (`api/...`, `app.js`) porque se sirve bajo `/<id>/`.
+
+El manager lo detecta solo y lo muestra como checkbox.
+
+---
+
 ## 🛠️ Comandos de Mantenimiento
 
 * **Ver estado y logs:**

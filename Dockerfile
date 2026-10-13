@@ -26,8 +26,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy manager application and bundled assets (demo-mode, helpers)
 COPY manager/ ./manager/
 COPY Inspire/demo-mode/ ./Inspire/demo-mode/
-COPY producer/ ./producer/
-COPY inbox/ ./inbox/
+COPY use-cases/ ./use-cases/
 COPY init-databases.sql .
 COPY grant_impersonation.java .
 COPY clean_config.json .

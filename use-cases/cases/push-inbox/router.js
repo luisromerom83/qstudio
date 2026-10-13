@@ -1,38 +1,35 @@
 const express = require('express');
-const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-require('dotenv').config();
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+// Montado en /push-inbox; los links de las notificaciones deben apuntar dentro de esa ruta
+const BASE_PATH = '/push-inbox';
 
-// Middlewares
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+const router = express.Router();
 
 /**
  * Configuración web de Firebase para el navegador, tomada de variables de entorno
  * (FIREBASE_WEB_CONFIG en JSON o Base64, FIREBASE_VAPID_KEY). Debe ir antes de express.static.
  */
-app.get('/js/runtime-config.js', (req, res) => {
-  let config = null;
-  const rawConfig = (process.env.FIREBASE_WEB_CONFIG || '').trim();
-  if (rawConfig) {
-    try {
-      config = JSON.parse(rawConfig.startsWith('{') ? rawConfig : Buffer.from(rawConfig, 'base64').toString('utf8'));
-    } catch (err) {
-      console.error('❌ FIREBASE_WEB_CONFIG no es un JSON válido:', err.message);
-    }
-  }
-  const runtime = { config, vapidKey: (process.env.FIREBASE_VAPID_KEY || '').trim() || null };
+router.get('/js/runtime-config.js', (req, res) => {
+  const runtime = { config: readWebConfig(), vapidKey: (process.env.FIREBASE_VAPID_KEY || '').trim() || null };
   res.type('application/javascript').set('Cache-Control', 'no-store');
   res.send(`window.__FIREBASE_RUNTIME__ = ${JSON.stringify(runtime).replace(/</g, '\\u003c')};`);
 });
 
+function readWebConfig() {
+  const rawConfig = (process.env.FIREBASE_WEB_CONFIG || '').trim();
+  if (!rawConfig) return null;
+  try {
+    return JSON.parse(rawConfig.startsWith('{') ? rawConfig : Buffer.from(rawConfig, 'base64').toString('utf8'));
+  } catch (err) {
+    console.error('❌ FIREBASE_WEB_CONFIG no es un JSON válido:', err.message);
+    return null;
+  }
+}
+
 // Servir archivos estáticos del frontend
-app.use(express.static(path.join(__dirname, 'public')));
+router.use(express.static(path.join(__dirname, 'public')));
 
 // Estado de Firebase Admin
 let admin = null;
@@ -127,7 +124,7 @@ initFirebaseAdmin();
  * Endpoint de estado y diagnóstico
  * GET /api/status
  */
-app.get('/api/status', (req, res) => {
+router.get('/api/status', (req, res) => {
   res.json({
     status: 'online',
     timestamp: new Date().toISOString(),
@@ -140,7 +137,7 @@ app.get('/api/status', (req, res) => {
  * POST /api/inbox/register-token
  * Body: { userId, userEmail, token, userAgent }
  */
-app.post('/api/inbox/register-token', async (req, res) => {
+router.post('/api/inbox/register-token', async (req, res) => {
   const { userId, userEmail, token, userAgent } = req.body;
 
   if (!userId || !token) {
@@ -188,7 +185,7 @@ app.post('/api/inbox/register-token', async (req, res) => {
  * - pushTitle: título de la notificación push
  * - pushBody: contenido/cuerpo de la notificación push
  */
-app.post('/api/inbox/send', async (req, res) => {
+router.post('/api/inbox/send', async (req, res) => {
   const { userId, userEmail, title, html, pushTitle, pushBody, metadata } = req.body;
 
   // 1. Validaciones
@@ -297,15 +294,15 @@ app.post('/api/inbox/send', async (req, res) => {
           pushBody: pushBody,
           inboxId: inboxRef.id,
           createdAt: now,
-          url: `/?inboxId=${inboxRef.id}`,
-          click_action: `/?inboxId=${inboxRef.id}`
+          url: `${BASE_PATH}/?inboxId=${inboxRef.id}`,
+          click_action: `${BASE_PATH}/?inboxId=${inboxRef.id}`
         },
         webpush: {
           headers: {
             Urgency: 'high'
           },
           fcmOptions: {
-            link: `/?inboxId=${inboxRef.id}`
+            link: `${BASE_PATH}/?inboxId=${inboxRef.id}`
           }
         }
       };
@@ -368,7 +365,7 @@ app.post('/api/inbox/send', async (req, res) => {
  * - url (opcional): link al hacer clic
  * - data (opcional): metadata adicional
  */
-app.post('/api/push/send', async (req, res) => {
+router.post('/api/push/send', async (req, res) => {
   const { userId, userEmail, title, pushTitle, body, pushBody, url, data } = req.body;
 
   const finalTitle = (title || pushTitle || '').trim();
@@ -440,7 +437,7 @@ app.post('/api/push/send', async (req, res) => {
       const customData = Object.assign({}, data || {}, {
         title: finalTitle,
         body: finalBody,
-        url: url || '/',
+        url: url || `${BASE_PATH}/`,
         type: 'push_only',
         timestamp: new Date().toISOString()
       });
@@ -453,7 +450,7 @@ app.post('/api/push/send', async (req, res) => {
             Urgency: 'high'
           },
           fcmOptions: {
-            link: url || '/'
+            link: url || `${BASE_PATH}/`
           }
         }
       };
@@ -505,19 +502,21 @@ app.post('/api/push/send', async (req, res) => {
 });
 
 // Ruta de captura para la SPA (Single Page Application)
-app.get('*', (req, res) => {
+router.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Iniciar servidor solo si se ejecuta directamente (en Vercel se exporta como Serverless Function)
-if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`===================================================`);
-    console.log(`🚀 Servidor ejecutándose en http://localhost:${PORT}`);
-    console.log(`📁 Frontend disponible en: http://localhost:${PORT}`);
-    console.log(`📡 API endpoint: POST http://localhost:${PORT}/api/inbox/send`);
-    console.log(`===================================================`);
-  });
-}
-
-module.exports = app;
+module.exports = {
+  router,
+  // Rutas que Scaler/aplicaciones externas ya usaban en la raíz del antiguo contenedor push-inbox
+  legacyPaths: ['/api/inbox/', '/api/push/'],
+  status() {
+    const missing = [];
+    if (!firebaseAdminStatus.initialized) missing.push('cuenta de servicio');
+    if (!readWebConfig()) missing.push('configuración web');
+    if (!(process.env.FIREBASE_VAPID_KEY || '').trim()) missing.push('VAPID key');
+    return missing.length
+      ? { ready: false, message: `Firebase sin configurar (falta: ${missing.join(', ')}). Configúralo en Studio Manager.` }
+      : { ready: true, message: 'Firebase configurado' };
+  }
+};

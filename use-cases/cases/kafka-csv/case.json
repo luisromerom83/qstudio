@@ -1,0 +1,8 @@
+{
+  "id": "kafka-csv",
+  "name": "Formularios a Kafka",
+  "description": "Formularios de negocio (factura digital, solicitud de contacto) que publican un mensaje JSON en un tópico de Kafka con los datos de la notificación push.",
+  "icon": "⚡",
+  "requires": ["kafka"],
+  "order": 10
+}

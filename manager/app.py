@@ -50,6 +50,7 @@ def get_config():
         },
         "needs_onboarding": is_onboarding_needed,
         "firebase": env_service.get_firebase_status(),
+        "use_cases": env_service.get_use_case_catalog(),
         "verticals": VERTICAL_CATEGORIES
     })
 

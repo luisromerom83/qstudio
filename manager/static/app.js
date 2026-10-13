@@ -7,6 +7,7 @@ let currentFilter = "all";
 let activeContainerForLogs = null;
 let logPollInterval = null;
 let verticals = [];             // from /api/config
+let useCaseCatalog = [];        // from /api/config: bundled use cases (use-cases/cases/*/case.json)
 const busyEnvs = new Map();     // envId -> {kind: "activate"|"stop", label, step, total}
 let lastEnvSnapshot = "";
 
@@ -85,6 +86,7 @@ async function checkConfigAndOnboarding() {
     // Populate settings form
     const creds = data.credentials || {};
     verticals = data.verticals || [];
+    useCaseCatalog = data.use_cases || [];
     renderFilterPills();
     document.getElementById("setting-registry").value = creds.registry || "quadientdistribution.azurecr.io";
     document.getElementById("setting-username").value = creds.username || "";
@@ -191,8 +193,52 @@ function renderFirebaseStatus(fb) {
       !(fb && fb.web_config) && "configuración web",
       !(fb && fb.vapid_key) && "VAPID key"
     ].filter(Boolean);
-    el.textContent = `Sin configurar (falta: ${missing.join(", ")}). El inbox arrancará, pero no podrá iniciar sesión, guardar mensajes ni enviar notificaciones.`;
+    el.textContent = `Sin configurar (falta: ${missing.join(", ")}). El caso de uso Push Notifications Inbox arrancará, pero no podrá iniciar sesión, guardar mensajes ni enviar notificaciones.`;
   }
+}
+
+// ------------------------------------------------------------------------------
+// Use cases (one checkbox per bundled case)
+// ------------------------------------------------------------------------------
+const USE_CASE_REQUIREMENTS = {
+  kafka: "Publica en Kafka: activa también Apache Kafka.",
+  firebase: "Requiere tu proyecto de Firebase en Configuración."
+};
+
+function renderUseCaseCheckboxes(prefix, selected) {
+  const container = document.getElementById(`${prefix}-env-use-cases`);
+  if (!container) return;
+  if (!useCaseCatalog.length) {
+    container.innerHTML = `<p class="text-[11px] text-slate-500">No hay casos de uso disponibles en esta versión del Studio.</p>`;
+    return;
+  }
+  container.innerHTML = useCaseCatalog.map(c => {
+    const id = `${prefix}-env-uc-${c.id}`;
+    const reqs = (c.requires || []).map(r => USE_CASE_REQUIREMENTS[r]).filter(Boolean).join(" ");
+    return `
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-start gap-3 hover:border-slate-700 transition">
+        <input type="checkbox" id="${id}" data-use-case="${escapeHtml(c.id)}" data-requires="${escapeHtml((c.requires || []).join(","))}"
+          ${selected.includes(c.id) ? "checked" : ""} onchange="handleUseCaseToggle('${prefix}', this)"
+          class="mt-1 w-4 h-4 rounded border-slate-700 text-brand-600 bg-slate-950 focus:ring-brand-500 cursor-pointer">
+        <label for="${id}" class="cursor-pointer">
+          <span class="block text-xs font-semibold text-white">${escapeHtml(c.name)} <code class="text-[10px] text-slate-500 font-normal">/${escapeHtml(c.id)}/</code></span>
+          <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">${escapeHtml(c.description)}${reqs ? ` <span class="text-slate-500">${escapeHtml(reqs)}</span>` : ""}</span>
+        </label>
+      </div>`;
+  }).join("");
+}
+
+function handleUseCaseToggle(prefix, checkbox) {
+  // Selecting a Kafka use case brings the broker along; it can still be unchecked for an external broker
+  if (checkbox.checked && checkbox.dataset.requires.split(",").includes("kafka")) {
+    const kafka = document.getElementById(`${prefix}-env-enable-kafka`);
+    if (kafka) kafka.checked = true;
+  }
+}
+
+function selectedUseCases(prefix) {
+  return Array.from(document.querySelectorAll(`#${prefix}-env-use-cases input[data-use-case]:checked`))
+    .map(el => el.dataset.useCase);
 }
 
 async function handleSaveFirebase(e) {
@@ -655,8 +701,7 @@ function openNewEnvModal() {
   if (chkScaler) chkScaler.checked = true;
   const chkKafka = document.getElementById("new-env-enable-kafka");
   if (chkKafka) chkKafka.checked = false;
-  const chkInbox = document.getElementById("new-env-enable-inbox");
-  if (chkInbox) chkInbox.checked = false;
+  renderUseCaseCheckboxes("new", []);
   const chkFtp = document.getElementById("new-env-enable-ftp");
   if (chkFtp) chkFtp.checked = false;
   toggleScalerSharedFolder();
@@ -696,8 +741,6 @@ async function handleCreateEnvSubmit(e) {
   const scalerJobsDir = document.getElementById("new-env-scaler-jobs-dir")?.value.trim() || "";
   const chkKafka = document.getElementById("new-env-enable-kafka");
   const enableKafka = chkKafka ? chkKafka.checked : false;
-  const chkInbox = document.getElementById("new-env-enable-inbox");
-  const enableInbox = chkInbox ? chkInbox.checked : false;
   const chkFtp = document.getElementById("new-env-enable-ftp");
   const enableFtp = chkFtp ? chkFtp.checked : false;
 
@@ -713,7 +756,7 @@ async function handleCreateEnvSubmit(e) {
     scaler_sharedfolder: scalerSharedfolder,
     scaler_jobs_dir: scalerJobsDir,
     enable_kafka: enableKafka,
-    enable_inbox: enableInbox,
+    use_cases: selectedUseCases("new"),
     enable_ftp: enableFtp
   };
   if (port) {
@@ -794,8 +837,7 @@ function openEditEnvModal(envId) {
   const chkKafka = document.getElementById("edit-env-enable-kafka");
   if (chkKafka) chkKafka.checked = Boolean(env.enable_kafka);
 
-  const chkInbox = document.getElementById("edit-env-enable-inbox");
-  if (chkInbox) chkInbox.checked = Boolean(env.enable_inbox);
+  renderUseCaseCheckboxes("edit", env.use_cases || []);
 
   const chkFtp = document.getElementById("edit-env-enable-ftp");
   if (chkFtp) chkFtp.checked = Boolean(env.enable_ftp);
@@ -819,7 +861,6 @@ async function handleEditEnvSubmit(e) {
   const scalerSharedfolder = document.getElementById("edit-env-scaler-sharedfolder")?.value.trim() || "";
   const scalerJobsDir = document.getElementById("edit-env-scaler-jobs-dir")?.value.trim() || "";
   const enableKafka = document.getElementById("edit-env-enable-kafka")?.checked ?? false;
-  const enableInbox = document.getElementById("edit-env-enable-inbox")?.checked ?? false;
   const enableFtp = document.getElementById("edit-env-enable-ftp")?.checked ?? false;
   const demoMode = document.getElementById("edit-env-demo-mode")?.checked ?? false;
 
@@ -831,7 +872,7 @@ async function handleEditEnvSubmit(e) {
     scaler_sharedfolder: scalerSharedfolder,
     scaler_jobs_dir: scalerJobsDir,
     enable_kafka: enableKafka,
-    enable_inbox: enableInbox,
+    use_cases: selectedUseCases("edit"),
     enable_ftp: enableFtp,
     demo_mode: demoMode
   };
@@ -934,16 +975,11 @@ function getServicePortInfo(c, env) {
     portText = `30354 (IPS Interactive)`;
   } else if (s.includes("prepare")) {
     portText = `One-Shot (Prep BD)`;
-  } else if (s.includes("push-inbox")) {
-    const port = extractHostPort(c.ports, 3000) || ports.inbox || 3000;
+  } else if (s.includes("use-cases")) {
+    const port = extractHostPort(c.ports, 3000) || ports.use_cases || 3000;
     portText = `${port}`;
     accessUrl = `http://${host}:${port}/`;
-    urlLabel = "Abrir Push Notifications Inbox";
-  } else if (s.includes("studio") || s.includes("producer")) {
-    const port = extractHostPort(c.ports, 8080) || ports.csv_studio || 8081;
-    portText = `${port}`;
-    accessUrl = `http://${host}:${port}/`;
-    urlLabel = "Abrir Kafka CSV Studio";
+    urlLabel = "Abrir portal de casos de uso";
   } else if (s.includes("kafka")) {
     const port = extractHostPort(c.ports, 29092) || extractHostPort(c.ports, 9092) || ports.kafka || 9092;
     portText = `${port} (KRaft Broker)`;
@@ -964,8 +1000,8 @@ function renderNodeBox({ title, container, defaultPort, internalPort, type, env 
   const host = window.location.hostname || "localhost";
   const portInfo = container ? getServicePortInfo(container, env) : {
     portText: `${defaultPort}${internalPort ? ` -> ${internalPort}` : ''}`,
-    accessUrl: type === "interactive" ? `http://${host}:${defaultPort}/interactive` : ((type === "scaler" || type === "studio" || type === "inbox") ? `http://${host}:${defaultPort}/` : null),
-    urlLabel: type === "interactive" ? "Abrir Inspire Interactive" : (type === "scaler" ? "Abrir Inspire Scaler" : (type === "studio" ? "Abrir Kafka CSV Studio" : (type === "inbox" ? "Abrir Push Notifications Inbox" : "")))
+    accessUrl: type === "interactive" ? `http://${host}:${defaultPort}/interactive` : ((type === "scaler" || type === "use-cases") ? `http://${host}:${defaultPort}/` : null),
+    urlLabel: type === "interactive" ? "Abrir Inspire Interactive" : (type === "scaler" ? "Abrir Inspire Scaler" : (type === "use-cases" ? "Abrir portal de casos de uso" : ""))
   };
 
   return `
@@ -1141,17 +1177,12 @@ function renderServicesView() {
 
   const kafka = rawContainers.find(c => {
     const s = (c.service || c.name || "").toLowerCase();
-    return s.includes("kafka") && !s.includes("studio") && !s.includes("producer");
+    return s === "kafka" || s.endsWith("-kafka");
   });
 
-  const kafkaProducer = rawContainers.find(c => {
+  const useCasesContainer = rawContainers.find(c => {
     const s = (c.service || c.name || "").toLowerCase();
-    return s.includes("kafka-csv-studio") || s.includes("producer") || (s.includes("studio") && !s.includes("inspire"));
-  });
-
-  const pushInbox = rawContainers.find(c => {
-    const s = (c.service || c.name || "").toLowerCase();
-    return s.includes("push-inbox");
+    return s.includes("use-cases");
   });
 
   const ftp = rawContainers.find(c => {
@@ -1168,7 +1199,7 @@ function renderServicesView() {
   const interPrep = rawContainers.find(c => (c.service || c.name || "").toLowerCase().includes("interactive-prepare"));
 
   // Check extra unmapped containers
-  const coreIds = [interactive, interactiveIps, scaler, scalerIps, icm, postgres, scalerPrep, interPrep, kafka, kafkaProducer, pushInbox, ftp]
+  const coreIds = [interactive, interactiveIps, scaler, scalerIps, icm, postgres, scalerPrep, interPrep, kafka, useCasesContainer, ftp]
     .filter(Boolean)
     .map(c => c.name);
   const extraContainers = rawContainers.filter(c => !coreIds.includes(c.name));
@@ -1177,8 +1208,9 @@ function renderServicesView() {
 
   const hasInteractive = env.enable_interactive !== false;
   const hasScaler = env.enable_scaler !== false;
-  const hasKafka = Boolean(env.enable_kafka || kafka || kafkaProducer);
-  const hasInbox = Boolean(env.enable_inbox || pushInbox);
+  const hasKafka = Boolean(env.enable_kafka || kafka);
+  const envUseCases = (env.use_cases || []).map(id => useCaseCatalog.find(c => c.id === id) || { id, name: id });
+  const hasUseCases = Boolean(envUseCases.length || useCasesContainer);
   const hasFtp = Boolean(env.enable_ftp || ftp);
 
   // Helper to render Interactive Group
@@ -1303,10 +1335,10 @@ function renderServicesView() {
               <span class="font-bold text-slate-200">KAFKA</span>
             </span>
           ` : ''}
-          ${hasInbox ? `
+          ${hasUseCases ? `
             <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
               <span class="w-3 h-3 rounded-sm bg-[#A35F78] inline-block border border-slate-700"></span>
-              <span class="font-bold text-slate-200">PUSH INBOX</span>
+              <span class="font-bold text-slate-200">CASOS DE USO</span>
             </span>
           ` : ''}
           ${hasFtp ? `
@@ -1491,7 +1523,7 @@ function renderServicesView() {
   `;
 
   // OPTIONAL THIRD-PARTY SERVICES: KAFKA, PUSH INBOX & FTP
-  if (hasKafka || hasInbox || hasFtp) {
+  if (hasKafka || hasUseCases || hasFtp) {
     html += `
       <div class="pt-6 border-t border-slate-800 space-y-6">
         <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -1499,17 +1531,64 @@ function renderServicesView() {
           Servicios de Integración y Terceros Opcionales
         </div>
 
-        <div class="grid grid-cols-1 ${[hasKafka, hasInbox, hasFtp].filter(Boolean).length > 1 ? 'lg:grid-cols-2' : ''} gap-6">
-          ${hasKafka ? `
-            <!-- KAFKA STREAMING & CSV STUDIO GROUP -->
+        <div class="grid grid-cols-1 ${[hasKafka, hasUseCases, hasFtp].filter(Boolean).length > 1 ? 'lg:grid-cols-2' : ''} gap-6">
+          ${hasUseCases ? `
+            <!-- USE CASES GROUP -->
             <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
-              <!-- Header Banner (Indigo/Purple) -->
-              <div class="bg-[#6E6CA3] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
-                <i data-lucide="radio" class="w-4 h-4 text-white"></i>
-                <span>KAFKA STREAMING & CSV STUDIO</span>
+              <div class="bg-[#A35F78] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
+                <i data-lucide="layout-grid" class="w-4 h-4 text-white"></i>
+                <span>CASOS DE USO</span>
               </div>
 
-              <!-- Group Body: Broker and CSV Producer -->
+              <div class="p-4 sm:p-5 flex-1 flex flex-col justify-between bg-slate-900/60 space-y-4">
+                ${renderNodeBox({
+                  title: "PORTAL DE CASOS DE USO",
+                  container: useCasesContainer,
+                  defaultPort: env.ports?.use_cases || 3000,
+                  internalPort: 3000,
+                  type: "use-cases",
+                  env: env
+                })}
+
+                <div class="space-y-2">
+                  ${envUseCases.map(c => {
+                    const url = `http://${window.location.hostname || "localhost"}:${env.ports?.use_cases || 3000}/${c.id}/`;
+                    const isUp = useCasesContainer && useCasesContainer.state === "running";
+                    return `
+                      <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer"
+                         class="flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs border ${isUp ? 'bg-slate-950/70 border-slate-800 hover:border-slate-600 text-slate-200' : 'bg-slate-800/40 border-slate-800 text-slate-500 pointer-events-none'} transition">
+                        <span class="flex items-center gap-2 truncate">
+                          <span aria-hidden="true">${escapeHtml(c.icon || "")}</span>
+                          <span class="font-semibold truncate">${escapeHtml(c.name)}</span>
+                        </span>
+                        <span class="font-mono text-[10px] text-slate-400 flex-shrink-0">/${escapeHtml(c.id)}/</span>
+                      </a>`;
+                  }).join("")}
+                </div>
+
+                ${(env.use_cases || []).includes("push-inbox") ? `
+                  <div class="bg-slate-950/80 p-3.5 rounded-xl border border-rose-500/30 flex flex-col gap-2 text-xs">
+                    <span class="text-rose-300 font-semibold flex items-center gap-1.5">
+                      <i data-lucide="send" class="w-3.5 h-3.5"></i> Endpoint del inbox para Scaler / Kafka
+                    </span>
+                    <div class="font-mono text-[11px] bg-slate-900 p-2 rounded-lg border border-slate-800 text-slate-300 break-all">
+                      POST http://use-cases:3000/push-inbox/api/inbox/send
+                    </div>
+                    <span class="text-[10px] text-slate-500">También responde en <code>http://push-inbox:3000/api/inbox/send</code> para no romper conectores previos. Desde el navegador usa <code>localhost</code>: las notificaciones push solo funcionan en localhost o HTTPS.</span>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          ` : ''}
+
+          ${hasKafka ? `
+            <!-- KAFKA BROKER GROUP -->
+            <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
+              <div class="bg-[#6E6CA3] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
+                <i data-lucide="radio" class="w-4 h-4 text-white"></i>
+                <span>KAFKA STREAMING</span>
+              </div>
+
               <div class="p-4 sm:p-5 space-y-4 flex-1 flex flex-col justify-between bg-slate-900/60">
                 ${renderNodeBox({
                   title: "KAFKA BROKER (KRaft)",
@@ -1520,53 +1599,13 @@ function renderServicesView() {
                   env: env
                 })}
 
-                <!-- Connector indicator -->
-                <div class="flex items-center justify-center text-slate-500 py-0.5 gap-2 text-[11px] font-mono">
-                  <i data-lucide="chevrons-down" class="w-4 h-4 text-indigo-400 opacity-70"></i>
-                  <span class="text-indigo-300">Flujo CSV / Ingesta de Mensajes</span>
-                  <i data-lucide="chevrons-down" class="w-4 h-4 text-indigo-400 opacity-70"></i>
-                </div>
-
-                ${renderNodeBox({
-                  title: "KAFKA CSV PRODUCER (WEB GUI)",
-                  container: kafkaProducer,
-                  defaultPort: env.ports?.csv_studio || 8081,
-                  internalPort: 8080,
-                  type: "studio",
-                  env: env
-                })}
-              </div>
-            </div>
-          ` : ''}
-
-          ${hasInbox ? `
-            <!-- PUSH NOTIFICATIONS INBOX GROUP -->
-            <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
-              <!-- Header Banner (Rose) -->
-              <div class="bg-[#A35F78] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
-                <i data-lucide="bell-ring" class="w-4 h-4 text-white"></i>
-                <span>PUSH NOTIFICATIONS INBOX</span>
-              </div>
-
-              <div class="p-4 sm:p-5 flex-1 flex flex-col justify-between bg-slate-900/60 space-y-4">
-                ${renderNodeBox({
-                  title: "INBOX WEB + API (Firebase)",
-                  container: pushInbox,
-                  defaultPort: env.ports?.inbox || 3000,
-                  internalPort: 3000,
-                  type: "inbox",
-                  env: env
-                })}
-
-                <!-- API endpoint banner -->
-                <div class="bg-slate-950/80 p-3.5 rounded-xl border border-rose-500/30 flex flex-col gap-2 text-xs">
-                  <span class="text-rose-300 font-semibold flex items-center gap-1.5">
-                    <i data-lucide="send" class="w-3.5 h-3.5"></i> Endpoint para Scaler / Kafka
+                <div class="bg-slate-950/80 p-3.5 rounded-xl border border-indigo-500/30 flex flex-col gap-2 text-xs">
+                  <span class="text-indigo-300 font-semibold flex items-center gap-1.5">
+                    <i data-lucide="plug" class="w-3.5 h-3.5"></i> Bootstrap servers
                   </span>
                   <div class="font-mono text-[11px] bg-slate-900 p-2 rounded-lg border border-slate-800 text-slate-300 break-all">
-                    POST http://push-inbox:3000/api/inbox/send
+                    kafka:9092 <span class="text-slate-500">(contenedores)</span> · localhost:${escapeHtml(String(env.ports?.kafka || 9092))} <span class="text-slate-500">(host)</span>
                   </div>
-                  <span class="text-[10px] text-slate-500">Desde el navegador usa <code>localhost</code>: las notificaciones push solo funcionan en localhost o HTTPS.</span>
                 </div>
               </div>
             </div>

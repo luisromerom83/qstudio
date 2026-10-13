@@ -31,7 +31,7 @@ async function registerFCMServiceWorker() {
 
   try {
     const configStr = encodeURIComponent(JSON.stringify(window.firebaseConfig || {}));
-    const swUrl = `/firebase-messaging-sw.js?config=${configStr}`;
+    const swUrl = `firebase-messaging-sw.js?config=${configStr}`;
 
     const reg = await navigator.serviceWorker.register(swUrl);
     console.log('✅ Service Worker de FCM registrado con éxito:', reg.scope);
@@ -149,7 +149,7 @@ async function saveTokenToFirestore(token, userId, userEmail) {
     }
 
     // 2. Notificar al backend Express
-    await fetch('/api/inbox/register-token', {
+    await fetch('api/inbox/register-token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
