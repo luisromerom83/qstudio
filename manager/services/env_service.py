@@ -1201,6 +1201,8 @@ class EnvService:
 
         # 5. Kafka Stack (Optional)
         if enable_kafka:
+            # Not published to any registry: compose builds it from the bundled sources
+            producer_dir = os.path.join(self.base_dir, "producer")
             services.append(f"""  kafka:
     image: apache/kafka:latest
     container_name: {project_name}-kafka
@@ -1222,6 +1224,8 @@ class EnvService:
 
   kafka-csv-studio:
     image: kafka-csv-producer:latest
+    build:
+      context: "{producer_dir}"
     container_name: {project_name}-kafka-csv-studio
     depends_on:
       - kafka
@@ -1347,5 +1351,12 @@ class EnvService:
             if enable_ftp:
                 vol_lines.append(f"""  ftpdata_{env_id}:
     name: {project_name}_ftpdata_{env_id}""")
+
+        # Native Docker on SELinux hosts (Fedora/RHEL) blocks access to bind-mounted
+        # host folders; disable labeling like the manager itself does.
+        services = [
+            re.sub(r"^(    container_name: .*)$", r"\1\n    security_opt:\n      - label=disable", s, flags=re.M)
+            for s in services
+        ]
 
         return "services:\n" + "\n\n".join(services) + "\n\n" + "\n".join(vol_lines) + "\n"
