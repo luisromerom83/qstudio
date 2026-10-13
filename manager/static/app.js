@@ -1000,7 +1000,7 @@ function getServicePortInfo(c, env) {
   return { portText, accessUrl, urlLabel };
 }
 
-function renderNodeBox({ title, container, defaultPort, internalPort, type, env }) {
+function renderNodeBox({ title, container, defaultPort, internalPort, type, env, compact = false }) {
   const isUp = container && container.state === "running";
   const isHealthy = container && container.status && container.status.includes("healthy");
   const host = window.location.hostname || "localhost";
@@ -1043,7 +1043,7 @@ function renderNodeBox({ title, container, defaultPort, internalPort, type, env 
         </div>
 
         <!-- Container name & Port Info -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
+        <div class="grid grid-cols-1 ${compact ? "" : "sm:grid-cols-2"} gap-2 text-[11px] pt-1">
           <div class="bg-slate-950/70 p-2 rounded-lg border border-slate-800/80 flex items-center justify-between">
             <span class="text-slate-400 font-medium">Puerto:</span>
             <span class="font-mono font-semibold ${isUp ? 'text-brand-300' : 'text-slate-400'}">
@@ -1260,11 +1260,11 @@ function renderServicesView() {
 
   // Helper to render Scaler Group
   const renderScalerGroup = () => `
-    <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
-      <!-- Header Banner (Orange as in groups.png) -->
+    <div class="group-box hub-box flex flex-col rounded-2xl border-2 border-[#C99A62] overflow-hidden bg-slate-900/90" data-flow-target>
+      <!-- Header Banner: Scaler is the communications hub every integration feeds -->
       <div class="bg-[#C99A62] text-slate-950 font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2 flex-wrap">
         ${productIcon("scaler", "black", "w-5 h-5")}
-        <span>SCALER NODE</span>
+        <span>SCALER · HUB DE COMUNICACIONES</span>
         ${(env.scaler_sharedfolder || env.volume_locations?.sharedfolder) ? `
           <span class="text-[10px] font-mono font-bold bg-slate-950 text-amber-300 px-2 py-0.5 rounded-full border border-slate-800 lowercase tracking-normal flex items-center gap-1 shadow-inner" title="Volumen: ${escapeHtml(env.volume_locations?.sharedfolder || env.scaler_sharedfolder)}">
             <i data-lucide="folder" class="w-3 h-3 text-amber-400"></i> sharedfolder
@@ -1275,6 +1275,12 @@ function renderServicesView() {
             <i data-lucide="briefcase" class="w-3 h-3 text-amber-400"></i> jobsdir
           </span>
         ` : ''}
+      </div>
+
+      <!-- Control tower role -->
+      <div class="flex items-start gap-2.5 px-4 sm:px-5 py-3 bg-[#C99A62]/10 border-b border-[#C99A62]/30 text-[11px] leading-relaxed text-amber-100/90">
+        <i data-lucide="radar" class="w-4 h-4 text-amber-300 flex-shrink-0 mt-0.5"></i>
+        <span><span class="font-bold text-amber-200 uppercase tracking-wider">Torre de control.</span> Recibe eventos, archivos y solicitudes de los sistemas del cliente, orquesta la generación con Inspire y entrega cada comunicación por su canal.</span>
       </div>
 
       <!-- Group Body: SCALER SERVER & SCALER IPS -->
@@ -1332,7 +1338,7 @@ function renderServicesView() {
             <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
               <span class="w-3 h-3 rounded-sm bg-[#C99A62] inline-block border border-slate-700"></span>
               ${productIcon("scaler", "white", "w-3.5 h-3.5")}
-              <span class="font-bold text-slate-200">SCALER NODE</span>
+              <span class="font-bold text-slate-200">SCALER · HUB</span>
             </span>
           ` : ''}
           <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
@@ -1426,14 +1432,181 @@ function renderServicesView() {
     `;
   }
 
-  // TOP SECTION: QUADIENT INTERACTIVE & SCALER
+  // INTEGRATIONS: customer systems and third-party services; every one of them talks to Scaler
+  const integrationGroup = ({ key, color, icon, title, body, flow, bidir }) => `
+    <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl" data-flow-source="${key}" ${bidir ? "data-flow-bidir" : ""}>
+      <div class="bg-[${color}] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
+        ${productIcon(icon, "white", "w-5 h-5")}
+        <span>${title}</span>
+      </div>
+      <div class="p-4 sm:p-5 flex-1 flex flex-col justify-start bg-slate-900/60 space-y-4">
+        ${body}
+      </div>
+      ${hasScaler ? `
+        <div class="flex items-center gap-2 px-4 py-2.5 border-t-2 border-slate-700 bg-[#C99A62]/10 text-[11px] leading-snug text-amber-100/90">
+          <i data-lucide="${bidir ? "arrow-down-up" : "arrow-down"}" class="w-3.5 h-3.5 text-amber-300 flex-shrink-0"></i>
+          ${productIcon("scaler", "white", "w-3.5 h-3.5")}
+          <span>${flow}</span>
+        </div>
+      ` : ""}
+    </div>
+  `;
+
+  const integrations = [];
+  // Three integration columns are too narrow for port and ID side by side
+  const compactNodes = [hasUseCases, hasKafka, hasFtp].filter(Boolean).length === 3;
+  if (hasUseCases) {
+    integrations.push(integrationGroup({
+      key: "use-cases",
+      color: "#A35F78",
+      icon: "use-cases",
+      title: "CASOS DE USO",
+      bidir: true,
+      flow: "Envía solicitudes y eventos a Scaler y recibe los documentos y notificaciones",
+      body: `
+        ${renderNodeBox({
+          title: "PORTAL DE CASOS DE USO",
+          container: useCasesContainer,
+          defaultPort: env.ports?.use_cases || 3000,
+          internalPort: 3000,
+          type: "use-cases",
+          env: env,
+          compact: compactNodes
+        })}
+
+        <div class="space-y-2">
+          ${envUseCases.map(c => {
+            const url = `http://${window.location.hostname || "localhost"}:${env.ports?.use_cases || 3000}/${c.id}/`;
+            const isUp = useCasesContainer && useCasesContainer.state === "running";
+            return `
+              <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer"
+                 class="flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs border ${isUp ? 'bg-slate-950/70 border-slate-800 hover:border-slate-600 text-slate-200' : 'bg-slate-800/40 border-slate-800 text-slate-500 pointer-events-none'} transition">
+                <span class="flex items-center gap-2 truncate">
+                  <span aria-hidden="true">${escapeHtml(c.icon || "")}</span>
+                  <span class="font-semibold truncate">${escapeHtml(c.name)}</span>
+                </span>
+                <span class="font-mono text-[10px] text-slate-400 flex-shrink-0">/${escapeHtml(c.id)}/</span>
+              </a>`;
+          }).join("")}
+        </div>
+
+        ${(env.use_cases || []).includes("push-inbox") ? `
+          <div class="bg-slate-950/80 p-3.5 rounded-xl border border-rose-500/30 flex flex-col gap-2 text-xs">
+            <span class="text-rose-300 font-semibold flex items-center gap-1.5">
+              <i data-lucide="send" class="w-3.5 h-3.5"></i> Endpoint del inbox para Scaler
+            </span>
+            <div class="font-mono text-[11px] bg-slate-900 p-2 rounded-lg border border-slate-800 text-slate-300 break-all">
+              POST http://use-cases:3000/push-inbox/api/inbox/send
+            </div>
+            <span class="text-[10px] text-slate-500">También responde en <code>http://push-inbox:3000/api/inbox/send</code> para no romper conectores previos. Desde el navegador usa <code>localhost</code>: las notificaciones push solo funcionan en localhost o HTTPS.</span>
+          </div>
+        ` : ''}
+      `
+    }));
+  }
+  if (hasKafka) {
+    integrations.push(integrationGroup({
+      key: "kafka",
+      color: "#6E6CA3",
+      icon: "kafka",
+      title: "KAFKA STREAMING",
+      bidir: false,
+      flow: "Scaler consume los tópicos como entrada de eventos en tiempo real",
+      body: `
+        ${renderNodeBox({
+          title: "KAFKA BROKER (KRaft)",
+          container: kafka,
+          defaultPort: env.ports?.kafka || 9092,
+          internalPort: 9092,
+          type: "kafka",
+          env: env,
+          compact: compactNodes
+        })}
+
+        <div class="bg-slate-950/80 p-3.5 rounded-xl border border-indigo-500/30 flex flex-col gap-2 text-xs">
+          <span class="text-indigo-300 font-semibold flex items-center gap-1.5">
+            <i data-lucide="plug" class="w-3.5 h-3.5"></i> Bootstrap servers
+          </span>
+          <div class="font-mono text-[11px] bg-slate-900 p-2 rounded-lg border border-slate-800 text-slate-300 break-all">
+            kafka:9092 <span class="text-slate-500">(contenedores)</span> · localhost:${escapeHtml(String(env.ports?.kafka || 9092))} <span class="text-slate-500">(host)</span>
+          </div>
+        </div>
+      `
+    }));
+  }
+  if (hasFtp) {
+    integrations.push(integrationGroup({
+      key: "ftp",
+      color: "#3F7F76",
+      icon: "ftp",
+      title: "FTP SERVER (vsftpd)",
+      bidir: true,
+      flow: "Scaler recoge los archivos de entrada y deposita los de salida",
+      body: `
+        ${renderNodeBox({
+          title: "FTP SERVER (vsftpd)",
+          container: ftp,
+          defaultPort: env.ports?.ftp || 2121,
+          internalPort: 21,
+          type: "ftp",
+          env: env,
+          compact: compactNodes
+        })}
+
+        <div class="bg-slate-950/80 p-3.5 rounded-xl border border-teal-500/30 flex flex-col gap-2 text-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-teal-300 font-semibold flex items-center gap-1.5">
+              <i data-lucide="key-round" class="w-3.5 h-3.5"></i> Autenticación FTP
+            </span>
+            <span class="text-[10px] font-mono text-slate-400">PASV: ${env.ports?.ftp_pasv_min || 21100}-${env.ports?.ftp_pasv_max || 21105}</span>
+          </div>
+          <div class="flex items-center gap-2 font-mono text-[11px] bg-slate-900 p-2 rounded-lg border border-slate-800">
+            <span class="text-slate-400">Usuario:</span>
+            <span class="text-white font-bold">system</span>
+            <span class="text-slate-600">|</span>
+            <span class="text-slate-400">Password:</span>
+            <span class="text-teal-400 font-bold">Password12345*</span>
+          </div>
+        </div>
+      `
+    }));
+  }
+
+  // HUB FLOW: integrations on top converge into Scaler; drawHubFlow() draws the connectors once laid out
+  html += `<div id="hub-flow" class="relative" data-running="${isRunning}">
+    <svg id="hub-flow-svg" class="hidden lg:block absolute inset-0 w-full h-full pointer-events-none overflow-visible" aria-hidden="true"></svg>`;
+
+  if (integrations.length) {
+    const cols = integrations.length === 3 ? "lg:grid-cols-3" : integrations.length === 2 ? "lg:grid-cols-2" : "lg:max-w-2xl lg:mx-auto";
+    html += `
+      <div class="space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400">
+            <i data-lucide="network" class="w-4 h-4 text-amber-300"></i>
+            Sistemas del cliente e integraciones
+          </div>
+          <span class="text-[11px] ${hasScaler ? "text-slate-500" : "text-amber-300"}">
+            ${hasScaler ? "Todo lo que generan o reciben pasa por Scaler" : "Activa Scaler para orquestar estas integraciones"}
+          </span>
+        </div>
+        <div class="grid grid-cols-1 ${cols} gap-6">
+          ${integrations.join("")}
+        </div>
+      </div>
+
+      <!-- Space for the connectors into the hub (arrow only on narrow screens) -->
+      <div class="h-10 lg:h-24 flex items-center justify-center">
+        <i data-lucide="arrow-down" class="lg:hidden w-5 h-5 text-amber-300"></i>
+      </div>
+    `;
+  }
+
   if (hasInteractive && hasScaler) {
     html += `
-      <div>
-        <div class="grid grid-cols-1 lg:grid-cols-[1fr,68px,1fr] gap-4 lg:gap-0 items-start">
-          ${renderInteractiveGroup()}
+        <div class="grid grid-cols-1 lg:grid-cols-[1.25fr,68px,1fr] gap-4 lg:gap-0 items-start">
+          ${renderScalerGroup()}
 
-          <!-- CONNECTOR BETWEEN INTERACTIVE & SCALER NODE -->
+          <!-- CONNECTOR BETWEEN SCALER HUB & INTERACTIVE -->
           <div class="hidden lg:flex flex-col items-center justify-start h-full px-1">
             <div class="h-11"></div>
             <div class="h-44 flex flex-col items-center justify-center">
@@ -1446,7 +1619,7 @@ function renderServicesView() {
             </div>
           </div>
 
-          ${renderScalerGroup()}
+          ${renderInteractiveGroup()}
         </div>
       </div>
 
@@ -1462,22 +1635,11 @@ function renderServicesView() {
         </div>
       </div>
     `;
-  } else if (hasInteractive) {
-    html += `
-      <div class="w-full max-w-2xl mx-auto">
-        ${renderInteractiveGroup()}
-      </div>
-
-      <!-- Single vertical connector down to ICM -->
-      <div class="flex flex-col items-center justify-center pt-2 pb-1 text-slate-500">
-        <div class="w-0.5 h-6 bg-slate-700"></div>
-        <i data-lucide="arrow-down" class="w-4 h-4 text-slate-500 -mt-1"></i>
-      </div>
-    `;
   } else if (hasScaler) {
     html += `
-      <div class="w-full max-w-2xl mx-auto">
-        ${renderScalerGroup()}
+        <div class="w-full max-w-2xl mx-auto">
+          ${renderScalerGroup()}
+        </div>
       </div>
 
       <!-- Single vertical connector down to ICM -->
@@ -1486,6 +1648,21 @@ function renderServicesView() {
         <i data-lucide="arrow-down" class="w-4 h-4 text-slate-500 -mt-1"></i>
       </div>
     `;
+  } else if (hasInteractive) {
+    html += `
+        <div class="w-full max-w-2xl mx-auto">
+          ${renderInteractiveGroup()}
+        </div>
+      </div>
+
+      <!-- Single vertical connector down to ICM -->
+      <div class="flex flex-col items-center justify-center pt-2 pb-1 text-slate-500">
+        <div class="w-0.5 h-6 bg-slate-700"></div>
+        <i data-lucide="arrow-down" class="w-4 h-4 text-slate-500 -mt-1"></i>
+      </div>
+    `;
+  } else {
+    html += `</div>`;
   }
 
   // ICM BOX (Mandatory)
@@ -1539,138 +1716,6 @@ function renderServicesView() {
     </div>
   `;
 
-  // OPTIONAL THIRD-PARTY SERVICES: KAFKA, PUSH INBOX & FTP
-  if (hasKafka || hasUseCases || hasFtp) {
-    html += `
-      <div class="pt-6 border-t border-slate-800 space-y-6">
-        <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-          <i data-lucide="cpu" class="w-4 h-4 text-cyan-400"></i>
-          Servicios de Integración y Terceros Opcionales
-        </div>
-
-        <div class="grid grid-cols-1 ${[hasKafka, hasUseCases, hasFtp].filter(Boolean).length > 1 ? 'lg:grid-cols-2' : ''} gap-6">
-          ${hasUseCases ? `
-            <!-- USE CASES GROUP -->
-            <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
-              <div class="bg-[#A35F78] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
-                ${productIcon("use-cases", "white", "w-5 h-5")}
-                <span>CASOS DE USO</span>
-              </div>
-
-              <div class="p-4 sm:p-5 flex-1 flex flex-col justify-between bg-slate-900/60 space-y-4">
-                ${renderNodeBox({
-                  title: "PORTAL DE CASOS DE USO",
-                  container: useCasesContainer,
-                  defaultPort: env.ports?.use_cases || 3000,
-                  internalPort: 3000,
-                  type: "use-cases",
-                  env: env
-                })}
-
-                <div class="space-y-2">
-                  ${envUseCases.map(c => {
-                    const url = `http://${window.location.hostname || "localhost"}:${env.ports?.use_cases || 3000}/${c.id}/`;
-                    const isUp = useCasesContainer && useCasesContainer.state === "running";
-                    return `
-                      <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer"
-                         class="flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs border ${isUp ? 'bg-slate-950/70 border-slate-800 hover:border-slate-600 text-slate-200' : 'bg-slate-800/40 border-slate-800 text-slate-500 pointer-events-none'} transition">
-                        <span class="flex items-center gap-2 truncate">
-                          <span aria-hidden="true">${escapeHtml(c.icon || "")}</span>
-                          <span class="font-semibold truncate">${escapeHtml(c.name)}</span>
-                        </span>
-                        <span class="font-mono text-[10px] text-slate-400 flex-shrink-0">/${escapeHtml(c.id)}/</span>
-                      </a>`;
-                  }).join("")}
-                </div>
-
-                ${(env.use_cases || []).includes("push-inbox") ? `
-                  <div class="bg-slate-950/80 p-3.5 rounded-xl border border-rose-500/30 flex flex-col gap-2 text-xs">
-                    <span class="text-rose-300 font-semibold flex items-center gap-1.5">
-                      <i data-lucide="send" class="w-3.5 h-3.5"></i> Endpoint del inbox para Scaler / Kafka
-                    </span>
-                    <div class="font-mono text-[11px] bg-slate-900 p-2 rounded-lg border border-slate-800 text-slate-300 break-all">
-                      POST http://use-cases:3000/push-inbox/api/inbox/send
-                    </div>
-                    <span class="text-[10px] text-slate-500">También responde en <code>http://push-inbox:3000/api/inbox/send</code> para no romper conectores previos. Desde el navegador usa <code>localhost</code>: las notificaciones push solo funcionan en localhost o HTTPS.</span>
-                  </div>
-                ` : ''}
-              </div>
-            </div>
-          ` : ''}
-
-          ${hasKafka ? `
-            <!-- KAFKA BROKER GROUP -->
-            <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
-              <div class="bg-[#6E6CA3] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
-                ${productIcon("kafka", "white", "w-5 h-5")}
-                <span>KAFKA STREAMING</span>
-              </div>
-
-              <div class="p-4 sm:p-5 space-y-4 flex-1 flex flex-col justify-between bg-slate-900/60">
-                ${renderNodeBox({
-                  title: "KAFKA BROKER (KRaft)",
-                  container: kafka,
-                  defaultPort: env.ports?.kafka || 9092,
-                  internalPort: 9092,
-                  type: "kafka",
-                  env: env
-                })}
-
-                <div class="bg-slate-950/80 p-3.5 rounded-xl border border-indigo-500/30 flex flex-col gap-2 text-xs">
-                  <span class="text-indigo-300 font-semibold flex items-center gap-1.5">
-                    <i data-lucide="plug" class="w-3.5 h-3.5"></i> Bootstrap servers
-                  </span>
-                  <div class="font-mono text-[11px] bg-slate-900 p-2 rounded-lg border border-slate-800 text-slate-300 break-all">
-                    kafka:9092 <span class="text-slate-500">(contenedores)</span> · localhost:${escapeHtml(String(env.ports?.kafka || 9092))} <span class="text-slate-500">(host)</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ` : ''}
-
-          ${hasFtp ? `
-            <!-- FTP SERVER GROUP -->
-            <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
-              <!-- Header Banner (Teal) -->
-              <div class="bg-[#3F7F76] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
-                ${productIcon("ftp", "white", "w-5 h-5")}
-                <span>FTP SERVER (vsftpd)</span>
-              </div>
-
-              <div class="p-4 sm:p-5 flex-1 flex flex-col justify-between bg-slate-900/60 space-y-4">
-                ${renderNodeBox({
-                  title: "FTP SERVER (vsftpd)",
-                  container: ftp,
-                  defaultPort: env.ports?.ftp || 2121,
-                  internalPort: 21,
-                  type: "ftp",
-                  env: env
-                })}
-
-                <!-- FTP Credentials and PASV Range Banner -->
-                <div class="bg-slate-950/80 p-3.5 rounded-xl border border-teal-500/30 flex flex-col gap-2 text-xs">
-                  <div class="flex items-center justify-between">
-                    <span class="text-teal-300 font-semibold flex items-center gap-1.5">
-                      <i data-lucide="key-round" class="w-3.5 h-3.5"></i> Autenticación FTP
-                    </span>
-                    <span class="text-[10px] font-mono text-slate-400">PASV: ${env.ports?.ftp_pasv_min || 21100}-${env.ports?.ftp_pasv_max || 21105}</span>
-                  </div>
-                  <div class="flex items-center gap-2 font-mono text-[11px] bg-slate-900 p-2 rounded-lg border border-slate-800">
-                    <span class="text-slate-400">Usuario:</span>
-                    <span class="text-white font-bold">system</span>
-                    <span class="text-slate-600">|</span>
-                    <span class="text-slate-400">Password:</span>
-                    <span class="text-teal-400 font-bold">Password12345*</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ` : ''}
-        </div>
-      </div>
-    `;
-  }
-
   // If there are extra containers not part of the standard architecture
   if (extraContainers.length > 0) {
     html += `
@@ -1712,7 +1757,51 @@ function renderServicesView() {
 
   container.innerHTML = html;
   lucide.createIcons();
+  requestAnimationFrame(drawHubFlow);
 }
+
+// Connectors from each integration into the Scaler hub; measured from the laid-out cards
+function drawHubFlow() {
+  const wrap = document.getElementById("hub-flow");
+  const svg = document.getElementById("hub-flow-svg");
+  if (!wrap || !svg) return;
+  const target = wrap.querySelector("[data-flow-target]");
+  const sources = Array.from(wrap.querySelectorAll("[data-flow-source]"));
+  const box = wrap.getBoundingClientRect();
+  // Hidden tab or stacked (mobile) layout: the arrow below the integrations is enough
+  if (!target || !sources.length || box.width === 0 || window.innerWidth < 1024) {
+    svg.innerHTML = "";
+    return;
+  }
+  const t = target.getBoundingClientRect();
+  const tx = t.left + t.width / 2 - box.left;
+  const ty = t.top - box.top;
+  const running = wrap.dataset.running === "true";
+  const paths = sources.map((el, i) => {
+    const r = el.getBoundingClientRect();
+    const sx = r.left + r.width / 2 - box.left;
+    const sy = r.bottom - box.top;
+    // Spread arrivals along the top of the hub so the lines don't merge into one
+    const ax = tx + (i - (sources.length - 1) / 2) * 36;
+    const my = (sy + ty) / 2;
+    const bidir = el.hasAttribute("data-flow-bidir");
+    return `<path d="M ${sx} ${sy + 2} C ${sx} ${my}, ${ax} ${my}, ${ax} ${ty - 3}" class="hub-flow-line${running ? " is-running" : ""}" marker-end="url(#hub-arrow)"${bidir ? ' marker-start="url(#hub-arrow)"' : ""} />`;
+  }).join("");
+  svg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+  svg.innerHTML = `
+    <defs>
+      <marker id="hub-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#C99A62" />
+      </marker>
+    </defs>
+    ${paths}`;
+}
+
+let hubFlowResizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(hubFlowResizeTimer);
+  hubFlowResizeTimer = setTimeout(drawHubFlow, 120);
+});
 
 async function containerAction(containerName, action) {
   showAlert("info", `Ejecutando ${action} en ${containerName}...`);

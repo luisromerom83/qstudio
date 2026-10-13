@@ -78,6 +78,33 @@ dialog::backdrop {
   transition: all 0.2s ease-in-out;
 }
 
+/* Scaler: communications hub every integration converges into */
+.hub-box {
+  box-shadow: 0 0 0 4px rgba(201, 154, 98, 0.12), 0 0 48px -12px rgba(201, 154, 98, 0.55), 0 20px 40px -20px rgba(0, 0, 0, 0.7);
+}
+
+.hub-flow-line {
+  fill: none;
+  stroke: #C99A62;
+  stroke-width: 2;
+  stroke-opacity: 0.45;
+  stroke-dasharray: 6 6;
+}
+
+/* Dashes travel toward Scaler while the environment is up */
+.hub-flow-line.is-running {
+  stroke-opacity: 0.9;
+  animation: hub-flow 1.1s linear infinite;
+}
+
+@keyframes hub-flow {
+  to { stroke-dashoffset: -12; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-flow-line.is-running { animation: none; }
+}
+
 .node-box {
   background-color: rgba(2, 6, 23, 0.85);
   border: 1.5px solid #334155;
