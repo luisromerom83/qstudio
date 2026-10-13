@@ -402,15 +402,21 @@ function iconButton(icon, label, onclick, { danger = false, disabled = false } =
     </button>`;
 }
 
-function serviceLink(label, url, port, enabled) {
+// Quadient product pictograms (manager/static/img/products), black for light banners, white for dark surfaces
+function productIcon(product, color, sizeClass = "w-4 h-4") {
+  return `<img src="/static/img/products/${product}-${color}.png" alt="" aria-hidden="true" class="${sizeClass} flex-shrink-0 object-contain">`;
+}
+
+function serviceLink(label, url, port, enabled, product) {
   const base = "flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm transition";
+  const icon = product ? productIcon(product, "white", `w-4 h-4${enabled ? "" : " opacity-40"}`) : `<i data-lucide="external-link" class="w-3.5 h-3.5"></i>`;
   if (!enabled) {
     return `<span class="${base} border-slate-800 text-slate-500" aria-disabled="true" title="Disponible cuando la demo esté activa">
-      <span class="inline-flex items-center gap-2 font-medium"><i data-lucide="external-link" class="w-3.5 h-3.5"></i>${label}</span>
+      <span class="inline-flex items-center gap-2 font-medium">${icon}${label}</span>
       <span class="font-mono text-xs">:${port}</span></span>`;
   }
   return `<a href="${url}" target="_blank" rel="noopener" class="${base} border-slate-700 text-slate-100 hover:bg-slate-800 hover:border-slate-600" title="Abrir ${label} en una pestaña nueva">
-    <span class="inline-flex items-center gap-2 font-medium"><i data-lucide="external-link" class="w-3.5 h-3.5"></i>${label}</span>
+    <span class="inline-flex items-center gap-2 font-medium">${icon}${label}</span>
     <span class="font-mono text-xs text-slate-400">:${port}</span></a>`;
 }
 
@@ -475,10 +481,10 @@ function renderEnvironments() {
 
     const links = [];
     if (env.enable_interactive !== false) {
-      links.push(serviceLink("Interactive", `http://${host}:${portInter}/interactive`, portInter, isRunning && !busy));
+      links.push(serviceLink("Interactive", `http://${host}:${portInter}/interactive`, portInter, isRunning && !busy, "interactive"));
     }
     if (env.enable_scaler !== false) {
-      links.push(serviceLink("Scaler", `http://${host}:${portScaler}/`, portScaler, isRunning && !busy));
+      links.push(serviceLink("Scaler", `http://${host}:${portScaler}/`, portScaler, isRunning && !busy, "scaler"));
     }
 
     const card = document.createElement("div");
@@ -1218,6 +1224,7 @@ function renderServicesView() {
     <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
       <!-- Header Banner (Mint Green as in groups.png) -->
       <div class="bg-[#8FB8A0] text-slate-950 font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
+        ${productIcon("interactive", "black", "w-5 h-5")}
         <span>INTERACTIVE</span>
       </div>
 
@@ -1256,6 +1263,7 @@ function renderServicesView() {
     <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
       <!-- Header Banner (Orange as in groups.png) -->
       <div class="bg-[#C99A62] text-slate-950 font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2 flex-wrap">
+        ${productIcon("scaler", "black", "w-5 h-5")}
         <span>SCALER NODE</span>
         ${(env.scaler_sharedfolder || env.volume_locations?.sharedfolder) ? `
           <span class="text-[10px] font-mono font-bold bg-slate-950 text-amber-300 px-2 py-0.5 rounded-full border border-slate-800 lowercase tracking-normal flex items-center gap-1 shadow-inner" title="Volumen: ${escapeHtml(env.volume_locations?.sharedfolder || env.scaler_sharedfolder)}">
@@ -1316,17 +1324,20 @@ function renderServicesView() {
           ${hasInteractive ? `
             <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
               <span class="w-3 h-3 rounded-sm bg-[#8FB8A0] inline-block border border-slate-700"></span>
+              ${productIcon("interactive", "white", "w-3.5 h-3.5")}
               <span class="font-bold text-slate-200">INTERACTIVE</span>
             </span>
           ` : ''}
           ${hasScaler ? `
             <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
               <span class="w-3 h-3 rounded-sm bg-[#C99A62] inline-block border border-slate-700"></span>
+              ${productIcon("scaler", "white", "w-3.5 h-3.5")}
               <span class="font-bold text-slate-200">SCALER NODE</span>
             </span>
           ` : ''}
           <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
             <span class="w-3 h-3 rounded-sm bg-[#8b929d] inline-block border border-slate-700"></span>
+            ${productIcon("content-manager", "white", "w-3.5 h-3.5")}
             <span class="font-bold text-slate-200">ICM / POSTGRES</span>
           </span>
           ${hasKafka ? `
@@ -1477,7 +1488,8 @@ function renderServicesView() {
   html += `
       <!-- ICM BOX (Inspire Configuration Manager) -->
       <div class="w-full max-w-2xl mx-auto group-box rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
-        <div class="bg-[#8b929d] text-slate-950 font-black tracking-widest text-center py-2 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm">
+        <div class="bg-[#8b929d] text-slate-950 font-black tracking-widest text-center py-2 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
+          ${productIcon("content-manager", "black", "w-5 h-5")}
           <span>ICM</span>
         </div>
         <div class="p-4 sm:p-5 bg-slate-900/60">
