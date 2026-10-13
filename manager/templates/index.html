@@ -364,6 +364,30 @@
           </div>
         </form>
       </div>
+
+      <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="bell-ring" class="w-5 h-5 text-amber-400"></i>
+            Firebase para Push Notifications Inbox
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">Cuenta de servicio de Firebase Admin que usa el servicio opcional Push Notifications Inbox para guardar mensajes y enviar notificaciones. Se guarda solo en este equipo.</p>
+        </div>
+
+        <form id="firebase-form" onsubmit="handleSaveFirebase(event)" class="space-y-4">
+          <div id="firebase-status" class="text-xs text-slate-400"></div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Cuenta de servicio (serviceAccountKey.json)</label>
+            <textarea id="setting-firebase-key" rows="5" required spellcheck="false" placeholder='{"type": "service_account", "project_id": "...", ...}' class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500"></textarea>
+            <span class="text-[10px] text-slate-500">Pega el contenido completo del JSON. Los ambientes en ejecución lo toman al reactivarlos.</span>
+          </div>
+          <div class="pt-4 flex items-center justify-end border-t border-slate-800">
+            <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-xs font-semibold rounded-lg text-white shadow-lg">
+              Guardar Cuenta de Servicio
+            </button>
+          </div>
+        </form>
+      </div>
     </section>
 
   </main>
@@ -596,6 +620,15 @@
                 </label>
               </div>
 
+              <!-- Push Notifications Inbox Checkbox -->
+              <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-start gap-3 hover:border-slate-700 transition">
+                <input type="checkbox" id="new-env-enable-inbox" class="mt-1 w-4 h-4 rounded border-slate-700 text-brand-600 bg-slate-950 focus:ring-brand-500 cursor-pointer">
+                <label for="new-env-enable-inbox" class="cursor-pointer">
+                  <span class="block text-xs font-semibold text-white">Push Notifications Inbox</span>
+                  <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Inbox web + API <code>/api/inbox/send</code> (3000). Requiere la cuenta de servicio de Firebase en Configuración.</span>
+                </label>
+              </div>
+
               <!-- FTP Server Checkbox -->
               <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-start gap-3 hover:border-slate-700 transition">
                 <input type="checkbox" id="new-env-enable-ftp" class="mt-1 w-4 h-4 rounded border-slate-700 text-brand-600 bg-slate-950 focus:ring-brand-500 cursor-pointer">
@@ -767,6 +800,15 @@
                 <label for="edit-env-enable-kafka" class="cursor-pointer">
                   <span class="block text-xs font-semibold text-white">Apache Kafka</span>
                   <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Broker KRaft (9092) + CSV Studio (8080).</span>
+                </label>
+              </div>
+
+              <!-- Push Notifications Inbox Checkbox -->
+              <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-start gap-3 hover:border-slate-700 transition">
+                <input type="checkbox" id="edit-env-enable-inbox" class="mt-1 w-4 h-4 rounded border-slate-700 text-brand-600 bg-slate-950 focus:ring-brand-500 cursor-pointer">
+                <label for="edit-env-enable-inbox" class="cursor-pointer">
+                  <span class="block text-xs font-semibold text-white">Push Notifications Inbox</span>
+                  <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Inbox web + API <code>/api/inbox/send</code> (3000). Requiere la cuenta de servicio de Firebase en Configuración.</span>
                 </label>
               </div>
 

@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Push Inbox &middot; Firebase Notifications & HTML Inbox</title>
+
+  <!-- Fuentes tipográficas -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Bootstrap 5.3 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <!-- PWA Manifest & Theme Color -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0d6efd">
+  <!-- Estilos personalizados -->
+  <link href="/css/styles.css" rel="stylesheet">
+</head>
+<body>
+
+  <!-- NAVBAR SUPERIOR -->
+  <nav class="navbar navbar-expand-lg navbar-app sticky-top py-2">
+    <div class="container-fluid px-3 px-lg-4">
+      <a class="navbar-brand d-flex align-items-center gap-2 fw-bold text-primary" href="#">
+        <span class="p-1 px-2 bg-primary text-white rounded-3 shadow-sm">
+          <i class="bi bi-inbox-fill"></i>
+        </span>
+        <span>Push<span class="text-dark">Inbox</span></span>
+      </a>
+
+      <!-- Controles de navegación y usuario -->
+      <div class="d-flex align-items-center gap-2 ms-auto">
+        <!-- Indicador de Push Notifications -->
+        <span id="fcm-status-badge" class="badge badge-fcm bg-secondary" title="Haz clic para activar o verificar notificaciones push">
+          <i class="bi bi-bell"></i> Verificando notificaciones...
+        </span>
+
+        <!-- Botón Configuración de Firebase -->
+        <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalFirebaseConfig">
+          <i class="bi bi-gear-fill"></i>
+          <span class="d-none d-md-inline">Configurar Firebase</span>
+        </button>
+
+        <!-- Dropdown Usuario Autenticado -->
+        <div id="user-dropdown-container" class="dropdown d-none">
+          <button class="btn btn-sm btn-light border dropdown-toggle d-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-person-circle text-primary"></i>
+            <span id="user-email-display" class="fw-semibold text-truncate" style="max-width: 180px;">usuario@ejemplo.com</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+            <li class="px-3 py-2 text-muted border-bottom small">
+              <span class="d-block text-secondary fw-semibold">Identificador UID:</span>
+              <code id="user-id-display" class="small">Cargando...</code>
+            </li>
+            <li>
+              <button id="btn-logout" class="dropdown-item text-danger d-flex align-items-center gap-2 mt-1">
+                <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ======================================================== -->
+  <!-- SECCIÓN 1: PANTALLA DE AUTENTICACIÓN (LOGIN Y REGISTRO)  -->
+  <!-- ======================================================== -->
+  <main id="auth-section" class="auth-wrapper container py-4">
+    <div class="row justify-content-center w-100">
+      <div class="col-12 col-sm-10 col-md-8 col-lg-5 col-xl-4">
+        
+        <!-- Tarjeta de Auth -->
+        <div class="card auth-card">
+          <!-- Pestañas Login / Registro -->
+          <ul class="nav nav-tabs auth-nav-tabs nav-fill" id="authTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" id="tab-login-btn" data-bs-toggle="tab" data-bs-target="#tab-login" type="button" role="tab" aria-selected="true">
+                <i class="bi bi-box-arrow-in-right me-1"></i> Iniciar Sesión
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="tab-register-btn" data-bs-toggle="tab" data-bs-target="#tab-register" type="button" role="tab" aria-selected="false">
+                <i class="bi bi-person-plus me-1"></i> Registro
+              </button>
+            </li>
+          </ul>
+
+          <div class="tab-content p-4" id="authTabsContent">
+            
+            <!-- PANEL: INICIAR SESIÓN -->
+            <div class="tab-pane fade show active" id="tab-login" role="tabpanel">
+              <div class="text-center mb-4">
+                <h4 class="fw-bold mb-1">¡Bienvenido de vuelta!</h4>
+                <p class="text-muted small">Ingresa con tus credenciales de Firebase Authentication</p>
+              </div>
+
+              <!-- Alerta de Error de Login -->
+              <div id="login-alert" class="alert alert-danger d-none small"></div>
+
+              <form id="form-login">
+                <div class="mb-3">
+                  <label for="login-email" class="form-label small fw-semibold">Correo Electrónico</label>
+                  <div class="input-group">
+                    <span class="input-group-text bg-light text-muted"><i class="bi bi-envelope"></i></span>
+                    <input type="email" class="form-control" id="login-email" placeholder="nombre@correo.com" required autocomplete="username">
+                  </div>
+                </div>
+
+                <div class="mb-4">
+                  <label for="login-password" class="form-label small fw-semibold">Contraseña</label>
+                  <div class="input-group">
+                    <span class="input-group-text bg-light text-muted"><i class="bi bi-lock"></i></span>
+                    <input type="password" class="form-control" id="login-password" placeholder="Tu contraseña" required autocomplete="current-password">
+                  </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold shadow-sm">
+                  <i class="bi bi-box-arrow-in-right me-2"></i>Iniciar Sesión
+                </button>
+              </form>
+            </div>
+
+            <!-- PANEL: REGISTRO DE NUEVO USUARIO -->
+            <div class="tab-pane fade" id="tab-register" role="tabpanel">
+              <div class="text-center mb-4">
+                <h4 class="fw-bold mb-1">Crea tu cuenta</h4>
+                <p class="text-muted small">Regístrate para recibir notificaciones y mensajes HTML</p>
+              </div>
+
+              <!-- Alerta de Error/Éxito de Registro -->
+              <div id="register-alert" class="alert alert-danger d-none small"></div>
+
+              <form id="form-register">
+                <div class="mb-3">
+                  <label for="register-email" class="form-label small fw-semibold">Correo Electrónico</label>
+                  <div class="input-group">
+                    <span class="input-group-text bg-light text-muted"><i class="bi bi-envelope"></i></span>
+                    <input type="email" class="form-control" id="register-email" placeholder="nombre@correo.com" required autocomplete="username">
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <label for="register-password" class="form-label small fw-semibold">Contraseña</label>
+                  <div class="input-group">
+                    <span class="input-group-text bg-light text-muted"><i class="bi bi-lock"></i></span>
+                    <input type="password" class="form-control" id="register-password" placeholder="Mínimo 6 caracteres" minlength="6" required autocomplete="new-password">
+                  </div>
+                </div>
+
+                <div class="mb-4">
+                  <label for="register-password-confirm" class="form-label small fw-semibold">Confirmar Contraseña</label>
+                  <div class="input-group">
+                    <span class="input-group-text bg-light text-muted"><i class="bi bi-check2-circle"></i></span>
+                    <input type="password" class="form-control" id="register-password-confirm" placeholder="Repite tu contraseña" minlength="6" required autocomplete="new-password">
+                  </div>
+                </div>
+
+                <button type="submit" class="btn btn-success w-100 py-2 fw-semibold shadow-sm">
+                  <i class="bi bi-person-plus-fill me-2"></i>Crear Cuenta
+                </button>
+              </form>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="text-center mt-3 text-muted small">
+          <i class="bi bi-shield-lock me-1"></i> Autenticación segura mediante Firebase Auth
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- ======================================================== -->
+  <!-- SECCIÓN 2: APLICACIÓN PRINCIPAL (INBOX + SIMULADOR API)  -->
+  <!-- ======================================================== -->
+  <main id="app-section" class="container-fluid px-3 px-lg-4 py-3 d-none">
+    
+    <!-- Pestañas de la App -->
+    <ul class="nav nav-pills mb-3 border-bottom pb-2 gap-2" id="mainAppTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active d-flex align-items-center gap-2 fw-semibold" id="nav-inbox-tab" data-bs-toggle="pill" data-bs-target="#tab-inbox-content" type="button" role="tab">
+          <i class="bi bi-inbox-fill"></i>
+          <span>Bandeja de Entrada (Inbox)</span>
+          <span id="inbox-count-badge" class="badge bg-secondary rounded-pill">0</span>
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link d-flex align-items-center gap-2 fw-semibold" id="nav-tester-tab" data-bs-toggle="pill" data-bs-target="#tab-tester-content" type="button" role="tab">
+          <i class="bi bi-send-plus-fill text-primary"></i>
+          <span>Simulador de API Externa</span>
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link d-flex align-items-center gap-2 fw-semibold" id="nav-docs-tab" data-bs-toggle="pill" data-bs-target="#tab-docs-content" type="button" role="tab">
+          <i class="bi bi-code-slash text-success"></i>
+          <span>Guía de la API REST</span>
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content" id="mainAppTabsContent">
+
+      <!-- ======================================== -->
+      <!-- PESTAÑA 1: BANDEJA DE ENTRADA (INBOX)   -->
+      <!-- ======================================== -->
+      <div class="tab-pane fade show active" id="tab-inbox-content" role="tabpanel">
+        <div class="card shadow-sm border rounded-3 overflow-hidden inbox-container">
+          <div class="row g-0 h-100">
+            
+            <!-- Columna Izquierda: Lista de Mensajes -->
+            <div class="col-12 col-md-5 col-lg-4 inbox-list-col bg-white">
+              <!-- Barra de Búsqueda y Filtros -->
+              <div class="p-3 border-bottom bg-light">
+                <div class="input-group input-group-sm mb-2">
+                  <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                  <input type="text" id="inbox-search" class="form-control border-start-0" placeholder="Buscar en mensajes...">
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                  <div class="btn-group btn-group-sm w-100" role="group">
+                    <button type="button" id="filter-all-btn" class="btn btn-primary active">Todos</button>
+                    <button type="button" id="filter-unread-btn" class="btn btn-outline-secondary">No leídos</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Lista de elementos con Scroll -->
+              <div id="inbox-list" class="inbox-scrollable-list">
+                <div class="text-center p-4 text-muted">
+                  <span class="spinner-border spinner-border-sm text-primary mb-2"></span>
+                  <p class="small mb-0">Cargando mensajes del Inbox...</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Columna Derecha: Visor de Contenido HTML -->
+            <div class="col-12 col-md-7 col-lg-8 inbox-viewer-col">
+              
+              <!-- Estado Vacío del Visor -->
+              <div id="viewer-empty-state" class="d-flex flex-column align-items-center justify-content-center h-100 text-center p-4 text-muted">
+                <div class="p-4 rounded-circle bg-light mb-3 text-secondary">
+                  <i class="bi bi-file-earmark-code fs-1"></i>
+                </div>
+                <h5 class="fw-semibold text-dark">Ningún elemento seleccionado</h5>
+                <p class="small text-secondary" style="max-width: 380px;">
+                  Selecciona cualquier mensaje de la lista a la izquierda para visualizar el contenido HTML renderizado, o envía uno nuevo desde la API externa.
+                </p>
+              </div>
+
+              <!-- Contenido del Mensaje Seleccionado -->
+              <div id="viewer-content" class="d-flex flex-column h-100 d-none">
+                <!-- Barra de herramientas del visor -->
+                <div class="p-3 border-bottom bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                  <div class="d-flex align-items-center gap-2 text-truncate me-2" style="max-width: 70%;">
+                    <button id="btn-back-to-inbox" class="btn btn-sm btn-outline-secondary d-md-none flex-shrink-0" title="Volver a la bandeja">
+                      <i class="bi bi-arrow-left"></i>
+                    </button>
+                    <div class="text-truncate">
+                      <h5 id="viewer-title" class="fw-bold mb-0 text-truncate">Título del Elemento</h5>
+                      <small id="viewer-date" class="text-muted">Fecha de recepción</small>
+                    </div>
+                  </div>
+                  <div class="d-flex align-items-center gap-1">
+                    <button id="btn-mark-unread" class="btn btn-sm btn-outline-secondary" title="Marcar como no leído">
+                      <i class="bi bi-envelope"></i>
+                    </button>
+                    <button id="btn-open-new-tab" class="btn btn-sm btn-outline-secondary" title="Abrir en pestaña nueva">
+                      <i class="bi bi-box-arrow-up-right"></i>
+                    </button>
+                    <button id="btn-print-html" class="btn btn-sm btn-outline-secondary" title="Imprimir contenido">
+                      <i class="bi bi-printer"></i>
+                    </button>
+                    <button id="btn-delete-message" class="btn btn-sm btn-outline-danger" title="Eliminar mensaje">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Marco Iframe de Renderizado HTML Aislado -->
+                <div class="flex-grow-1 p-2 bg-light">
+                  <iframe id="html-preview-frame" class="html-preview-frame h-100" sandbox="allow-same-origin allow-popups allow-scripts allow-forms" title="Visualizador de contenido HTML"></iframe>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ================================================= -->
+      <!-- PESTAÑA 2: SIMULADOR Y PROBADOR DE LA API EXTERNA -->
+      <!-- ================================================= -->
+      <div class="tab-pane fade" id="tab-tester-content" role="tabpanel">
+        <div class="row g-4">
+          
+          <!-- Columna Formulario de Envío -->
+          <div class="col-12 col-lg-7">
+            <div class="card shadow-sm border rounded-3 p-4 bg-white">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0 text-primary">
+                  <i class="bi bi-send-check me-2"></i>Simulador de Envío desde App Externa
+                </h5>
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                  POST /api/inbox/send
+                </span>
+              </div>
+              <p class="text-muted small">
+                Este formulario simula el request HTTP que tu sistema o aplicación externa enviará hacia la API. Al enviar, el mensaje HTML se guardará en el Inbox y el usuario recibirá la Notificación Push en tiempo real.
+              </p>
+
+              <!-- Selector de Plantillas Rápidas -->
+              <div class="mb-3">
+                <label for="tester-template-select" class="form-label small fw-semibold">Cargar plantilla de ejemplo:</label>
+                <select id="tester-template-select" class="form-select form-select-sm">
+                  <option value="factura">📄 Factura Electrónica con Tabla de Precios</option>
+                  <option value="alerta">⚠️ Alerta de Seguridad de Cuenta</option>
+                  <option value="boletin">🚀 Boletín de Novedades con Gradientes y Tarjetas</option>
+                </select>
+              </div>
+
+              <form id="form-api-tester">
+                <!-- Destinatario -->
+                <div class="row g-2 mb-3">
+                  <div class="col-12 col-md-6">
+                    <label for="tester-user-email" class="form-label small fw-semibold">Correo del Destinatario (userEmail)</label>
+                    <input type="email" id="tester-user-email" class="form-control form-control-sm" required placeholder="correo@ejemplo.com">
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <label for="tester-user-id" class="form-label small fw-semibold">UID Opcional (userId)</label>
+                    <input type="text" id="tester-user-id" class="form-control form-control-sm" readonly placeholder="UID de Firebase">
+                  </div>
+                </div>
+
+                <!-- Título en Inbox -->
+                <div class="mb-3">
+                  <label for="tester-title" class="form-label small fw-semibold">Título del Elemento (title)</label>
+                  <input type="text" id="tester-title" class="form-control form-control-sm" required placeholder="Ej: Factura Septiembre #1234">
+                </div>
+
+                <!-- Campos para la Notificación Push -->
+                <div class="card bg-light border-0 p-3 mb-3 rounded-2">
+                  <h6 class="fw-bold small text-secondary mb-2">
+                    <i class="bi bi-bell-fill me-1 text-warning"></i> Datos para la Notificación Push (FCM)
+                  </h6>
+                  <div class="row g-2">
+                    <div class="col-12 col-md-6">
+                      <label for="tester-push-title" class="form-label small fw-semibold">Título del Push (pushTitle)</label>
+                      <input type="text" id="tester-push-title" class="form-control form-control-sm" required placeholder="Ej: Nueva Factura Disponible">
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label for="tester-push-body" class="form-label small fw-semibold">Contenido del Push (pushBody)</label>
+                      <input type="text" id="tester-push-body" class="form-control form-control-sm" required placeholder="Ej: Consulta tu factura de Septiembre.">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Código HTML a Enviar -->
+                <div class="mb-3">
+                  <label for="tester-html" class="form-label small fw-semibold">Contenido HTML (html)</label>
+                  <textarea id="tester-html" class="form-control font-monospace small" rows="8" required></textarea>
+                </div>
+
+                <!-- Botón de Envío -->
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold shadow-sm">
+                  <i class="bi bi-send-fill me-2"></i>Enviar vía API ahora
+                </button>
+              </form>
+
+              <!-- Alerta de Respuesta del Servidor -->
+              <div id="tester-result-alert" class="alert d-none mt-3 small"></div>
+
+            </div>
+          </div>
+
+          <!-- Columna Snippets de Código para Integración -->
+          <div class="col-12 col-lg-5">
+            <div class="card shadow-sm border rounded-3 p-4 bg-white">
+              <h5 class="fw-bold mb-3 text-dark">
+                <i class="bi bi-code-square me-2 text-primary"></i>Código para tu App Externa
+              </h5>
+              <p class="text-muted small">
+                Copia y pega este código en tu aplicación externa para realizar el envío directo hacia la API:
+              </p>
+
+              <!-- Tabs de Lenguajes -->
+              <ul class="nav nav-tabs nav-fill mb-3 small" id="snippetTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link active fw-semibold" id="tab-curl-btn" data-bs-toggle="tab" data-bs-target="#tab-curl" type="button" role="tab">cURL</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link fw-semibold" id="tab-js-btn" data-bs-toggle="tab" data-bs-target="#tab-js" type="button" role="tab">JavaScript</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link fw-semibold" id="tab-py-btn" data-bs-toggle="tab" data-bs-target="#tab-py" type="button" role="tab">Python</button>
+                </li>
+              </ul>
+
+              <div class="tab-content">
+                <!-- Tab cURL -->
+                <div class="tab-pane fade show active" id="tab-curl" role="tabpanel">
+                  <div class="code-block-wrapper">
+                    <button class="btn btn-xs btn-outline-light btn-copy-code" onclick="copyToClipboard('snippet-curl', this)">
+                      <i class="bi bi-clipboard me-1"></i>Copiar
+                    </button>
+                    <pre class="code-block"><code id="snippet-curl">curl ...</code></pre>
+                  </div>
+                </div>
+
+                <!-- Tab JS -->
+                <div class="tab-pane fade" id="tab-js" role="tabpanel">
+                  <div class="code-block-wrapper">
+                    <button class="btn btn-xs btn-outline-light btn-copy-code" onclick="copyToClipboard('snippet-js', this)">
+                      <i class="bi bi-clipboard me-1"></i>Copiar
+                    </button>
+                    <pre class="code-block"><code id="snippet-js">fetch(...)</code></pre>
+                  </div>
+                </div>
+
+                <!-- Tab Python -->
+                <div class="tab-pane fade" id="tab-py" role="tabpanel">
+                  <div class="code-block-wrapper">
+                    <button class="btn btn-xs btn-outline-light btn-copy-code" onclick="copyToClipboard('snippet-python', this)">
+                      <i class="bi bi-clipboard me-1"></i>Copiar
+                    </button>
+                    <pre class="code-block"><code id="snippet-python">import requests...</code></pre>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ================================================= -->
+      <!-- PESTAÑA 3: DOCUMENTACIÓN Y GUÍA DE INTEGRACIÓN   -->
+      <!-- ================================================= -->
+      <div class="tab-pane fade" id="tab-docs-content" role="tabpanel">
+        <div class="card shadow-sm border rounded-3 p-4 bg-white">
+          <h4 class="fw-bold mb-3 text-primary">
+            <i class="bi bi-journal-text me-2"></i>Especificación de la API REST Externa
+          </h4>
+          <p class="text-muted">
+            Cualquier sistema externo (ERP, CRM, servicio de facturación o backend) puede enviar contenidos HTML hacia el inbox del usuario y activar una notificación push en sus dispositivos.
+          </p>
+
+          <div class="table-responsive my-3">
+            <table class="table table-bordered align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th style="width: 140px;">Método & URL</th>
+                  <th>Encabezados (Headers)</th>
+                  <th>Descripción</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="badge bg-success">POST</span> <code>/api/inbox/send</code></td>
+                  <td><code>Content-Type: application/json</code></td>
+                  <td>Crea el elemento en el Inbox del usuario en Firestore y envía la Notificación Push por FCM a todos sus dispositivos activos.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h5 class="fw-bold mt-4 mb-2">Parámetros del Request Body (JSON)</h5>
+          <div class="table-responsive">
+            <table class="table table-sm table-striped border">
+              <thead>
+                <tr>
+                  <th>Campo</th>
+                  <th>Tipo</th>
+                  <th>Requerido</th>
+                  <th>Descripción</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>userEmail</code></td>
+                  <td>String</td>
+                  <td>Sí (o <code>userId</code>)</td>
+                  <td>Correo electrónico del usuario destinatario registrado en Firebase Auth.</td>
+                </tr>
+                <tr>
+                  <td><code>userId</code></td>
+                  <td>String</td>
+                  <td>Opcional</td>
+                  <td>UID del usuario en Firebase Auth (alternativa a <code>userEmail</code>).</td>
+                </tr>
+                <tr>
+                  <td><code>title</code></td>
+                  <td>String</td>
+                  <td>Sí</td>
+                  <td>Título del elemento que se listará en el Inbox del usuario.</td>
+                </tr>
+                <tr>
+                  <td><code>html</code></td>
+                  <td>String</td>
+                  <td>Sí</td>
+                  <td>Contenido HTML completo que el usuario visualizará al hacer clic en el elemento.</td>
+                </tr>
+                <tr>
+                  <td><code>pushTitle</code></td>
+                  <td>String</td>
+                  <td>Sí</td>
+                  <td>Título que se mostrará en el banner de la Notificación Push del sistema operativo / navegador.</td>
+                </tr>
+                <tr>
+                  <td><code>pushBody</code></td>
+                  <td>String</td>
+                  <td>Sí</td>
+                  <td>Mensaje / texto descriptivo de la Notificación Push.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h5 class="fw-bold mt-4 mb-2">Respuesta Exitosa (HTTP 201 Created)</h5>
+          <pre class="bg-light p-3 rounded border"><code>{
+  "success": true,
+  "message": "HTML guardado en Inbox y proceso de push completado.",
+  "inboxId": "mN37vB8Xq1209La",
+  "userId": "Jklq817290abcdef",
+  "title": "Factura Electrónica #FAC-2026-9810",
+  "pushResult": {
+    "sent": true,
+    "tokensTargeted": 1,
+    "successCount": 1,
+    "failureCount": 0
+  }
+}</code></pre>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: CONFIGURACIÓN DE FIREBASE                         -->
+  <!-- ======================================================== -->
+  <div class="modal fade" id="modalFirebaseConfig" tabindex="-1" aria-labelledby="modalFirebaseConfigLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold" id="modalFirebaseConfigLabel">
+            <i class="bi bi-fire text-danger me-2"></i>Configuración de Firebase
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">
+            Configura aquí las credenciales web de tu proyecto de Firebase. Se guardarán en el almacenamiento local de tu navegador.
+          </p>
+
+          <div class="row g-3">
+            <div class="col-12 col-md-6">
+              <label for="config-api-key" class="form-label small fw-semibold">apiKey</label>
+              <input type="text" id="config-api-key" class="form-control form-control-sm" placeholder="AIzaSy...">
+            </div>
+            <div class="col-12 col-md-6">
+              <label for="config-auth-domain" class="form-label small fw-semibold">authDomain</label>
+              <input type="text" id="config-auth-domain" class="form-control form-control-sm" placeholder="tu-proyecto.firebaseapp.com">
+            </div>
+            <div class="col-12 col-md-6">
+              <label for="config-project-id" class="form-label small fw-semibold">projectId</label>
+              <input type="text" id="config-project-id" class="form-control form-control-sm" placeholder="tu-proyecto">
+            </div>
+            <div class="col-12 col-md-6">
+              <label for="config-storage-bucket" class="form-label small fw-semibold">storageBucket</label>
+              <input type="text" id="config-storage-bucket" class="form-control form-control-sm" placeholder="tu-proyecto.firebasestorage.app">
+            </div>
+            <div class="col-12 col-md-6">
+              <label for="config-messaging-sender-id" class="form-label small fw-semibold">messagingSenderId</label>
+              <input type="text" id="config-messaging-sender-id" class="form-control form-control-sm" placeholder="1234567890">
+            </div>
+            <div class="col-12 col-md-6">
+              <label for="config-app-id" class="form-label small fw-semibold">appId</label>
+              <input type="text" id="config-app-id" class="form-control form-control-sm" placeholder="1:123456:web:abcdef">
+            </div>
+            <div class="col-12">
+              <label for="config-vapid-key" class="form-label small fw-semibold">
+                Clave de Certificado Web Push (VAPID Key)
+                <span class="badge bg-info-subtle text-info ms-1">Requerido para FCM Web</span>
+              </label>
+              <input type="text" id="config-vapid-key" class="form-control form-control-sm" placeholder="BK...">
+              <div class="form-text small">
+                Obtenla en Firebase Console &gt; <strong>Settings &gt; Project settings &gt; Cloud Messaging &gt; Web configuration &gt; Key pair</strong>.
+              </div>
+            </div>
+          </div>
+
+          <div class="alert alert-info small mt-3 mb-0">
+            <i class="bi bi-info-circle-fill me-1"></i>
+            <strong>Nota para el Servidor (Backend):</strong> Para habilitar el envío de push desde el servidor, recuerda colocar tu archivo <code>serviceAccountKey.json</code> descargado de Firebase en la raíz del proyecto.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-outline-danger me-auto" id="btn-reset-firebase-config">
+            Restablecer Valores
+          </button>
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-sm btn-primary fw-semibold" id="btn-save-firebase-config">
+            Guardar y Recargar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- TOAST DE NOTIFICACIÓN PUSH EN PRIMER PLANO               -->
+  <!-- ======================================================== -->
+  <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
+    <div id="toast-push-notification" class="toast shadow-lg border-primary" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="toast-header bg-primary text-white">
+        <i class="bi bi-bell-fill me-2"></i>
+        <strong id="toast-push-title" class="me-auto">Notificación Push Recibida</strong>
+        <small id="toast-push-time" class="text-white-50">Ahora</small>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+      <div id="toast-push-body" class="toast-body bg-white text-dark py-3" style="cursor: pointer;">
+        Tienes un nuevo contenido en tu Inbox. Haz clic aquí para verlo.
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts de Firebase SDK (Compat v10.13.2) -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js"></script>
+
+  <!-- Bootstrap 5.3 JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Módulos de la Aplicación -->
+  <script src="/js/firebase-config.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/fcm.js"></script>
+  <script src="/js/inbox.js"></script>
+  <script src="/js/api-tester.js"></script>
+
+  <!-- Script para el modal de configuración de Firebase -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const config = window.firebaseConfig || {};
+      const elApiKey = document.getElementById('config-api-key');
+      const elAuthDomain = document.getElementById('config-auth-domain');
+      const elProjectId = document.getElementById('config-project-id');
+      const elStorageBucket = document.getElementById('config-storage-bucket');
+      const elMessagingSenderId = document.getElementById('config-messaging-sender-id');
+      const elAppId = document.getElementById('config-app-id');
+      const elVapidKey = document.getElementById('config-vapid-key');
+
+      if (elApiKey && config.apiKey) elApiKey.value = config.apiKey.includes('TU_API_KEY') ? '' : config.apiKey;
+      if (elAuthDomain && config.authDomain) elAuthDomain.value = config.authDomain.includes('TU_PROYECTO') ? '' : config.authDomain;
+      if (elProjectId && config.projectId) elProjectId.value = config.projectId.includes('TU_PROYECTO') ? '' : config.projectId;
+      if (elStorageBucket && config.storageBucket) elStorageBucket.value = config.storageBucket.includes('TU_PROYECTO') ? '' : config.storageBucket;
+      if (elMessagingSenderId && config.messagingSenderId) elMessagingSenderId.value = config.messagingSenderId === '1234567890' ? '' : config.messagingSenderId;
+      if (elAppId && config.appId) elAppId.value = config.appId.includes('TU_PROYECTO') ? '' : config.appId;
+      if (elVapidKey && window.firebaseVapidKey) elVapidKey.value = window.firebaseVapidKey.includes('TU_VAPID_PUBLIC_KEY') ? '' : window.firebaseVapidKey;
+
+      document.getElementById('btn-save-firebase-config')?.addEventListener('click', () => {
+        const newConfig = {
+          apiKey: elApiKey.value.trim(),
+          authDomain: elAuthDomain.value.trim(),
+          projectId: elProjectId.value.trim(),
+          storageBucket: elStorageBucket.value.trim(),
+          messagingSenderId: elMessagingSenderId.value.trim(),
+          appId: elAppId.value.trim()
+        };
+        const newVapid = elVapidKey.value.trim();
+        window.saveActiveFirebaseConfig(newConfig, newVapid);
+      });
+
+      document.getElementById('btn-reset-firebase-config')?.addEventListener('click', () => {
+        if (confirm('¿Deseas restablecer la configuración a los valores por defecto?')) {
+          window.resetFirebaseConfigToDefault();
+        }
+      });
+    });
+  </script>
+
+</body>
+</html>

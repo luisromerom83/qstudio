@@ -27,6 +27,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY manager/ ./manager/
 COPY Inspire/demo-mode/ ./Inspire/demo-mode/
 COPY producer/ ./producer/
+COPY inbox/ ./inbox/
 COPY init-databases.sql .
 COPY grant_impersonation.java .
 COPY clean_config.json .

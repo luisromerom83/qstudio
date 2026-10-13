@@ -1,0 +1,14 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.quadient.pushnotifications",
+      "sha256_cert_fingerprints": [
+        "5A:C8:9F:60:DA:92:C6:D1:72:AE:33:D4:F2:BC:E1:4B:23:78:C8:11:BE:BF:22:64:D7:9B:4D:C0:40:6B:D0:99",
+        "46:63:28:B4:BF:BF:FC:3F:A5:63:9A:3F:EA:92:49:28:F0:6F:02:32:42:D5:53:0E:82:E2:C5:C0:A6:13:51:CB",
+        "C8:09:90:03:FB:4E:20:1B:58:B3:46:5C:DC:14:2D:8B:44:0E:53:53:73:1F:93:75:AF:DF:F3:F2:4B:5F:1A:E3"
+      ]
+    }
+  }
+]

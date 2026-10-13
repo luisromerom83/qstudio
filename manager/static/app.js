@@ -89,6 +89,7 @@ async function checkConfigAndOnboarding() {
     document.getElementById("setting-registry").value = creds.registry || "quadientdistribution.azurecr.io";
     document.getElementById("setting-username").value = creds.username || "";
     document.getElementById("setting-lic-server").value = creds.license_server || "";
+    renderFirebaseStatus(data.firebase);
 
     if (data.needs_onboarding) {
       const modal = document.getElementById("onboarding-modal");
@@ -174,6 +175,34 @@ async function handleSaveSettings(e) {
     });
     const data = await res.json();
     showAlert(data.success ? "success" : "error", data.message);
+  } catch (err) {
+    showAlert("error", "Error de red: " + err.message);
+  }
+}
+
+function renderFirebaseStatus(fb) {
+  const el = document.getElementById("firebase-status");
+  if (!el) return;
+  el.textContent = fb && fb.configured
+    ? `Configurada: proyecto ${fb.project_id} (${fb.client_email}). Pega un JSON nuevo para reemplazarla.`
+    : "Sin configurar: el inbox arrancará, pero no podrá guardar mensajes ni enviar notificaciones.";
+}
+
+async function handleSaveFirebase(e) {
+  e.preventDefault();
+  const input = document.getElementById("setting-firebase-key");
+  try {
+    const res = await fetch("/api/config/firebase", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ service_account: input.value })
+    });
+    const data = await res.json();
+    showAlert(data.success ? "success" : "error", data.message);
+    if (data.success) {
+      input.value = "";
+      renderFirebaseStatus(data.firebase);
+    }
   } catch (err) {
     showAlert("error", "Error de red: " + err.message);
   }
@@ -613,6 +642,8 @@ function openNewEnvModal() {
   if (chkScaler) chkScaler.checked = true;
   const chkKafka = document.getElementById("new-env-enable-kafka");
   if (chkKafka) chkKafka.checked = false;
+  const chkInbox = document.getElementById("new-env-enable-inbox");
+  if (chkInbox) chkInbox.checked = false;
   const chkFtp = document.getElementById("new-env-enable-ftp");
   if (chkFtp) chkFtp.checked = false;
   toggleScalerSharedFolder();
@@ -652,6 +683,8 @@ async function handleCreateEnvSubmit(e) {
   const scalerJobsDir = document.getElementById("new-env-scaler-jobs-dir")?.value.trim() || "";
   const chkKafka = document.getElementById("new-env-enable-kafka");
   const enableKafka = chkKafka ? chkKafka.checked : false;
+  const chkInbox = document.getElementById("new-env-enable-inbox");
+  const enableInbox = chkInbox ? chkInbox.checked : false;
   const chkFtp = document.getElementById("new-env-enable-ftp");
   const enableFtp = chkFtp ? chkFtp.checked : false;
 
@@ -667,6 +700,7 @@ async function handleCreateEnvSubmit(e) {
     scaler_sharedfolder: scalerSharedfolder,
     scaler_jobs_dir: scalerJobsDir,
     enable_kafka: enableKafka,
+    enable_inbox: enableInbox,
     enable_ftp: enableFtp
   };
   if (port) {
@@ -747,6 +781,9 @@ function openEditEnvModal(envId) {
   const chkKafka = document.getElementById("edit-env-enable-kafka");
   if (chkKafka) chkKafka.checked = Boolean(env.enable_kafka);
 
+  const chkInbox = document.getElementById("edit-env-enable-inbox");
+  if (chkInbox) chkInbox.checked = Boolean(env.enable_inbox);
+
   const chkFtp = document.getElementById("edit-env-enable-ftp");
   if (chkFtp) chkFtp.checked = Boolean(env.enable_ftp);
 
@@ -769,6 +806,7 @@ async function handleEditEnvSubmit(e) {
   const scalerSharedfolder = document.getElementById("edit-env-scaler-sharedfolder")?.value.trim() || "";
   const scalerJobsDir = document.getElementById("edit-env-scaler-jobs-dir")?.value.trim() || "";
   const enableKafka = document.getElementById("edit-env-enable-kafka")?.checked ?? false;
+  const enableInbox = document.getElementById("edit-env-enable-inbox")?.checked ?? false;
   const enableFtp = document.getElementById("edit-env-enable-ftp")?.checked ?? false;
   const demoMode = document.getElementById("edit-env-demo-mode")?.checked ?? false;
 
@@ -780,6 +818,7 @@ async function handleEditEnvSubmit(e) {
     scaler_sharedfolder: scalerSharedfolder,
     scaler_jobs_dir: scalerJobsDir,
     enable_kafka: enableKafka,
+    enable_inbox: enableInbox,
     enable_ftp: enableFtp,
     demo_mode: demoMode
   };
@@ -882,6 +921,11 @@ function getServicePortInfo(c, env) {
     portText = `30354 (IPS Interactive)`;
   } else if (s.includes("prepare")) {
     portText = `One-Shot (Prep BD)`;
+  } else if (s.includes("push-inbox")) {
+    const port = extractHostPort(c.ports, 3000) || ports.inbox || 3000;
+    portText = `${port}`;
+    accessUrl = `http://${host}:${port}/`;
+    urlLabel = "Abrir Push Notifications Inbox";
   } else if (s.includes("studio") || s.includes("producer")) {
     const port = extractHostPort(c.ports, 8080) || ports.csv_studio || 8081;
     portText = `${port}`;
@@ -907,8 +951,8 @@ function renderNodeBox({ title, container, defaultPort, internalPort, type, env 
   const host = window.location.hostname || "localhost";
   const portInfo = container ? getServicePortInfo(container, env) : {
     portText: `${defaultPort}${internalPort ? ` -> ${internalPort}` : ''}`,
-    accessUrl: type === "interactive" ? `http://${host}:${defaultPort}/interactive` : ((type === "scaler" || type === "studio") ? `http://${host}:${defaultPort}/` : null),
-    urlLabel: type === "interactive" ? "Abrir Inspire Interactive" : (type === "scaler" ? "Abrir Inspire Scaler" : (type === "studio" ? "Abrir Kafka CSV Studio" : ""))
+    accessUrl: type === "interactive" ? `http://${host}:${defaultPort}/interactive` : ((type === "scaler" || type === "studio" || type === "inbox") ? `http://${host}:${defaultPort}/` : null),
+    urlLabel: type === "interactive" ? "Abrir Inspire Interactive" : (type === "scaler" ? "Abrir Inspire Scaler" : (type === "studio" ? "Abrir Kafka CSV Studio" : (type === "inbox" ? "Abrir Push Notifications Inbox" : "")))
   };
 
   return `
@@ -1092,6 +1136,11 @@ function renderServicesView() {
     return s.includes("kafka-csv-studio") || s.includes("producer") || (s.includes("studio") && !s.includes("inspire"));
   });
 
+  const pushInbox = rawContainers.find(c => {
+    const s = (c.service || c.name || "").toLowerCase();
+    return s.includes("push-inbox");
+  });
+
   const ftp = rawContainers.find(c => {
     const s = (c.service || c.name || "").toLowerCase();
     return s.includes("ftp");
@@ -1106,7 +1155,7 @@ function renderServicesView() {
   const interPrep = rawContainers.find(c => (c.service || c.name || "").toLowerCase().includes("interactive-prepare"));
 
   // Check extra unmapped containers
-  const coreIds = [interactive, interactiveIps, scaler, scalerIps, icm, postgres, scalerPrep, interPrep, kafka, kafkaProducer, ftp]
+  const coreIds = [interactive, interactiveIps, scaler, scalerIps, icm, postgres, scalerPrep, interPrep, kafka, kafkaProducer, pushInbox, ftp]
     .filter(Boolean)
     .map(c => c.name);
   const extraContainers = rawContainers.filter(c => !coreIds.includes(c.name));
@@ -1116,6 +1165,7 @@ function renderServicesView() {
   const hasInteractive = env.enable_interactive !== false;
   const hasScaler = env.enable_scaler !== false;
   const hasKafka = Boolean(env.enable_kafka || kafka || kafkaProducer);
+  const hasInbox = Boolean(env.enable_inbox || pushInbox);
   const hasFtp = Boolean(env.enable_ftp || ftp);
 
   // Helper to render Interactive Group
@@ -1238,6 +1288,12 @@ function renderServicesView() {
             <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
               <span class="w-3 h-3 rounded-sm bg-[#6E6CA3] inline-block border border-slate-700"></span>
               <span class="font-bold text-slate-200">KAFKA</span>
+            </span>
+          ` : ''}
+          ${hasInbox ? `
+            <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
+              <span class="w-3 h-3 rounded-sm bg-[#A35F78] inline-block border border-slate-700"></span>
+              <span class="font-bold text-slate-200">PUSH INBOX</span>
             </span>
           ` : ''}
           ${hasFtp ? `
@@ -1421,8 +1477,8 @@ function renderServicesView() {
     </div>
   `;
 
-  // OPTIONAL THIRD-PARTY SERVICES: KAFKA & FTP
-  if (hasKafka || hasFtp) {
+  // OPTIONAL THIRD-PARTY SERVICES: KAFKA, PUSH INBOX & FTP
+  if (hasKafka || hasInbox || hasFtp) {
     html += `
       <div class="pt-6 border-t border-slate-800 space-y-6">
         <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -1430,7 +1486,7 @@ function renderServicesView() {
           Servicios de Integración y Terceros Opcionales
         </div>
 
-        <div class="grid grid-cols-1 ${hasKafka && hasFtp ? 'lg:grid-cols-2' : ''} gap-6">
+        <div class="grid grid-cols-1 ${[hasKafka, hasInbox, hasFtp].filter(Boolean).length > 1 ? 'lg:grid-cols-2' : ''} gap-6">
           ${hasKafka ? `
             <!-- KAFKA STREAMING & CSV STUDIO GROUP -->
             <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
@@ -1466,6 +1522,39 @@ function renderServicesView() {
                   type: "studio",
                   env: env
                 })}
+              </div>
+            </div>
+          ` : ''}
+
+          ${hasInbox ? `
+            <!-- PUSH NOTIFICATIONS INBOX GROUP -->
+            <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
+              <!-- Header Banner (Rose) -->
+              <div class="bg-[#A35F78] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
+                <i data-lucide="bell-ring" class="w-4 h-4 text-white"></i>
+                <span>PUSH NOTIFICATIONS INBOX</span>
+              </div>
+
+              <div class="p-4 sm:p-5 flex-1 flex flex-col justify-between bg-slate-900/60 space-y-4">
+                ${renderNodeBox({
+                  title: "INBOX WEB + API (Firebase)",
+                  container: pushInbox,
+                  defaultPort: env.ports?.inbox || 3000,
+                  internalPort: 3000,
+                  type: "inbox",
+                  env: env
+                })}
+
+                <!-- API endpoint banner -->
+                <div class="bg-slate-950/80 p-3.5 rounded-xl border border-rose-500/30 flex flex-col gap-2 text-xs">
+                  <span class="text-rose-300 font-semibold flex items-center gap-1.5">
+                    <i data-lucide="send" class="w-3.5 h-3.5"></i> Endpoint para Scaler / Kafka
+                  </span>
+                  <div class="font-mono text-[11px] bg-slate-900 p-2 rounded-lg border border-slate-800 text-slate-300 break-all">
+                    POST http://push-inbox:3000/api/inbox/send
+                  </div>
+                  <span class="text-[10px] text-slate-500">Desde el navegador usa <code>localhost</code>: las notificaciones push solo funcionan en localhost o HTTPS.</span>
+                </div>
               </div>
             </div>
           ` : ''}

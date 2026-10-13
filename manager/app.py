@@ -49,6 +49,7 @@ def get_config():
             "version": creds.get("INSPIRE_VERSION", "17.5-latest")
         },
         "needs_onboarding": is_onboarding_needed,
+        "firebase": env_service.get_firebase_status(),
         "verticals": VERTICAL_CATEGORIES
     })
 
@@ -105,6 +106,12 @@ def update_config():
         }), 400
 
     return jsonify({"success": True, "message": "Configuración guardada y sesión iniciada exitosamente en Azure Container Registry"})
+
+@app.route("/api/config/firebase", methods=["POST"])
+def update_firebase_config():
+    data = request.json or {}
+    ok, msg = env_service.save_firebase_key((data.get("service_account") or "").strip())
+    return jsonify({"success": ok, "message": msg, "firebase": env_service.get_firebase_status()}), (200 if ok else 400)
 
 @app.route("/api/config/test", methods=["POST"])
 def test_config():

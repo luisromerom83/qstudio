@@ -17,3 +17,7 @@ Thumbs.db
 # Python
 __pycache__/
 *.pyc
+
+# Firebase Admin key for the push inbox (pasted in Settings)
+manager/data/firebase-service-account.json
+inbox.env

@@ -15,3 +15,4 @@ manager/data/snapshots/*
 manager/studio.log
 manager/.studio.pid
 *.log
+manager/data/firebase-service-account.json
