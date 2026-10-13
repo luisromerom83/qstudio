@@ -1338,23 +1338,27 @@ function renderServicesView() {
           <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
             <span class="w-3 h-3 rounded-sm bg-[#8b929d] inline-block border border-slate-700"></span>
             ${productIcon("content-manager", "white", "w-3.5 h-3.5")}
+            ${productIcon("postgres", "white", "w-3.5 h-3.5")}
             <span class="font-bold text-slate-200">ICM / POSTGRES</span>
           </span>
           ${hasKafka ? `
             <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
               <span class="w-3 h-3 rounded-sm bg-[#6E6CA3] inline-block border border-slate-700"></span>
+              ${productIcon("kafka", "white", "w-3.5 h-3.5")}
               <span class="font-bold text-slate-200">KAFKA</span>
             </span>
           ` : ''}
           ${hasUseCases ? `
             <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
               <span class="w-3 h-3 rounded-sm bg-[#A35F78] inline-block border border-slate-700"></span>
+              ${productIcon("use-cases", "white", "w-3.5 h-3.5")}
               <span class="font-bold text-slate-200">CASOS DE USO</span>
             </span>
           ` : ''}
           ${hasFtp ? `
             <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
               <span class="w-3 h-3 rounded-sm bg-[#3F7F76] inline-block border border-slate-700"></span>
+              ${productIcon("ftp", "white", "w-3.5 h-3.5")}
               <span class="font-bold text-slate-200">FTP</span>
             </span>
           ` : ''}
@@ -1516,7 +1520,8 @@ function renderServicesView() {
 
       <!-- POSTGRES DATABASE BOX (Mandatory) -->
       <div class="w-full max-w-2xl mx-auto group-box rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
-        <div class="bg-[#8b929d] text-slate-950 font-black tracking-widest text-center py-2 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm">
+        <div class="bg-[#8b929d] text-slate-950 font-black tracking-widest text-center py-2 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
+          ${productIcon("postgres", "black", "w-5 h-5")}
           <span>POSTGRES DATABASE</span>
         </div>
         <div class="p-4 sm:p-5 bg-slate-900/60">
@@ -1548,7 +1553,7 @@ function renderServicesView() {
             <!-- USE CASES GROUP -->
             <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
               <div class="bg-[#A35F78] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
-                <i data-lucide="layout-grid" class="w-4 h-4 text-white"></i>
+                ${productIcon("use-cases", "white", "w-5 h-5")}
                 <span>CASOS DE USO</span>
               </div>
 
@@ -1597,7 +1602,7 @@ function renderServicesView() {
             <!-- KAFKA BROKER GROUP -->
             <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
               <div class="bg-[#6E6CA3] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
-                <i data-lucide="radio" class="w-4 h-4 text-white"></i>
+                ${productIcon("kafka", "white", "w-5 h-5")}
                 <span>KAFKA STREAMING</span>
               </div>
 
@@ -1628,7 +1633,7 @@ function renderServicesView() {
             <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
               <!-- Header Banner (Teal) -->
               <div class="bg-[#3F7F76] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
-                <i data-lucide="folder-sync" class="w-4 h-4 text-white"></i>
+                ${productIcon("ftp", "white", "w-5 h-5")}
                 <span>FTP SERVER (vsftpd)</span>
               </div>
 
