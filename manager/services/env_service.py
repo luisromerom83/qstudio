@@ -3,6 +3,7 @@ Environment Service
 Manages Demo & PoC Sandboxes organized by industry verticals.
 """
 import base64
+import copy
 import os
 import json
 import re
@@ -621,6 +622,7 @@ class EnvService:
                 break
         if not target:
             return False, "Ambiente no encontrado"
+        original = copy.deepcopy(target)
 
         if "name" in data:
             target["name"] = data["name"].strip()
@@ -739,15 +741,77 @@ class EnvService:
                 target.get("volume_locations", {}).pop("ftpdata", None)
 
         self._rewrite_compose(target)
+        is_running = target.get("status") in ["running", "partial"]
+
+        ok, msg = self._rebind_scaler_volumes(target)
+        if not ok:
+            # Nothing is saved: put the previous compose back and bring back any container already removed
+            self._rewrite_compose(original)
+            if is_running:
+                DockerService.compose_up(original["compose_file"], original["env_file"], original["project_name"])
+            return False, msg
 
         # If environment is currently running, apply changes live with docker compose up
-        if target.get("status") in ["running", "partial"]:
+        if is_running:
             if target.get("demo_mode"):
                 self._ensure_demo_mode_volume(target)
             DockerService.compose_up(target["compose_file"], target["env_file"], target["project_name"])
 
         self._save_environments(envs)
         return True, "Ambiente y configuración de servicios actualizados correctamente"
+
+    def _scaler_volume_targets(self, target: Dict[str, Any]) -> Dict[str, Optional[str]]:
+        """Volume name -> host folder it must be bound to (None = Docker-managed)."""
+        storage = target.get("storage_path")
+        custom = storage if storage and storage != "docker_default" else None
+        targets = {}
+        for key, field in (("sharedfolder", "scaler_sharedfolder"), ("jobsdir", "scaler_jobs_dir")):
+            path = target.get(field, "") or (f"{custom}/{key}" if custom else None)
+            targets[f"{target['project_name']}_{key}_{target['id']}"] = path
+        return targets
+
+    def _rebind_scaler_volumes(self, target: Dict[str, Any]) -> Tuple[bool, str]:
+        """Scaler folders are named volumes bound to a host path. Docker fixes that path when the
+        volume is created and compose won't recreate it unattended, so a changed folder only takes
+        effect once the volume is removed and compose creates it again with the new path."""
+        if not target.get("enable_scaler", True):
+            return True, ""
+        for volume, wanted in self._scaler_volume_targets(target).items():
+            code, out, _ = DockerService._run_cmd(f"docker volume inspect {shlex.quote(volume)}")
+            if code != 0:
+                continue  # Not created yet: compose will create it with the new path
+            try:
+                current = (json.loads(out)[0].get("Options") or {}).get("device") or None
+            except (ValueError, IndexError, AttributeError):
+                current = None
+            if current == (wanted or None):
+                continue
+
+            # A Docker-managed volume would lose its files when removed: copy them to the new folder
+            # first, file by file so nothing already in that folder is overwritten (busybox `cp -n`
+            # skips the whole tree once the top directory exists)
+            if not current and wanted:
+                copy_script = (
+                    'cd /from && find . -type d -exec mkdir -p "/to/{}" \\; && '
+                    'find . ! -type d -exec sh -c \'for f; do [ -e "/to/$f" ] || [ -L "/to/$f" ] || cp -a "$f" "/to/$f"; done\' _ {} +'
+                )
+                code, out, err = DockerService._run_cmd(
+                    f"docker run --rm --security-opt label=disable "
+                    f"-v {shlex.quote(volume + ':/from')} -v {shlex.quote(wanted + ':/to')} alpine "
+                    f"sh -c {shlex.quote(copy_script)}",
+                    timeout=600
+                )
+                if code != 0:
+                    return False, f"No se pudo copiar el contenido del volumen {volume} a '{wanted}': {err or out}"
+
+            # Containers holding the volume (scaler, ips) are recreated by compose afterwards
+            code, out, _ = DockerService._run_cmd(f"docker ps -a -q --filter volume={shlex.quote(volume)}")
+            for cid in out.split() if code == 0 else []:
+                DockerService._run_cmd(f"docker rm -f {shlex.quote(cid)}")
+            code, out, err = DockerService._run_cmd(f"docker volume rm {shlex.quote(volume)}")
+            if code != 0:
+                return False, f"No se pudo recrear el volumen {volume} con la nueva carpeta: {err or out}"
+        return True, ""
 
     def _rewrite_compose(self, target: Dict[str, Any]) -> None:
         """Re-renders docker-compose.yml from the stored environment settings."""
