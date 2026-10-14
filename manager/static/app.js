@@ -1455,8 +1455,8 @@ function renderServicesView() {
     </div>
   ` : "";
 
-  const serviceGroup = ({ key, color, icon, title, body, flow, arrow, bidir }) => `
-    <div class="group-box flex flex-col h-full rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl" data-flow-source="${key}" ${bidir ? "data-flow-bidir" : ""}>
+  const serviceGroup = ({ key, color, icon, title, body, flow, arrow, bidir, protocol }) => `
+    <div class="group-box flex flex-col h-full rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl" data-flow-source="${key}" ${bidir ? "data-flow-bidir" : ""} data-flow-protocol="${protocol}">
       <div class="bg-[${color}] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
         ${productIcon(icon, "white", "w-5 h-5")}
         <span>${title}</span>
@@ -1600,7 +1600,7 @@ function renderServicesView() {
     title: "Front-end",
     icon: "monitor",
     subtitle: "Edición de comunicaciones por los usuarios",
-    body: `<div data-flow-source="interactive" data-flow-bidir data-flow-style="platform" class="h-full">${renderInteractiveGroup()}</div>`
+    body: `<div data-flow-source="interactive" data-flow-bidir data-flow-style="platform" data-flow-protocol="HTTP REST" class="h-full">${renderInteractiveGroup()}</div>`
   }) : "";
 
   const integrationGroups = [];
@@ -1612,6 +1612,7 @@ function renderServicesView() {
       title: "FTP SERVER (vsftpd)",
       bidir: true,
       arrow: "arrow-up-down",
+      protocol: "FTP · TCP 21",
       flow: "Scaler recoge los archivos de entrada y deposita los de salida",
       body: `
         ${renderNodeBox({
@@ -1650,6 +1651,7 @@ function renderServicesView() {
       title: "KAFKA STREAMING",
       bidir: false,
       arrow: "arrow-up",
+      protocol: "Kafka · TCP 9092",
       flow: "Scaler consume los tópicos como entrada de eventos en tiempo real",
       body: `
         ${renderNodeBox({
@@ -1781,19 +1783,30 @@ function drawHubFlow() {
 
   // Spread arrivals along the hub edge so the lines don't merge into one
   const spread = (list, i) => tCenter + (i - (list.length - 1) / 2) * 40;
-  const line = (m, sx, sy, ax, ay) => {
+  // animate: only the use cases above pulse; front-end and integrations below are fixed links
+  const line = (m, sx, sy, ax, ay, animate) => {
     const my = (sy + ay) / 2;
     const bidir = m.el.hasAttribute("data-flow-bidir");
     const style = m.el.dataset.flowStyle === "platform" ? " is-platform" : "";
     const marker = style ? "hub-arrow-platform" : "hub-arrow";
-    return `<path d="M ${sx} ${sy} C ${sx} ${my}, ${ax} ${my}, ${ax} ${ay}" class="hub-flow-line${style}${running ? " is-running" : ""}" marker-end="url(#${marker})"${bidir ? ` marker-start="url(#${marker})"` : ""} />`;
+    const path = `<path d="M ${sx} ${sy} C ${sx} ${my}, ${ax} ${my}, ${ax} ${ay}" class="hub-flow-line${style}${animate && running ? " is-running" : ""}" marker-end="url(#${marker})"${bidir ? ` marker-start="url(#${marker})"` : ""} />`;
+    const protocol = m.el.dataset.flowProtocol;
+    if (!protocol) return path;
+    // A cubic with these control points passes through ((sx+ax)/2, my) at t = 0.5
+    const lx = (sx + ax) / 2;
+    const w = protocol.length * 6.6 + 18;
+    return `${path}
+      <g class="hub-flow-label${style}">
+        <rect x="${lx - w / 2}" y="${my - 10}" width="${w}" height="20" rx="10" />
+        <text x="${lx}" y="${my + 3.5}" text-anchor="middle">${escapeHtml(protocol)}</text>
+      </g>`;
   };
 
   const paths = [
     ...above.sort((a, b) => a.r.left - b.r.left).map((m, i, list) =>
-      line(m, m.r.left + m.r.width / 2 - box.left, m.r.bottom - box.top + 2, spread(list, i), t.top - box.top - 3)),
+      line(m, m.r.left + m.r.width / 2 - box.left, m.r.bottom - box.top + 2, spread(list, i), t.top - box.top - 3, true)),
     ...below.sort((a, b) => a.r.left - b.r.left).map((m, i, list) =>
-      line(m, m.r.left + m.r.width / 2 - box.left, m.r.top - box.top - 2, spread(list, i), t.bottom - box.top + 3))
+      line(m, m.r.left + m.r.width / 2 - box.left, m.r.top - box.top - 2, spread(list, i), t.bottom - box.top + 3, false))
   ].join("");
 
   svg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);

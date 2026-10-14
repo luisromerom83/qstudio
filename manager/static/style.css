@@ -96,6 +96,30 @@ dialog::backdrop {
   stroke: #8FB8A0;
 }
 
+/* Protocol pill sitting on each connector */
+.hub-flow-label rect {
+  fill: #0b0f14;
+  stroke: #C99A62;
+  stroke-opacity: 0.7;
+  stroke-width: 1;
+}
+
+.hub-flow-label text {
+  fill: #f3dcc0;
+  font-family: ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.hub-flow-label.is-platform rect {
+  stroke: #8FB8A0;
+}
+
+.hub-flow-label.is-platform text {
+  fill: #cfe5d8;
+}
+
 /* Dashes travel toward Scaler while the environment is up */
 .hub-flow-line.is-running {
   stroke-opacity: 0.9;
