@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function initApp() {
   lucide.createIcons();
+  initProductHints();
   await checkConfigAndOnboarding();
   await loadEnvironments();
   loadVolumes();
@@ -400,6 +401,91 @@ function iconButton(icon, label, onclick, { danger = false, disabled = false } =
       class="p-1.5 rounded-md text-slate-400 transition disabled:opacity-30 disabled:pointer-events-none ${danger ? "hover:text-rose-300 hover:bg-rose-500/10" : "hover:text-slate-100 hover:bg-slate-800"}">
       <i data-lucide="${icon}" class="w-4 h-4"></i>
     </button>`;
+}
+
+// Product descriptions shown as hints in the services view
+const PRODUCT_HINTS = {
+  scaler: {
+    name: "Scaler",
+    paragraphs: [
+      "Scaler es nuestro componente de automatización habilitado para la nube. Permite a las empresas gestionar todo su entorno de producción desde un cuadro de mando. Ofrece respaldo escalable (y tolerante a fallos) para comunicación bajo demanda (y por lotes) y monitoriza el progreso y el historial de jobs de producción individuales.",
+      "Como parte de Inspire Flex, puede estar presente en el back-end, junto con Production Server e ICM. Scaler es nuestro motor recomendado para la automatización de procesos. Se ejecuta como servicio y, con su lógica de clúster, permite crear una arquitectura de elevada disponibilidad con varios servidores de Scaler cooperando."
+    ]
+  },
+  interactive: {
+    name: "Interactive",
+    paragraphs: [
+      "Interactive es nuestro componente para agilizar la correspondencia específica y la creación colaborativa de documentos, en una red en grandes empresas. Los usuarios de línea de negocio (como, por ejemplo, equipos de atención al cliente) siguen pasos predefinidos para seleccionar comunicaciones y personalizarlas con datos de clientes. Puede poblarlas con texto preaprobado adicional o editarlas con arreglo a las necesidades de ese cliente. Antes de producir cualquier comunicación, esta puede someterse a un ciclo de aprobación para su aprobación por parte de los gestores de línea.",
+      "Como parte de Inspire Flex, Interactive es la capa de front-end. Es la interfaz de usuario final. También se considera parte de la capa de diseño, ya que deben definirse plantillas (para documentos y procesos empresariales) antes de poder trabajar en cualquier comunicación."
+    ]
+  },
+  "production-server": {
+    name: "Production Server",
+    paragraphs: [
+      "Production Server es nuestro componente que no pertenece a la GUI que nos permite producir comunicaciones personalizadas de Inspire Flex. Es sumamente rápido en el procesamiento de grandes volúmenes de datos y diseños complejos.",
+      "Como parte de Inspire Flex, está presente en el back-end junto con Scaler e ICM. Se ejecuta como un servicio y se le pueden enviar comandos de producción a través de una red."
+    ]
+  },
+  icm: {
+    name: "Content Manager (ICM)",
+    paragraphs: [
+      "Content Manager es nuestro repositorio de colaboración global para todos los recursos de Inspire y todos los activos de comunicación, incluidos flujos de trabajo, plantillas, bloques de texto, imágenes, archivos nativos y configuraciones. Su versión controla todos estos archivos, lo cual permite rastrear su historial de trabajo completo para recuperación y auditoría. También puede vincularse con otros sistemas de administración de contenido como, por ejemplo, Microsoft SharePoint®.",
+      "Como parte de Inspire Flex, este componente principal está presente en el back-end, junto con Scaler y Production Server. Se ejecuta como un servicio para controlar la transferencia de recursos y gestionar el acceso de usuarios a esos recursos y los componentes de la solución al completo."
+    ]
+  }
+};
+
+// Info button that opens the product's description in the floating hint
+function productHint(key, tone = "dark") {
+  const hint = PRODUCT_HINTS[key];
+  if (!hint) return "";
+  const toneClass = tone === "dark" ? "text-slate-900/70 hover:text-slate-950" : "text-slate-400 hover:text-white";
+  return `<button type="button" class="product-hint-trigger inline-flex items-center justify-center rounded-full ${toneClass} transition flex-shrink-0" data-product-hint="${key}" aria-label="¿Qué es ${escapeHtml(hint.name)}?">
+    <i data-lucide="info" class="w-4 h-4"></i>
+  </button>`;
+}
+
+// One floating tooltip for every hint, positioned against the viewport so group overflow never clips it
+function initProductHints() {
+  const tip = document.createElement("div");
+  tip.id = "product-hint-tooltip";
+  tip.setAttribute("role", "tooltip");
+  tip.hidden = true;
+  document.body.appendChild(tip);
+  let current = null;
+
+  const show = trigger => {
+    const hint = PRODUCT_HINTS[trigger.dataset.productHint];
+    if (!hint) return;
+    current = trigger;
+    tip.innerHTML = `<p class="product-hint-title">${escapeHtml(hint.name)}</p>${hint.paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join("")}`;
+    tip.hidden = false;
+    trigger.setAttribute("aria-describedby", tip.id);
+    const r = trigger.getBoundingClientRect();
+    const margin = 12;
+    const w = tip.offsetWidth;
+    const h = tip.offsetHeight;
+    const left = Math.min(Math.max(margin, r.left + r.width / 2 - w / 2), window.innerWidth - w - margin);
+    const below = r.bottom + 8;
+    const top = below + h > window.innerHeight - margin && r.top - h - 8 > margin ? r.top - h - 8 : below;
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
+  };
+
+  const hide = () => {
+    if (current) current.removeAttribute("aria-describedby");
+    current = null;
+    tip.hidden = true;
+  };
+
+  const triggerOf = e => e.target.closest?.("[data-product-hint]");
+  document.addEventListener("mouseover", e => { const t = triggerOf(e); if (t && t !== current) show(t); });
+  document.addEventListener("mouseout", e => { const t = triggerOf(e); if (t && !t.contains(e.relatedTarget)) hide(); });
+  document.addEventListener("focusin", e => { const t = triggerOf(e); if (t) show(t); });
+  document.addEventListener("focusout", e => { if (triggerOf(e)) hide(); });
+  document.addEventListener("click", e => { const t = triggerOf(e); if (t) { e.preventDefault(); show(t); } else hide(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") hide(); });
+  window.addEventListener("scroll", hide, true);
 }
 
 // Quadient product pictograms (manager/static/img/products), black for light banners, white for dark surfaces
@@ -1000,7 +1086,7 @@ function getServicePortInfo(c, env) {
   return { portText, accessUrl, urlLabel };
 }
 
-function renderNodeBox({ title, container, defaultPort, internalPort, type, env, compact = false }) {
+function renderNodeBox({ title, container, defaultPort, internalPort, type, env, compact = false, hint = null }) {
   const isUp = container && container.state === "running";
   const isHealthy = container && container.status && container.status.includes("healthy");
   const host = window.location.hostname || "localhost";
@@ -1015,11 +1101,12 @@ function renderNodeBox({ title, container, defaultPort, internalPort, type, env,
       <div class="space-y-2">
         <!-- Node Title & State -->
         <div class="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
-          <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full ${isUp ? 'bg-emerald-400' : 'bg-slate-500'}"></span>
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="w-2 h-2 rounded-full flex-shrink-0 ${isUp ? 'bg-emerald-400' : 'bg-slate-500'}"></span>
             <h4 class="text-xs font-mono font-bold text-white tracking-wide truncate" title="${escapeHtml(title)}">
               ${escapeHtml(title)}
             </h4>
+            ${hint ? productHint(hint, "light") : ""}
           </div>
           <div>
             ${isHealthy ? `
@@ -1226,6 +1313,7 @@ function renderServicesView() {
       <div class="bg-[#8FB8A0] text-slate-950 font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
         ${productIcon("interactive", "black", "w-5 h-5")}
         <span>INTERACTIVE</span>
+        ${productHint("interactive")}
       </div>
 
       <!-- Group Body: INTERACTIVE BASE SERVER & INTERACTIVE IPS -->
@@ -1252,7 +1340,8 @@ function renderServicesView() {
           defaultPort: 30354,
           internalPort: 30354,
           type: "interactive-ips",
-          env: env
+          env: env,
+          hint: "production-server"
         })}
       </div>
     </div>
@@ -1265,6 +1354,7 @@ function renderServicesView() {
       <div class="bg-[#C99A62] text-slate-950 font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2 flex-wrap">
         ${productIcon("scaler", "black", "w-5 h-5")}
         <span>SCALER · HUB DE COMUNICACIONES</span>
+        ${productHint("scaler")}
         ${(env.scaler_sharedfolder || env.volume_locations?.sharedfolder) ? `
           <span class="text-[10px] font-mono font-bold bg-slate-950 text-amber-300 px-2 py-0.5 rounded-full border border-slate-800 lowercase tracking-normal flex items-center gap-1 shadow-inner" title="Volumen: ${escapeHtml(env.volume_locations?.sharedfolder || env.scaler_sharedfolder)}">
             <i data-lucide="folder" class="w-3 h-3 text-amber-400"></i> sharedfolder
@@ -1307,7 +1397,8 @@ function renderServicesView() {
           defaultPort: env.ports?.scaler_ips || 30354,
           internalPort: 30354,
           type: "ips",
-          env: env
+          env: env,
+          hint: "production-server"
         })}
       </div>
     </div>
@@ -1529,6 +1620,7 @@ function renderServicesView() {
       <div class="bg-[#8b929d] text-slate-950 font-black tracking-widest text-center py-2 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
         ${productIcon("content-manager", "black", "w-5 h-5")}
         <span>ICM</span>
+        ${productHint("icm")}
       </div>
       <div class="p-4 sm:p-5 bg-slate-900/60">
         ${renderNodeBox({

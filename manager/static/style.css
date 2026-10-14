@@ -146,3 +146,38 @@ dialog::backdrop {
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
 }
 
+
+/* Product description hint (Scaler, Interactive, Production Server, ICM) */
+#product-hint-tooltip {
+  position: fixed;
+  z-index: 60;
+  width: min(420px, calc(100vw - 24px));
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #334155;
+  background: #0b0f14;
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.55;
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+#product-hint-tooltip[hidden] {
+  display: none;
+}
+
+#product-hint-tooltip p + p {
+  margin-top: 8px;
+}
+
+#product-hint-tooltip .product-hint-title {
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.product-hint-trigger:focus-visible {
+  outline: 2px solid #C99A62;
+  outline-offset: 2px;
+}
