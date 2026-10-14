@@ -91,6 +91,11 @@ dialog::backdrop {
   stroke-dasharray: 6 6;
 }
 
+/* Front-end (Interactive) link to the back-end, in Interactive's color */
+.hub-flow-line.is-platform {
+  stroke: #8FB8A0;
+}
+
 /* Dashes travel toward Scaler while the environment is up */
 .hub-flow-line.is-running {
   stroke-opacity: 0.9;
