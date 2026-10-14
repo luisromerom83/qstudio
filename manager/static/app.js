@@ -29,6 +29,42 @@ document.addEventListener("DOMContentLoaded", () => {
   initApp();
 });
 
+// Optional message: t() for catalogs that come from the API (verticals, use cases), falling back to the API text
+function tOr(key, fallback, params) {
+  const known = key in (window.I18N_MESSAGES[currentLang] || {}) || key in (window.I18N_MESSAGES[FALLBACK_LANG] || {});
+  return known ? t(key, params) : fallback;
+}
+
+function verticalName(verticalId, fallback) {
+  return tOr(`app.verticals.${verticalId || "other"}`, fallback || t("app.catalog.general"));
+}
+
+function useCaseText(useCase, field) {
+  return tOr(`app.useCases.${useCase.id}.${field}`, useCase[field]);
+}
+
+function statusLabel(status) {
+  return tOr(`app.status.${status}`, status);
+}
+
+// Everything rendered by JS is rebuilt in the new language; static markup is handled by applyI18n()
+window.addEventListener("studio:languagechange", () => {
+  lastEnvSnapshot = "";
+  renderFilterPills();
+  renderEnvironments();
+  populateServicesSelect();
+  renderServicesView();
+  renderFirebaseStatus(lastFirebaseStatus);
+  loadVolumes();
+  if (!document.getElementById("view-storage")?.classList.contains("hidden")) loadSnapshots();
+  ["new", "edit"].forEach(prefix => {
+    if (document.getElementById(`${prefix}-env-modal`)?.open) renderUseCaseCheckboxes(prefix, selectedUseCases(prefix));
+  });
+  if (document.getElementById("logs-modal")?.open && activeContainerForLogs) renderLogsSubtitle(activeContainerForLogs);
+  if (document.getElementById("volume-locations-modal")?.open && volumeModalEnvId) openVolumeLocationModal(volumeModalEnvId);
+  lucide.createIcons();
+});
+
 async function initApp() {
   lucide.createIcons();
   initProductHints();
@@ -127,14 +163,14 @@ async function handleOnboardingSubmit(e) {
     const result = await res.json();
     if (result.success) {
       closeModal("onboarding-modal");
-      showAlert("success", "Credenciales configuradas exitosamente.");
+      showAlert("success", t("app.onboarding.saved"));
       await checkConfigAndOnboarding();
       loadEnvironments();
     } else {
-      showAlert("error", result.message || "Error al guardar");
+      showAlert("error", result.message || t("app.common.saveError"));
     }
   } catch (err) {
-    showAlert("error", "Error de red: " + err.message);
+    showAlert("error", t("app.common.networkError", { error: err.message }));
   }
 }
 
@@ -143,10 +179,10 @@ async function testOnboardingConnection() {
   const user = document.getElementById("ob-username").value.trim();
   const pwd = document.getElementById("ob-password").value.trim();
   if (!user || !pwd) {
-    showAlert("error", "Ingresa usuario y contraseña para probar.");
+    showAlert("error", t("app.onboarding.missingCreds"));
     return;
   }
-  showAlert("info", "Validando credenciales con Azure Container Registry...");
+  showAlert("info", t("app.onboarding.validating"));
   try {
     const res = await fetch("/api/config/test", {
       method: "POST",
@@ -156,7 +192,7 @@ async function testOnboardingConnection() {
     const data = await res.json();
     showAlert(data.success ? "success" : "error", data.message);
   } catch (err) {
-    showAlert("error", "Fallo al conectar: " + err.message);
+    showAlert("error", t("app.onboarding.connectFailed", { error: err.message }));
   }
 }
 
@@ -179,22 +215,25 @@ async function handleSaveSettings(e) {
     const data = await res.json();
     showAlert(data.success ? "success" : "error", data.message);
   } catch (err) {
-    showAlert("error", "Error de red: " + err.message);
+    showAlert("error", t("app.common.networkError", { error: err.message }));
   }
 }
 
+let lastFirebaseStatus = null;
+
 function renderFirebaseStatus(fb) {
+  lastFirebaseStatus = fb;
   const el = document.getElementById("firebase-status");
   if (!el) return;
   if (fb && fb.configured) {
-    el.textContent = `Configurado: proyecto ${fb.project_id} (${fb.client_email}).`;
+    el.textContent = t("app.firebase.configured", { project: fb.project_id, email: fb.client_email });
   } else {
     const missing = [
-      !(fb && fb.service_account) && "cuenta de servicio",
-      !(fb && fb.web_config) && "configuración web",
-      !(fb && fb.vapid_key) && "VAPID key"
+      !(fb && fb.service_account) && t("app.firebase.missing.serviceAccount"),
+      !(fb && fb.web_config) && t("app.firebase.missing.webConfig"),
+      !(fb && fb.vapid_key) && t("app.firebase.missing.vapidKey")
     ].filter(Boolean);
-    el.textContent = `Sin configurar (falta: ${missing.join(", ")}). El caso de uso Push Notifications Inbox arrancará, pero no podrá iniciar sesión, guardar mensajes ni enviar notificaciones.`;
+    el.textContent = t("app.firebase.notConfigured", { missing: missing.join(", ") });
   }
 }
 
@@ -202,28 +241,28 @@ function renderFirebaseStatus(fb) {
 // Use cases (one checkbox per bundled case)
 // ------------------------------------------------------------------------------
 const USE_CASE_REQUIREMENTS = {
-  kafka: "Publica en Kafka: activa también Apache Kafka.",
-  firebase: "Requiere tu proyecto de Firebase en Configuración."
+  kafka: "app.useCases.requires.kafka",
+  firebase: "app.useCases.requires.firebase"
 };
 
 function renderUseCaseCheckboxes(prefix, selected) {
   const container = document.getElementById(`${prefix}-env-use-cases`);
   if (!container) return;
   if (!useCaseCatalog.length) {
-    container.innerHTML = `<p class="text-[11px] text-slate-500">No hay casos de uso disponibles en esta versión del Studio.</p>`;
+    container.innerHTML = `<p class="text-[11px] text-slate-500">${t("app.useCases.noneAvailable")}</p>`;
     return;
   }
   container.innerHTML = useCaseCatalog.map(c => {
     const id = `${prefix}-env-uc-${c.id}`;
-    const reqs = (c.requires || []).map(r => USE_CASE_REQUIREMENTS[r]).filter(Boolean).join(" ");
+    const reqs = (c.requires || []).map(r => USE_CASE_REQUIREMENTS[r]).filter(Boolean).map(key => t(key)).join(" ");
     return `
       <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-start gap-3 hover:border-slate-700 transition">
         <input type="checkbox" id="${id}" data-use-case="${escapeHtml(c.id)}" data-requires="${escapeHtml((c.requires || []).join(","))}"
           ${selected.includes(c.id) ? "checked" : ""} onchange="handleUseCaseToggle('${prefix}', this)"
           class="mt-1 w-4 h-4 rounded border-slate-700 text-brand-600 bg-slate-950 focus:ring-brand-500 cursor-pointer">
         <label for="${id}" class="cursor-pointer">
-          <span class="block text-xs font-semibold text-white">${escapeHtml(c.name)} <code class="text-[10px] text-slate-500 font-normal">/${escapeHtml(c.id)}/</code></span>
-          <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">${escapeHtml(c.description)}${reqs ? ` <span class="text-slate-500">${escapeHtml(reqs)}</span>` : ""}</span>
+          <span class="block text-xs font-semibold text-white">${escapeHtml(useCaseText(c, "name"))} <code class="text-[10px] text-slate-500 font-normal">/${escapeHtml(c.id)}/</code></span>
+          <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">${escapeHtml(useCaseText(c, "description"))}${reqs ? ` <span class="text-slate-500">${escapeHtml(reqs)}</span>` : ""}</span>
         </label>
       </div>`;
   }).join("");
@@ -264,7 +303,7 @@ async function handleSaveFirebase(e) {
       renderFirebaseStatus(data.firebase);
     }
   } catch (err) {
-    showAlert("error", "Error de red: " + err.message);
+    showAlert("error", t("app.common.networkError", { error: err.message }));
   }
 }
 
@@ -272,7 +311,7 @@ async function testAcrConnection() {
   const reg = document.getElementById("setting-registry").value.trim();
   const user = document.getElementById("setting-username").value.trim();
   const pwd = document.getElementById("setting-password").value.trim();
-  showAlert("info", "Probando autenticación con Azure Container Registry...");
+  showAlert("info", t("app.settings.testingAcr"));
   try {
     const res = await fetch("/api/config/test", {
       method: "POST",
@@ -282,7 +321,7 @@ async function testAcrConnection() {
     const data = await res.json();
     showAlert(data.success ? "success" : "error", data.message);
   } catch (err) {
-    showAlert("error", "Error: " + err.message);
+    showAlert("error", t("app.common.error", { error: err.message }));
   }
 }
 
@@ -328,7 +367,7 @@ function renderFilterPills() {
     counts[id] = (counts[id] || 0) + 1;
   });
   // Only sectors that have demos (plus the active filter) to keep the bar compact
-  const items = [{ id: "all", name: "Todos" }, ...verticals.filter(v => counts[v.id] || v.id === currentFilter)];
+  const items = [{ id: "all", name: t("app.filters.all") }, ...verticals.filter(v => counts[v.id] || v.id === currentFilter)];
   box.innerHTML = items.map(v => {
     const active = v.id === currentFilter;
     const count = v.id === "all" ? allEnvironments.length : (counts[v.id] || 0);
@@ -336,7 +375,7 @@ function renderFilterPills() {
       <button type="button" onclick="filterVertical('${v.id}')" aria-pressed="${active}"
         class="vertical-pill inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition whitespace-nowrap ${active ? "bg-slate-700 text-white border-slate-600" : "text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-slate-800"}">
         ${v.id !== "all" ? `<i data-lucide="${verticalIcon(v.id)}" class="w-3.5 h-3.5 opacity-80"></i>` : ""}
-        ${escapeHtml(v.name)}
+        ${escapeHtml(v.id === "all" ? v.name : verticalName(v.id, v.name))}
         <span class="${active ? "text-slate-300" : "text-slate-500"}">${count}</span>
       </button>`;
   }).join("");
@@ -352,36 +391,36 @@ function filterVertical(catId) {
 function statusBadge(env, busy) {
   if (busy) {
     return `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-300 whitespace-nowrap">
-      <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>${busy.kind === "stop" ? "Deteniendo" : "Activando"}</span>`;
+      <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>${busy.kind === "stop" ? t("app.status.stopping") : t("app.status.activating")}</span>`;
   }
   if (env.status === "running") {
     return `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300 whitespace-nowrap">
-      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Activa</span>`;
+      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>${t("app.status.running")}</span>`;
   }
   if (env.status === "partial") {
-    return `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-300 whitespace-nowrap" title="Algunos servicios no están en ejecución. Revisa la pestaña Servicios y logs.">
-      <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Parcial</span>`;
+    return `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-300 whitespace-nowrap" title="${t("app.status.partialHint")}">
+      <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>${t("app.status.partial")}</span>`;
   }
   return `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 whitespace-nowrap">
-    <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>Detenida</span>`;
+    <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>${t("app.status.stopped")}</span>`;
 }
 
 function progressBlock(envId, busy) {
   if (busy.kind === "stop") {
-    return `<div id="progress-${envId}" class="rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-xs text-slate-300">Deteniendo contenedores…</div>`;
+    return `<div id="progress-${envId}" class="rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-xs text-slate-300">${t("app.progress.stopping")}</div>`;
   }
   const total = busy.total || 1;
   const pct = Math.round(((busy.step || 0) / total) * 100);
   return `
     <div id="progress-${envId}" class="rounded-md border border-slate-800 bg-slate-950/60 p-3" role="status" aria-live="polite">
       <div class="flex items-center justify-between gap-2 text-xs text-slate-300">
-        <span data-role="label">${escapeHtml(busy.label || "Preparando activación")}</span>
+        <span data-role="label">${escapeHtml(busy.label || t("app.progress.preparing"))}</span>
         <span data-role="step" class="font-mono text-slate-500 whitespace-nowrap">${busy.step || 0}/${total}</span>
       </div>
       <div class="mt-2 h-1 rounded-full bg-slate-800 overflow-hidden">
         <div data-role="bar" class="h-full bg-brand-600 transition-all duration-500" style="width:${pct}%"></div>
       </div>
-      <p class="mt-2 text-[11px] text-slate-500">La primera activación puede tardar varios minutos.</p>
+      <p class="mt-2 text-[11px] text-slate-500">${t("app.progress.firstRunHint")}</p>
     </div>`;
 }
 
@@ -403,36 +442,12 @@ function iconButton(icon, label, onclick, { danger = false, disabled = false } =
     </button>`;
 }
 
-// Product descriptions shown as hints in the services view
+// Product descriptions shown as hints in the services view; the text lives in app.hints.<key>.p1/p2
 const PRODUCT_HINTS = {
-  scaler: {
-    name: "Scaler",
-    paragraphs: [
-      "Scaler es nuestro componente de automatización habilitado para la nube. Permite a las empresas gestionar todo su entorno de producción desde un cuadro de mando. Ofrece respaldo escalable (y tolerante a fallos) para comunicación bajo demanda (y por lotes) y monitoriza el progreso y el historial de jobs de producción individuales.",
-      "Como parte de Inspire Flex, puede estar presente en el back-end, junto con Production Server e ICM. Scaler es nuestro motor recomendado para la automatización de procesos. Se ejecuta como servicio y, con su lógica de clúster, permite crear una arquitectura de elevada disponibilidad con varios servidores de Scaler cooperando."
-    ]
-  },
-  interactive: {
-    name: "Interactive",
-    paragraphs: [
-      "Interactive es nuestro componente para agilizar la correspondencia específica y la creación colaborativa de documentos, en una red en grandes empresas. Los usuarios de línea de negocio (como, por ejemplo, equipos de atención al cliente) siguen pasos predefinidos para seleccionar comunicaciones y personalizarlas con datos de clientes. Puede poblarlas con texto preaprobado adicional o editarlas con arreglo a las necesidades de ese cliente. Antes de producir cualquier comunicación, esta puede someterse a un ciclo de aprobación para su aprobación por parte de los gestores de línea.",
-      "Como parte de Inspire Flex, Interactive es la capa de front-end. Es la interfaz de usuario final. También se considera parte de la capa de diseño, ya que deben definirse plantillas (para documentos y procesos empresariales) antes de poder trabajar en cualquier comunicación."
-    ]
-  },
-  "production-server": {
-    name: "Production Server",
-    paragraphs: [
-      "Production Server es nuestro componente que no pertenece a la GUI que nos permite producir comunicaciones personalizadas de Inspire Flex. Es sumamente rápido en el procesamiento de grandes volúmenes de datos y diseños complejos.",
-      "Como parte de Inspire Flex, está presente en el back-end junto con Scaler e ICM. Se ejecuta como un servicio y se le pueden enviar comandos de producción a través de una red."
-    ]
-  },
-  icm: {
-    name: "Content Manager (ICM)",
-    paragraphs: [
-      "Content Manager es nuestro repositorio de colaboración global para todos los recursos de Inspire y todos los activos de comunicación, incluidos flujos de trabajo, plantillas, bloques de texto, imágenes, archivos nativos y configuraciones. Su versión controla todos estos archivos, lo cual permite rastrear su historial de trabajo completo para recuperación y auditoría. También puede vincularse con otros sistemas de administración de contenido como, por ejemplo, Microsoft SharePoint®.",
-      "Como parte de Inspire Flex, este componente principal está presente en el back-end, junto con Scaler y Production Server. Se ejecuta como un servicio para controlar la transferencia de recursos y gestionar el acceso de usuarios a esos recursos y los componentes de la solución al completo."
-    ]
-  }
+  scaler: { name: "Scaler", key: "scaler" },
+  interactive: { name: "Interactive", key: "interactive" },
+  "production-server": { name: "Production Server", key: "productionServer" },
+  icm: { name: "Content Manager (ICM)", key: "icm" }
 };
 
 // Info button that opens the product's description in the floating hint
@@ -440,7 +455,7 @@ function productHint(key, tone = "dark") {
   const hint = PRODUCT_HINTS[key];
   if (!hint) return "";
   const toneClass = tone === "dark" ? "text-slate-900/70 hover:text-slate-950" : "text-slate-400 hover:text-white";
-  return `<button type="button" class="product-hint-trigger inline-flex items-center justify-center rounded-full ${toneClass} transition flex-shrink-0" data-product-hint="${key}" aria-label="¿Qué es ${escapeHtml(hint.name)}?">
+  return `<button type="button" class="product-hint-trigger inline-flex items-center justify-center rounded-full ${toneClass} transition flex-shrink-0" data-product-hint="${key}" aria-label="${escapeHtml(t("app.hints.whatIs", { name: hint.name }))}">
     <i data-lucide="info" class="w-4 h-4"></i>
   </button>`;
 }
@@ -458,7 +473,7 @@ function initProductHints() {
     const hint = PRODUCT_HINTS[trigger.dataset.productHint];
     if (!hint) return;
     current = trigger;
-    tip.innerHTML = `<p class="product-hint-title">${escapeHtml(hint.name)}</p>${hint.paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join("")}`;
+    tip.innerHTML = `<p class="product-hint-title">${escapeHtml(hint.name)}</p>${["p1", "p2"].map(p => `<p>${escapeHtml(t(`app.hints.${hint.key}.${p}`))}</p>`).join("")}`;
     tip.hidden = false;
     trigger.setAttribute("aria-describedby", tip.id);
     const r = trigger.getBoundingClientRect();
@@ -497,11 +512,11 @@ function serviceLink(label, url, port, enabled, product) {
   const base = "flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm transition";
   const icon = product ? productIcon(product, "white", `w-4 h-4${enabled ? "" : " opacity-40"}`) : `<i data-lucide="external-link" class="w-3.5 h-3.5"></i>`;
   if (!enabled) {
-    return `<span class="${base} border-slate-800 text-slate-500" aria-disabled="true" title="Disponible cuando la demo esté activa">
+    return `<span class="${base} border-slate-800 text-slate-500" aria-disabled="true" title="${t("app.catalog.linkDisabled")}">
       <span class="inline-flex items-center gap-2 font-medium">${icon}${label}</span>
       <span class="font-mono text-xs">:${port}</span></span>`;
   }
-  return `<a href="${url}" target="_blank" rel="noopener" class="${base} border-slate-700 text-slate-100 hover:bg-slate-800 hover:border-slate-600" title="Abrir ${label} en una pestaña nueva">
+  return `<a href="${url}" target="_blank" rel="noopener" class="${base} border-slate-700 text-slate-100 hover:bg-slate-800 hover:border-slate-600" title="${t("app.catalog.openInNewTab", { name: label })}">
     <span class="inline-flex items-center gap-2 font-medium">${icon}${label}</span>
     <span class="font-mono text-xs text-slate-400">:${port}</span></a>`;
 }
@@ -514,10 +529,10 @@ function renderEnvironments() {
     container.innerHTML = `
       <div class="col-span-full py-16 text-center bg-slate-900/40 rounded-xl border border-dashed border-slate-800">
         <i data-lucide="layout-grid" class="w-8 h-8 mx-auto mb-3 text-slate-500"></i>
-        <h3 class="text-base font-semibold text-white mb-1">Aún no hay ambientes creados</h3>
-        <p class="text-sm text-slate-400 max-w-sm mx-auto mb-4">Configura tus credenciales y crea tu primer sandbox para comenzar.</p>
+        <h3 class="text-base font-semibold text-white mb-1">${t("app.catalog.emptyTitle")}</h3>
+        <p class="text-sm text-slate-400 max-w-sm mx-auto mb-4">${t("app.catalog.emptyText")}</p>
         <button type="button" onclick="openNewEnvModal()" class="px-4 py-2 bg-[#C2410C] hover:bg-[#9A3412] text-white rounded-md text-sm font-medium inline-flex items-center gap-2 transition">
-          <i data-lucide="plus" class="w-4 h-4"></i> Crear primer ambiente
+          <i data-lucide="plus" class="w-4 h-4"></i> ${t("app.catalog.createFirst")}
         </button>
       </div>
     `;
@@ -534,8 +549,8 @@ function renderEnvironments() {
     container.innerHTML = `
       <div class="col-span-full py-16 text-center text-slate-400 bg-slate-900/30 rounded-xl border border-dashed border-slate-800">
         <i data-lucide="folder-search" class="w-8 h-8 mx-auto mb-2 text-slate-500"></i>
-        <p class="text-sm">No hay demostraciones en esta categoría.</p>
-        <button type="button" onclick="openNewEnvModal()" class="mt-3 text-sm text-brand-400 hover:underline">Crear nueva demostración</button>
+        <p class="text-sm">${t("app.catalog.emptyFilter")}</p>
+        <button type="button" onclick="openNewEnvModal()" class="mt-3 text-sm text-brand-400 hover:underline">${t("app.catalog.createNew")}</button>
       </div>
     `;
     lucide.createIcons();
@@ -551,18 +566,18 @@ function renderEnvironments() {
     const portInter = ports.interactive || 30701;
     const portScaler = ports.scaler || 30600;
     const customStorage = env.storage_path && env.storage_path !== "docker_default";
-    const storageLabel = customStorage ? env.storage_path : "Volúmenes gestionados por Docker";
+    const storageLabel = customStorage ? env.storage_path : t("app.catalog.dockerVolumes");
 
     let primaryAction;
     if (busy) {
       primaryAction = `<button type="button" disabled class="px-3 py-1.5 rounded-md text-sm font-medium inline-flex items-center gap-1.5 bg-slate-800 text-slate-400 cursor-wait">
-        <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>${busy.kind === "stop" ? "Deteniendo…" : "Activando…"}</button>`;
+        <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>${busy.kind === "stop" ? t("app.status.stoppingEllipsis") : t("app.status.activatingEllipsis")}</button>`;
     } else if (isRunning) {
       primaryAction = `<button type="button" onclick="stopDemo('${env.id}')" class="px-3 py-1.5 rounded-md text-sm font-medium inline-flex items-center gap-1.5 border border-slate-700 text-slate-200 hover:bg-slate-800 transition">
-        <i data-lucide="square" class="w-3.5 h-3.5"></i>Detener</button>`;
+        <i data-lucide="square" class="w-3.5 h-3.5"></i>${t("app.actions.stop")}</button>`;
     } else {
       primaryAction = `<button type="button" onclick="activateDemo('${env.id}', true)" class="px-3.5 py-1.5 rounded-md text-sm font-medium inline-flex items-center gap-1.5 bg-[#C2410C] hover:bg-[#9A3412] text-white transition">
-        <i data-lucide="play" class="w-3.5 h-3.5"></i>Activar</button>`;
+        <i data-lucide="play" class="w-3.5 h-3.5"></i>${t("app.actions.activate")}</button>`;
     }
 
     const links = [];
@@ -582,24 +597,24 @@ function renderEnvironments() {
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400">
               <span class="inline-flex items-center gap-1 whitespace-nowrap">
-                <i data-lucide="${verticalIcon(env.vertical_id)}" class="w-3.5 h-3.5"></i>${escapeHtml(env.vertical || "General")}
+                <i data-lucide="${verticalIcon(env.vertical_id)}" class="w-3.5 h-3.5"></i>${escapeHtml(verticalName(env.vertical_id, env.vertical))}
               </span>
               <span class="text-slate-600" aria-hidden="true">·</span>
               <span class="font-mono whitespace-nowrap">v${escapeHtml(env.version || "17.5")}</span>
-              ${env.demo_mode ? `<span class="text-slate-600" aria-hidden="true">·</span><span class="whitespace-nowrap" title="Demo Mode activo con usuarios y avatares de ejemplo">Demo Mode</span>` : ""}
+              ${env.demo_mode ? `<span class="text-slate-600" aria-hidden="true">·</span><span class="whitespace-nowrap" title="${t("app.catalog.demoModeHint")}">Demo Mode</span>` : ""}
             </div>
             <h3 class="mt-1.5 text-base font-semibold text-white line-clamp-2 break-words" title="${escapeHtml(env.name)}">${escapeHtml(env.name)}</h3>
           </div>
           ${statusBadge(env, busy)}
         </div>
 
-        <p class="text-sm text-slate-400 line-clamp-2">${escapeHtml(env.description || "Sin notas de presentación.")}</p>
+        <p class="text-sm text-slate-400 line-clamp-2">${escapeHtml(env.description || t("app.catalog.noNotes"))}</p>
 
         ${busy ? progressBlock(env.id, busy) : ""}
 
         ${links.length ? `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${links.join("")}</div>` : ""}
 
-        <button type="button" onclick="openVolumeLocationModal('${env.id}')" title="${escapeHtml(storageLabel)}" aria-label="Ver ubicación de los volúmenes: ${escapeHtml(storageLabel)}"
+        <button type="button" onclick="openVolumeLocationModal('${env.id}')" title="${escapeHtml(storageLabel)}" aria-label="${escapeHtml(t("app.catalog.volumesLocation", { path: storageLabel }))}"
           class="w-full inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition min-w-0">
           <i data-lucide="${customStorage ? "folder" : "database"}" class="w-3.5 h-3.5 shrink-0"></i>
           <span class="truncate ${customStorage ? "font-mono" : ""}">${escapeHtml(storageLabel)}</span>
@@ -610,11 +625,11 @@ function renderEnvironments() {
       <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
         ${primaryAction}
         <div class="flex items-center gap-0.5">
-          ${iconButton("settings-2", "Configurar servicios", `openEditEnvModal('${env.id}')`, { disabled: !!busy })}
-          ${iconButton("server", "Ver servicios y logs", `viewEnvServices('${env.id}')`)}
-          ${iconButton("camera", "Crear snapshot", `createSnapshotForEnv('${env.id}')`, { disabled: !!busy })}
+          ${iconButton("settings-2", t("app.actions.configureServices"), `openEditEnvModal('${env.id}')`, { disabled: !!busy })}
+          ${iconButton("server", t("app.actions.viewServices"), `viewEnvServices('${env.id}')`)}
+          ${iconButton("camera", t("app.actions.createSnapshot"), `createSnapshotForEnv('${env.id}')`, { disabled: !!busy })}
           <span class="w-px h-4 bg-slate-800 mx-1" aria-hidden="true"></span>
-          ${iconButton("trash-2", "Eliminar ambiente", `deleteEnvironment('${env.id}')`, { danger: true, disabled: !!busy })}
+          ${iconButton("trash-2", t("app.actions.deleteEnv"), `deleteEnvironment('${env.id}')`, { danger: true, disabled: !!busy })}
         </div>
       </div>
     `;
@@ -641,7 +656,7 @@ async function fetchProgress(envId) {
 
 async function activateDemo(envId, exclusive = true) {
   if (busyEnvs.has(envId)) return;  // guard against double clicks
-  busyEnvs.set(envId, { kind: "activate", label: "Preparando activación", step: 0, total: 1 });
+  busyEnvs.set(envId, { kind: "activate", label: t("app.progress.preparing"), step: 0, total: 1 });
   renderEnvironments();
 
   const poller = setInterval(async () => {
@@ -663,7 +678,7 @@ async function activateDemo(envId, exclusive = true) {
     const data = await res.json();
     showAlert(data.success ? "success" : "error", data.message);
   } catch (err) {
-    showAlert("error", "Error al activar: " + err.message);
+    showAlert("error", t("app.lifecycle.activateError", { error: err.message }));
   } finally {
     clearInterval(poller);
     busyEnvs.delete(envId);
@@ -699,9 +714,9 @@ async function stopDemo(envId) {
       method: "POST"
     });
     const data = await res.json();
-    showAlert(data.success ? "success" : "error", data.success ? `Ambiente '${envName(envId)}' detenido.` : data.message);
+    showAlert(data.success ? "success" : "error", data.success ? t("app.lifecycle.stopped", { name: envName(envId) }) : data.message);
   } catch (err) {
-    showAlert("error", "Error: " + err.message);
+    showAlert("error", t("app.common.error", { error: err.message }));
   } finally {
     busyEnvs.delete(envId);
     lastEnvSnapshot = "";
@@ -712,23 +727,23 @@ async function stopDemo(envId) {
 async function deleteEnvironment(envId) {
   const name = envName(envId);
   const { action } = await openActionDialog({
-    title: "Eliminar ambiente",
+    title: t("app.actions.deleteEnv"),
     message: `
-      <p>Se detendrán y eliminarán los contenedores de <strong class="text-white">${escapeHtml(name)}</strong>.</p>
-      <p class="text-slate-400">Puedes conservar los datos (bases de datos, paquetes ICM y archivos) para recrearlo después, o borrarlos definitivamente.</p>`,
+      <p>${t("app.deleteEnv.intro", { name: `<strong class="text-white">${escapeHtml(name)}</strong>` })}</p>
+      <p class="text-slate-400">${t("app.deleteEnv.keepHint")}</p>`,
     input: {
-      label: `Para borrar también los datos, escribe <strong class="text-slate-200">${escapeHtml(name)}</strong>`,
+      label: t("app.deleteEnv.confirmLabel", { name: `<strong class="text-slate-200">${escapeHtml(name)}</strong>` }),
       match: name
     },
     actions: [
-      { id: "keep", label: "Eliminar y conservar datos", style: "dangerOutline" },
-      { id: "all", label: "Eliminar todo", style: "danger", gate: "match" }
+      { id: "keep", label: t("app.deleteEnv.keepData"), style: "dangerOutline" },
+      { id: "all", label: t("app.deleteEnv.deleteAll"), style: "danger", gate: "match" }
     ]
   });
   if (!action) return;
   const removeVols = action === "all";
 
-  showAlert("info", `Eliminando ambiente '${name}'...`);
+  showAlert("info", t("app.deleteEnv.deleting", { name }));
   try {
     const res = await fetch(`/api/environments/${envId}?remove_volumes=${removeVols}`, {
       method: "DELETE"
@@ -739,14 +754,14 @@ async function deleteEnvironment(envId) {
     populateServicesSelect();
     renderServicesView();
   } catch (err) {
-    showAlert("error", "Error al eliminar: " + err.message);
+    showAlert("error", t("app.deleteEnv.error", { error: err.message }));
   }
 }
 
 async function deleteSelectedEnvironment() {
   const select = document.getElementById("service-env-select");
   if (!select || !select.value) {
-    showAlert("error", "No hay ningún ambiente seleccionado.");
+    showAlert("error", t("app.common.noEnvSelected"));
     return;
   }
   deleteEnvironment(select.value);
@@ -807,7 +822,7 @@ function handleVerticalChange() {
   const opt = select.options[select.selectedIndex];
   const nameInput = document.getElementById("new-env-name");
   if (!nameInput.value || nameInput.value.startsWith("Demo ")) {
-    nameInput.value = `Demo ${opt.getAttribute("data-name")} - `;
+    nameInput.value = `Demo ${verticalName(select.value, opt.getAttribute("data-name"))} - `;
   }
 }
 
@@ -867,13 +882,13 @@ async function handleCreateEnvSubmit(e) {
     const data = await res.json();
     if (data.success) {
       closeModal("new-env-modal");
-      showAlert("success", "Ambiente creado exitosamente");
+      showAlert("success", t("app.newEnv.created"));
       await loadEnvironments();
     } else {
       showAlert("error", data.message);
     }
   } catch (err) {
-    showAlert("error", "Error: " + err.message);
+    showAlert("error", t("app.common.error", { error: err.message }));
   }
 }
 
@@ -907,7 +922,7 @@ function toggleEditInteractiveGroup() {
 function openEditEnvModal(envId) {
   const env = allEnvironments.find(e => e.id === envId);
   if (!env) {
-    showAlert("error", "Ambiente no encontrado.");
+    showAlert("error", t("app.common.envNotFound"));
     return;
   }
   document.getElementById("edit-env-id").value = env.id;
@@ -972,7 +987,7 @@ async function handleEditEnvSubmit(e) {
   // Close the modal window immediately upon clicking save
   closeModal("edit-env-modal");
 
-  showAlert("info", `Actualizando stacks y servicios en '${name}'...`);
+  showAlert("info", t("app.editEnv.updating", { name }));
   try {
     const res = await fetch(`/api/environments/${envId}`, {
       method: "PUT",
@@ -981,21 +996,21 @@ async function handleEditEnvSubmit(e) {
     });
     const data = await res.json();
     if (data.success) {
-      showAlert("success", data.message || "Ambiente actualizado correctamente");
+      showAlert("success", data.message || t("app.editEnv.updated"));
       await loadEnvironments();
       renderServicesView();
     } else {
       showAlert("error", data.message);
     }
   } catch (err) {
-    showAlert("error", "Error: " + err.message);
+    showAlert("error", t("app.common.error", { error: err.message }));
   }
 }
 
 function editSelectedEnvironment() {
   const select = document.getElementById("service-env-select");
   if (!select || !select.value) {
-    showAlert("error", "No hay ningún ambiente seleccionado.");
+    showAlert("error", t("app.common.noEnvSelected"));
     return;
   }
   openEditEnvModal(select.value);
@@ -1012,7 +1027,7 @@ function populateServicesSelect() {
   allEnvironments.forEach(e => {
     const opt = document.createElement("option");
     opt.value = e.id;
-    opt.innerText = `${e.name} (${e.status.toUpperCase()})`;
+    opt.innerText = `${e.name} (${statusLabel(e.status).toUpperCase()})`;
     select.appendChild(opt);
   });
   if (currVal && allEnvironments.some(e => e.id === currVal)) {
@@ -1048,12 +1063,12 @@ function getServicePortInfo(c, env) {
     const port = extractHostPort(c.ports, 30701) || ports.interactive || 30701;
     portText = `${port}`;
     accessUrl = `http://${host}:${port}/interactive`;
-    urlLabel = "Abrir Inspire Interactive";
+    urlLabel = t("app.services.openInteractive");
   } else if (s.includes("scaler") && !s.includes("ips") && !s.includes("prepare")) {
     const port = extractHostPort(c.ports, 30600) || ports.scaler || 30600;
     portText = `${port}`;
     accessUrl = `http://${host}:${port}/`;
-    urlLabel = "Abrir Inspire Scaler";
+    urlLabel = t("app.services.openScaler");
   } else if (s.includes("icm")) {
     const port = extractHostPort(c.ports, 30353) || ports.icm || 30353;
     portText = `${port} (Inspire ICM)`;
@@ -1066,12 +1081,12 @@ function getServicePortInfo(c, env) {
   } else if (s.includes("interactive-ips")) {
     portText = `30354 (IPS Interactive)`;
   } else if (s.includes("prepare")) {
-    portText = `One-Shot (Prep BD)`;
+    portText = t("app.services.prepOneShot");
   } else if (s.includes("use-cases")) {
     const port = extractHostPort(c.ports, 3000) || ports.use_cases || 3000;
     portText = `${port}`;
-    accessUrl = `http://${host}:${port}/`;
-    urlLabel = "Abrir portal de casos de uso";
+    accessUrl = `http://${host}:${port}/?lang=${currentLang}`;
+    urlLabel = t("app.services.openUseCasesPortal");
   } else if (s.includes("kafka")) {
     const port = extractHostPort(c.ports, 29092) || extractHostPort(c.ports, 9092) || ports.kafka || 9092;
     portText = `${port} (KRaft Broker)`;
@@ -1092,8 +1107,8 @@ function renderNodeBox({ title, container, defaultPort, internalPort, type, env,
   const host = window.location.hostname || "localhost";
   const portInfo = container ? getServicePortInfo(container, env) : {
     portText: `${defaultPort}${internalPort ? ` -> ${internalPort}` : ''}`,
-    accessUrl: type === "interactive" ? `http://${host}:${defaultPort}/interactive` : ((type === "scaler" || type === "use-cases") ? `http://${host}:${defaultPort}/` : null),
-    urlLabel: type === "interactive" ? "Abrir Inspire Interactive" : (type === "scaler" ? "Abrir Inspire Scaler" : (type === "use-cases" ? "Abrir portal de casos de uso" : ""))
+    accessUrl: type === "interactive" ? `http://${host}:${defaultPort}/interactive` : (type === "scaler" ? `http://${host}:${defaultPort}/` : (type === "use-cases" ? `http://${host}:${defaultPort}/?lang=${currentLang}` : null)),
+    urlLabel: type === "interactive" ? t("app.services.openInteractive") : (type === "scaler" ? t("app.services.openScaler") : (type === "use-cases" ? t("app.services.openUseCasesPortal") : ""))
   };
 
   return `
@@ -1123,7 +1138,7 @@ function renderNodeBox({ title, container, defaultPort, internalPort, type, env,
               </span>
             ` : `
               <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-500 border border-slate-800">
-                detenido
+                ${t("app.services.stoppedChip")}
               </span>
             `}
           </div>
@@ -1132,12 +1147,12 @@ function renderNodeBox({ title, container, defaultPort, internalPort, type, env,
         <!-- Container name & Port Info -->
         <div class="grid grid-cols-1 ${compact ? "" : "sm:grid-cols-2"} gap-2 text-[11px] pt-1">
           <div class="bg-slate-950/70 p-2 rounded-lg border border-slate-800/80 flex items-center justify-between">
-            <span class="text-slate-400 font-medium">Puerto:</span>
+            <span class="text-slate-400 font-medium">${t("app.services.port")}</span>
             <span class="font-mono font-semibold ${isUp ? 'text-brand-300' : 'text-slate-400'}">
               ${escapeHtml(portInfo.portText)}
             </span>
           </div>
-          <div class="bg-slate-950/70 p-2 rounded-lg border border-slate-800/80 flex items-center justify-between truncate" title="${escapeHtml(container ? container.name : 'No iniciado')}">
+          <div class="bg-slate-950/70 p-2 rounded-lg border border-slate-800/80 flex items-center justify-between truncate" title="${escapeHtml(container ? container.name : t("app.services.notStarted"))}">
             <span class="text-slate-400 font-medium mr-1 flex-shrink-0">ID:</span>
             <span class="font-mono text-[10px] text-slate-300 truncate">
               ${escapeHtml(container ? container.name : '--')}
@@ -1171,7 +1186,7 @@ function renderNodeBox({ title, container, defaultPort, internalPort, type, env,
                 <i data-lucide="external-link" class="w-3.5 h-3.5 ${type === 'studio' ? 'text-indigo-400' : 'text-brand-400'} group-hover:scale-110 transition-transform flex-shrink-0"></i>
                 <span class="font-mono text-[11px] truncate text-slate-200 group-hover:text-white">${escapeHtml(portInfo.accessUrl)}</span>
               </span>
-              <span class="text-[10px] uppercase font-bold text-white ${type === 'studio' ? 'bg-indigo-600' : 'bg-[#C2410C]'} px-2 py-0.5 rounded shadow-sm flex-shrink-0 ml-1.5">Abrir</span>
+              <span class="text-[10px] uppercase font-bold text-white ${type === 'studio' ? 'bg-indigo-600' : 'bg-[#C2410C]'} px-2 py-0.5 rounded shadow-sm flex-shrink-0 ml-1.5">${t("app.common.open")}</span>
             </a>
           </div>
         ` : ''}
@@ -1184,23 +1199,23 @@ function renderNodeBox({ title, container, defaultPort, internalPort, type, env,
             <i data-lucide="terminal" class="w-3.5 h-3.5 text-emerald-400"></i> Logs
           </button>
           <div class="flex items-center gap-1">
-            <button onclick="containerAction('${escapeHtml(container.name)}', 'restart')" class="p-1.5 hover:text-white text-slate-400 rounded-md hover:bg-slate-800 transition" title="Reiniciar Servicio">
+            <button onclick="containerAction('${escapeHtml(container.name)}', 'restart')" class="p-1.5 hover:text-white text-slate-400 rounded-md hover:bg-slate-800 transition" title="${t("app.services.restart")}">
               <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
             </button>
             ${isUp ? `
-              <button onclick="containerAction('${escapeHtml(container.name)}', 'stop')" class="p-1.5 hover:text-rose-400 text-slate-400 rounded-md hover:bg-slate-800 transition" title="Detener Servicio">
+              <button onclick="containerAction('${escapeHtml(container.name)}', 'stop')" class="p-1.5 hover:text-rose-400 text-slate-400 rounded-md hover:bg-slate-800 transition" title="${t("app.services.stop")}">
                 <i data-lucide="square" class="w-3.5 h-3.5"></i>
               </button>
             ` : `
-              <button onclick="containerAction('${escapeHtml(container.name)}', 'start')" class="p-1.5 hover:text-emerald-400 text-slate-400 rounded-md hover:bg-slate-800 transition" title="Iniciar Servicio">
+              <button onclick="containerAction('${escapeHtml(container.name)}', 'start')" class="p-1.5 hover:text-emerald-400 text-slate-400 rounded-md hover:bg-slate-800 transition" title="${t("app.services.start")}">
                 <i data-lucide="play" class="w-3.5 h-3.5"></i>
               </button>
             `}
           </div>
         ` : `
-          <span class="text-[11px] text-slate-500 italic">Contenedor no iniciado</span>
+          <span class="text-[11px] text-slate-500 italic">${t("app.services.containerNotStarted")}</span>
           <button onclick="startSelectedEnvironment()" class="text-xs text-emerald-400 hover:underline flex items-center gap-1">
-            <i data-lucide="play" class="w-3 h-3"></i> Iniciar
+            <i data-lucide="play" class="w-3 h-3"></i> ${t("app.common.start")}
           </button>
         `}
       </div>
@@ -1215,8 +1230,8 @@ function renderServicesView() {
   if (allEnvironments.length === 0) {
     container.innerHTML = `
       <div class="col-span-full py-12 text-center text-slate-500 bg-slate-900/30 rounded-2xl border border-dashed border-slate-800">
-        <p class="text-sm">Aún no hay ambientes creados.</p>
-        <button onclick="switchTab('catalog'); openNewEnvModal();" class="mt-2 text-xs text-brand-400 hover:underline">+ Crear primer ambiente</button>
+        <p class="text-sm">${t("app.services.noEnvs")}</p>
+        <button onclick="switchTab('catalog'); openNewEnvModal();" class="mt-2 text-xs text-brand-400 hover:underline">+ ${t("app.catalog.createFirst")}</button>
       </div>
     `;
     return;
@@ -1229,7 +1244,7 @@ function renderServicesView() {
   if (!env) {
     container.innerHTML = `
       <div class="py-12 text-center text-slate-500 bg-slate-900/30 rounded-2xl border border-dashed border-slate-800">
-        <p class="text-sm">Ambiente no seleccionado.</p>
+        <p class="text-sm">${t("app.services.noEnvSelected")}</p>
       </div>
     `;
     return;
@@ -1353,10 +1368,10 @@ function renderServicesView() {
       <!-- Header Banner: Scaler is the communications hub every integration feeds -->
       <div class="bg-[#C99A62] text-slate-950 font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2 flex-wrap">
         ${productIcon("scaler", "black", "w-5 h-5")}
-        <span>SCALER · HUB DE COMUNICACIONES</span>
+        <span>${t("app.services.scalerHub")}</span>
         ${productHint("scaler")}
         ${(env.scaler_sharedfolder || env.volume_locations?.sharedfolder) ? `
-          <span class="text-[10px] font-mono font-bold bg-slate-950 text-amber-300 px-2 py-0.5 rounded-full border border-slate-800 lowercase tracking-normal flex items-center gap-1 shadow-inner" title="Volumen: ${escapeHtml(env.volume_locations?.sharedfolder || env.scaler_sharedfolder)}">
+          <span class="text-[10px] font-mono font-bold bg-slate-950 text-amber-300 px-2 py-0.5 rounded-full border border-slate-800 lowercase tracking-normal flex items-center gap-1 shadow-inner" title="${escapeHtml(t("app.services.volumeTitle", { path: env.volume_locations?.sharedfolder || env.scaler_sharedfolder }))}">
             <i data-lucide="folder" class="w-3 h-3 text-amber-400"></i> sharedfolder
           </span>
         ` : ''}
@@ -1370,7 +1385,7 @@ function renderServicesView() {
       <!-- Control tower role -->
       <div class="flex items-start gap-2.5 px-4 sm:px-5 py-3 bg-[#C99A62]/10 border-b border-[#C99A62]/30 text-[11px] leading-relaxed text-amber-100/90">
         <i data-lucide="radar" class="w-4 h-4 text-amber-300 flex-shrink-0 mt-0.5"></i>
-        <span><span class="font-bold text-amber-200 uppercase tracking-wider">Torre de control.</span> Recibe eventos, archivos y solicitudes de los sistemas del cliente, orquesta la generación con Inspire y entrega cada comunicación por su canal.</span>
+        <span><span class="font-bold text-amber-200 uppercase tracking-wider">${t("app.services.controlTowerTitle")}</span> ${t("app.services.controlTowerText")}</span>
       </div>
 
       <!-- Group Body: SCALER SERVER & SCALER IPS -->
@@ -1413,8 +1428,8 @@ function renderServicesView() {
         <div class="flex items-center gap-3">
           <div class="w-2.5 h-2.5 rounded-full ${isRunning ? 'bg-emerald-400' : 'bg-slate-500'}"></div>
           <div>
-            <h3 class="text-sm font-bold text-white tracking-wide uppercase">Topología del Ambiente: <span class="text-brand-400 font-mono">${escapeHtml(env.name)}</span></h3>
-            <p class="text-[11px] text-slate-400">Estructura modular Quadient Inspire Flex</p>
+            <h3 class="text-sm font-bold text-white tracking-wide uppercase">${t("app.services.topology")} <span class="text-brand-400 font-mono">${escapeHtml(env.name)}</span></h3>
+            <p class="text-[11px] text-slate-400">${t("app.services.topologySubtitle")}</p>
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-3 text-xs">
@@ -1449,7 +1464,7 @@ function renderServicesView() {
             <span class="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
               <span class="w-3 h-3 rounded-sm bg-[#A35F78] inline-block border border-slate-700"></span>
               ${productIcon("use-cases", "white", "w-3.5 h-3.5")}
-              <span class="font-bold text-slate-200">CASOS DE USO</span>
+              <span class="font-bold text-slate-200">${t("app.services.useCasesBanner")}</span>
             </span>
           ` : ''}
           ${hasFtp ? `
@@ -1479,8 +1494,8 @@ function renderServicesView() {
         <div class="flex items-center gap-3">
           <i data-lucide="loader-2" class="w-5 h-5 text-amber-400 animate-spin flex-shrink-0"></i>
           <div>
-            <span class="font-bold text-white block">Inicializando Esquemas de Base de Datos (Prepare)</span>
-            <span class="text-slate-400">scaler-prepare y/o interactive-prepare están ejecutando configuraciones one-shot iniciales.</span>
+            <span class="font-bold text-white block">${t("app.services.prepRunningTitle")}</span>
+            <span class="text-slate-400">${t("app.services.prepRunningText")}</span>
           </div>
         </div>
         <div class="flex items-center gap-2">
@@ -1503,8 +1518,8 @@ function renderServicesView() {
         <div class="flex items-center gap-3">
           <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-400 flex-shrink-0"></i>
           <div>
-            <span class="font-bold text-white block">Fallo en la Preparación de Base de Datos (Prepare)</span>
-            <span class="text-slate-400">Uno de los contenedores one-shot finalizó con error. Revisa los logs para diagnosticar.</span>
+            <span class="font-bold text-white block">${t("app.services.prepFailedTitle")}</span>
+            <span class="text-slate-400">${t("app.services.prepFailedText")}</span>
           </div>
         </div>
         <div class="flex items-center gap-2">
@@ -1566,30 +1581,30 @@ function renderServicesView() {
     <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl" data-flow-source="use-cases" data-flow-bidir>
       <div class="bg-[#A35F78] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
         ${productIcon("use-cases", "white", "w-5 h-5")}
-        <span>CASOS DE USO</span>
+        <span>${t("app.services.useCasesBanner")}</span>
       </div>
 
       <div class="p-4 sm:p-5 bg-slate-900/60 space-y-4">
         <div class="grid grid-cols-1 ${envUseCases.length >= 3 ? "md:grid-cols-3" : envUseCases.length === 2 ? "md:grid-cols-2" : ""} gap-4">
           ${envUseCases.length ? envUseCases.map(c => `
-            <a href="${escapeHtml(`${useCasesBaseUrl}/${c.id}/`)}" target="_blank" rel="noopener noreferrer"
+            <a href="${escapeHtml(`${useCasesBaseUrl}/${c.id}/?lang=${currentLang}`)}" target="_blank" rel="noopener noreferrer"
                class="use-case-tile group rounded-xl border-2 p-4 sm:p-5 flex items-start gap-4 transition ${useCasesUp ? "border-[#A35F78]/60 bg-slate-950/80 hover:border-[#A35F78] hover:bg-slate-950" : "border-slate-800 bg-slate-900/40 pointer-events-none opacity-60"}">
               <span class="text-3xl sm:text-4xl leading-none" aria-hidden="true">${escapeHtml(c.icon || "📄")}</span>
               <span class="min-w-0 flex-1 space-y-1.5">
-                <span class="block text-lg sm:text-xl font-black text-white leading-tight">${escapeHtml(c.name)}</span>
-                ${c.description ? `<span class="block text-xs text-slate-400 leading-relaxed">${escapeHtml(c.description)}</span>` : ""}
+                <span class="block text-lg sm:text-xl font-black text-white leading-tight">${escapeHtml(useCaseText(c, "name"))}</span>
+                ${c.description ? `<span class="block text-xs text-slate-400 leading-relaxed">${escapeHtml(useCaseText(c, "description"))}</span>` : ""}
                 <span class="flex items-center gap-2 pt-1 text-[11px] font-mono text-rose-300">
                   /${escapeHtml(c.id)}/
                   <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"></i>
                 </span>
               </span>
             </a>`).join("") : `
-            <p class="text-xs text-slate-500">No hay casos de uso seleccionados. Actívalos en <em>Configurar servicios</em>.</p>`}
+            <p class="text-xs text-slate-500">${t("app.services.noUseCasesSelected")}</p>`}
         </div>
 
         <div class="grid grid-cols-1 ${(env.use_cases || []).includes("push-inbox") ? "lg:grid-cols-2" : ""} gap-4 items-start">
           ${renderNodeBox({
-            title: "PORTAL DE CASOS DE USO",
+            title: t("app.services.useCasesPortal"),
             container: useCasesContainer,
             defaultPort: env.ports?.use_cases || 3000,
             internalPort: 3000,
@@ -1599,18 +1614,18 @@ function renderServicesView() {
           ${(env.use_cases || []).includes("push-inbox") ? `
             <div class="bg-slate-950/80 p-3.5 rounded-xl border border-rose-500/30 flex flex-col gap-2 text-xs">
               <span class="text-rose-300 font-semibold flex items-center gap-1.5">
-                <i data-lucide="send" class="w-3.5 h-3.5"></i> Endpoint del inbox para Scaler
+                <i data-lucide="send" class="w-3.5 h-3.5"></i> ${t("app.services.inboxEndpoint")}
               </span>
               <div class="font-mono text-[11px] bg-slate-900 p-2 rounded-lg border border-slate-800 text-slate-300 break-all">
                 POST http://use-cases:3000/push-inbox/api/inbox/send
               </div>
-              <span class="text-[10px] text-slate-500">También responde en <code>http://push-inbox:3000/api/inbox/send</code> para no romper conectores previos. Desde el navegador usa <code>localhost</code>: las notificaciones push solo funcionan en localhost o HTTPS.</span>
+              <span class="text-[10px] text-slate-500">${t("app.services.inboxEndpointNote")}</span>
             </div>
           ` : ""}
         </div>
       </div>
 
-      ${scalerExchange("Envían solicitudes y eventos a Scaler y reciben los documentos y notificaciones", "arrow-down-up")}
+      ${scalerExchange(t("app.services.flowUseCases"), "arrow-down-up")}
     </div>
   ` : "";
 
@@ -1660,7 +1675,7 @@ function renderServicesView() {
       <div class="flex flex-col items-center justify-center py-1">
         <div class="flex items-center gap-2 text-[11px] font-mono text-slate-400 bg-slate-950/80 px-3 py-1 rounded-full border border-slate-800">
           <i data-lucide="arrow-up-down" class="w-3.5 h-3.5 text-cyan-400"></i>
-          <span>Repositorio y metadatos de licencias</span>
+          <span>${t("app.services.icmPostgresLink")}</span>
         </div>
       </div>
       ${renderPostgresGroup()}
@@ -1670,7 +1685,7 @@ function renderServicesView() {
   const backendSection = tierFrame({
     title: "Back-end",
     icon: "server",
-    subtitle: hasScaler ? "Scaler orquesta todas las comunicaciones; ICM y Postgres guardan recursos y configuración" : "Repositorio y base de datos de la plataforma",
+    subtitle: hasScaler ? t("app.services.backendSubtitleScaler") : t("app.services.backendSubtitle"),
     body: hasScaler ? `
       <div class="grid grid-cols-1 lg:grid-cols-[1.35fr,72px,1fr] gap-4 lg:gap-0 items-start">
         ${renderScalerGroup()}
@@ -1680,7 +1695,7 @@ function renderServicesView() {
             <polygon points="6,10 13,6 13,14" fill="currentColor" />
             <polygon points="58,10 51,6 51,14" fill="currentColor" />
           </svg>
-          <span class="text-[9px] font-mono text-slate-400 uppercase tracking-tighter text-center mt-1">Recursos<br>ICM</span>
+          <span class="text-[9px] font-mono text-slate-400 uppercase tracking-tighter text-center mt-1">${t("app.services.icmResources")}</span>
         </div>
         ${platformStack}
       </div>
@@ -1691,7 +1706,7 @@ function renderServicesView() {
   const frontendSection = hasInteractive ? tierFrame({
     title: "Front-end",
     icon: "monitor",
-    subtitle: "Edición de comunicaciones por los usuarios",
+    subtitle: t("app.services.frontendSubtitle"),
     body: `<div data-flow-source="interactive" data-flow-bidir data-flow-style="platform" data-flow-protocol="HTTP REST" class="h-full">${renderInteractiveGroup()}</div>`
   }) : "";
 
@@ -1705,7 +1720,7 @@ function renderServicesView() {
       bidir: true,
       arrow: "arrow-up-down",
       protocol: "FTP · TCP 21",
-      flow: "Scaler recoge los archivos de entrada y deposita los de salida",
+      flow: t("app.services.flowFtp"),
       body: `
         ${renderNodeBox({
           title: "FTP SERVER (vsftpd)",
@@ -1720,15 +1735,15 @@ function renderServicesView() {
         <div class="bg-slate-950/80 p-3.5 rounded-xl border border-teal-500/30 flex flex-col gap-2 text-xs">
           <div class="flex items-center justify-between">
             <span class="text-teal-300 font-semibold flex items-center gap-1.5">
-              <i data-lucide="key-round" class="w-3.5 h-3.5"></i> Autenticación FTP
+              <i data-lucide="key-round" class="w-3.5 h-3.5"></i> ${t("app.services.ftpAuth")}
             </span>
             <span class="text-[10px] font-mono text-slate-400">PASV: ${env.ports?.ftp_pasv_min || 21100}-${env.ports?.ftp_pasv_max || 21105}</span>
           </div>
           <div class="flex flex-wrap items-center gap-2 font-mono text-[11px] bg-slate-900 p-2 rounded-lg border border-slate-800">
-            <span class="text-slate-400">Usuario:</span>
+            <span class="text-slate-400">${t("app.services.user")}</span>
             <span class="text-white font-bold">system</span>
             <span class="text-slate-600">|</span>
-            <span class="text-slate-400">Password:</span>
+            <span class="text-slate-400">${t("app.services.password")}</span>
             <span class="text-teal-400 font-bold">Password12345*</span>
           </div>
         </div>
@@ -1744,7 +1759,7 @@ function renderServicesView() {
       bidir: false,
       arrow: "arrow-up",
       protocol: "Kafka · TCP 9092",
-      flow: "Scaler consume los tópicos como entrada de eventos en tiempo real",
+      flow: t("app.services.flowKafka"),
       body: `
         ${renderNodeBox({
           title: "KAFKA BROKER (KRaft)",
@@ -1761,7 +1776,7 @@ function renderServicesView() {
             <i data-lucide="plug" class="w-3.5 h-3.5"></i> Bootstrap servers
           </span>
           <div class="font-mono text-[11px] bg-slate-900 p-2 rounded-lg border border-slate-800 text-slate-300 break-all">
-            kafka:9092 <span class="text-slate-500">(contenedores)</span> · localhost:${escapeHtml(String(env.ports?.kafka || 9092))} <span class="text-slate-500">(host)</span>
+            kafka:9092 <span class="text-slate-500">${t("app.services.containers")}</span> · localhost:${escapeHtml(String(env.ports?.kafka || 9092))} <span class="text-slate-500">(host)</span>
           </div>
         </div>
       `
@@ -1769,9 +1784,9 @@ function renderServicesView() {
   }
 
   const integrationsSection = integrationGroups.length ? tierFrame({
-    title: "Sistemas del cliente e integraciones",
+    title: t("app.services.integrations"),
     icon: "network",
-    subtitle: hasScaler ? "" : `<span class="text-amber-300">Activa Scaler para orquestar estas integraciones</span>`,
+    subtitle: hasScaler ? "" : `<span class="text-amber-300">${t("app.services.enableScalerHint")}</span>`,
     body: `<div class="grid grid-cols-1 ${integrationGroups.length > 1 ? "md:grid-cols-2" : ""} gap-4 h-full">${integrationGroups.join("")}</div>`
   }) : "";
 
@@ -1808,7 +1823,7 @@ function renderServicesView() {
       <div class="pt-6 border-t border-slate-800 space-y-3">
         <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
           <i data-lucide="layers" class="w-4 h-4 text-slate-500"></i>
-          Otros Servicios Adicionales del Sandbox
+          ${t("app.services.extra")}
         </h4>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           ${extraContainers.map(c => {
@@ -1921,7 +1936,7 @@ window.addEventListener("resize", () => {
 });
 
 async function containerAction(containerName, action) {
-  showAlert("info", `Ejecutando ${action} en ${containerName}...`);
+  showAlert("info", t("app.services.runningAction", { action, name: containerName }));
   try {
     const res = await fetch(`/api/containers/${containerName}/action`, {
       method: "POST",
@@ -1933,7 +1948,7 @@ async function containerAction(containerName, action) {
     await loadEnvironments();
     renderServicesView();
   } catch (err) {
-    showAlert("error", "Error: " + err.message);
+    showAlert("error", t("app.common.error", { error: err.message }));
   }
 }
 
@@ -1958,24 +1973,7 @@ function openLogs(containerName) {
   activeContainerForLogs = containerName;
   document.getElementById("logs-container-name").innerText = containerName;
 
-  // Enhance subtitle with Port and Access URL if available
-  const subtitleEl = document.getElementById("logs-container-subtitle");
-  if (subtitleEl) {
-    const select = document.getElementById("service-env-select");
-    const envId = select ? select.value : (allEnvironments[0] ? allEnvironments[0].id : null);
-    const env = allEnvironments.find(e => e.id === envId);
-    const c = env && env.containers ? env.containers.find(x => x.name === containerName) : null;
-    if (c) {
-      const portInfo = getServicePortInfo(c, env);
-      if (portInfo.accessUrl) {
-        subtitleEl.innerHTML = `Puerto: <span class="font-mono text-brand-300 font-semibold">${escapeHtml(portInfo.portText)}</span> • URL: <a href="${portInfo.accessUrl}" target="_blank" rel="noopener noreferrer" class="font-mono text-brand-400 underline hover:text-brand-300 inline-flex items-center gap-1">${escapeHtml(portInfo.accessUrl)} <i data-lucide="external-link" class="w-3 h-3"></i></a>`;
-      } else {
-        subtitleEl.innerHTML = `Puerto: <span class="font-mono text-slate-300 font-semibold">${escapeHtml(portInfo.portText)}</span> • Registros en tiempo real`;
-      }
-    } else {
-      subtitleEl.innerText = "Últimos registros de ejecución";
-    }
-  }
+  renderLogsSubtitle(containerName);
 
   const modal = document.getElementById("logs-modal");
   modal.showModal();
@@ -1986,16 +1984,36 @@ function openLogs(containerName) {
   logPollInterval = setInterval(refreshCurrentLogs, 4000);
 }
 
+// Subtitle with Port and Access URL if available
+function renderLogsSubtitle(containerName) {
+  const subtitleEl = document.getElementById("logs-container-subtitle");
+  if (!subtitleEl) return;
+  const select = document.getElementById("service-env-select");
+  const envId = select ? select.value : (allEnvironments[0] ? allEnvironments[0].id : null);
+  const env = allEnvironments.find(e => e.id === envId);
+  const c = env && env.containers ? env.containers.find(x => x.name === containerName) : null;
+  if (c) {
+    const portInfo = getServicePortInfo(c, env);
+    if (portInfo.accessUrl) {
+      subtitleEl.innerHTML = `${t("app.services.port")} <span class="font-mono text-brand-300 font-semibold">${escapeHtml(portInfo.portText)}</span> • URL: <a href="${portInfo.accessUrl}" target="_blank" rel="noopener noreferrer" class="font-mono text-brand-400 underline hover:text-brand-300 inline-flex items-center gap-1">${escapeHtml(portInfo.accessUrl)} <i data-lucide="external-link" class="w-3 h-3"></i></a>`;
+    } else {
+      subtitleEl.innerHTML = `${t("app.services.port")} <span class="font-mono text-slate-300 font-semibold">${escapeHtml(portInfo.portText)}</span> • ${t("app.logs.live")}`;
+    }
+  } else {
+    subtitleEl.innerText = t("app.logs.latest");
+  }
+}
+
 async function refreshCurrentLogs() {
   if (!activeContainerForLogs) return;
   const viewer = document.getElementById("logs-viewer-content");
   try {
     const res = await fetch(`/api/containers/${activeContainerForLogs}/logs?tail=200`);
     const data = await res.json();
-    viewer.innerText = data.logs || "No hay registros disponibles.";
+    viewer.innerText = data.logs || t("app.logs.none");
     viewer.scrollTop = viewer.scrollHeight;
   } catch (err) {
-    viewer.innerText = "Error al obtener logs: " + err.message;
+    viewer.innerText = t("app.logs.error", { error: err.message });
   }
 }
 
@@ -2034,8 +2052,8 @@ async function loadAcrVersions() {
       card.className = "bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between";
       card.innerHTML = `
         <span class="font-mono text-xs text-cyan-300 font-bold">${escapeHtml(tag)}</span>
-        <button onclick="applyVersionToActiveEnv('${tag}')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded" title="Usar en ambiente activo">
-          Asignar
+        <button onclick="applyVersionToActiveEnv('${tag}')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded" title="${t("app.acr.useInEnv")}">
+          ${t("app.acr.assign")}
         </button>
       `;
       latestContainer.appendChild(card);
@@ -2051,7 +2069,7 @@ async function loadAcrVersions() {
     });
   } catch (err) {
     loading.classList.add("hidden");
-    showAlert("error", "Error al consultar Azure: " + err.message);
+    showAlert("error", t("app.acr.error", { error: err.message }));
   }
 }
 
@@ -2059,9 +2077,9 @@ async function applyVersionToActiveEnv(tag) {
   const select = document.getElementById("service-env-select");
   const envId = select ? select.value : "default";
   const { action } = await openActionDialog({
-    title: "Cambiar versión",
-    message: `<p>¿Asignar la versión <span class="font-mono text-white">${escapeHtml(tag)}</span> al ambiente <strong class="text-white">${escapeHtml(envName(envId))}</strong>?</p>`,
-    actions: [{ id: "ok", label: "Asignar versión", style: "primary" }]
+    title: t("app.acr.changeVersion"),
+    message: `<p>${t("app.acr.confirm", { version: `<span class="font-mono text-white">${escapeHtml(tag)}</span>`, name: `<strong class="text-white">${escapeHtml(envName(envId))}</strong>` })}</p>`,
+    actions: [{ id: "ok", label: t("app.acr.assignVersion"), style: "primary" }]
   });
   if (!action) return;
 
@@ -2075,7 +2093,7 @@ async function applyVersionToActiveEnv(tag) {
     showAlert(data.success ? "success" : "error", data.message);
     await loadEnvironments();
   } catch (err) {
-    showAlert("error", "Error: " + err.message);
+    showAlert("error", t("app.common.error", { error: err.message }));
   }
 }
 
@@ -2093,7 +2111,7 @@ async function loadVolumes() {
     container.innerHTML = "";
     const vols = data.volumes || [];
     if (vols.length === 0) {
-      container.innerHTML = `<span class="text-slate-500">No se detectaron volúmenes específicos.</span>`;
+      container.innerHTML = `<span class="text-slate-500">${t("app.volumes.none")}</span>`;
       return;
     }
     vols.forEach(v => {
@@ -2107,7 +2125,7 @@ async function loadVolumes() {
             <span class="text-[10px] ${v.is_custom ? 'bg-[#668fb3]/15 text-[#668fb3] border border-[#668fb3]/30 font-semibold' : 'bg-slate-900 text-slate-400'} px-2 py-0.5 rounded">
               ${v.is_custom ? 'Host Bind' : escapeHtml(v.driver)}
             </span>
-            <button onclick="deleteVolume('${escapeHtml(v.name)}')" class="p-1 text-slate-500 hover:text-rose-400 rounded transition" title="Eliminar volumen de Docker">
+            <button onclick="deleteVolume('${escapeHtml(v.name)}')" class="p-1 text-slate-500 hover:text-rose-400 rounded transition" title="${t("app.volumes.deleteTitle")}">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>
           </div>
@@ -2117,7 +2135,7 @@ async function loadVolumes() {
             <span class="truncate ${v.is_custom ? 'text-[#668fb3]' : 'text-slate-400'}" title="${escapeHtml(displayPath)}">
               ${escapeHtml(displayPath)}
             </span>
-            <button onclick="copyVolPath('${escapeHtml(displayPath)}')" class="text-slate-400 hover:text-white flex-shrink-0 ml-1.5" title="Copiar ruta">
+            <button onclick="copyVolPath('${escapeHtml(displayPath)}')" class="text-slate-400 hover:text-white flex-shrink-0 ml-1.5" title="${t("app.volumes.copyPath")}">
               <i data-lucide="copy" class="w-3 h-3"></i>
             </button>
           </div>
@@ -2133,13 +2151,13 @@ async function loadVolumes() {
 
 async function deleteVolume(volumeName) {
   const { action } = await openActionDialog({
-    title: "Eliminar volumen",
-    message: `<p>Se eliminará definitivamente el volumen <span class="font-mono text-white break-all">${escapeHtml(volumeName)}</span>.</p>
-      <p class="text-slate-400">Si pertenece a un ambiente, sus datos se perderán.</p>`,
-    actions: [{ id: "ok", label: "Eliminar volumen", style: "danger" }]
+    title: t("app.volumes.delete"),
+    message: `<p>${t("app.volumes.deleteIntro", { name: `<span class="font-mono text-white break-all">${escapeHtml(volumeName)}</span>` })}</p>
+      <p class="text-slate-400">${t("app.volumes.deleteWarning")}</p>`,
+    actions: [{ id: "ok", label: t("app.volumes.delete"), style: "danger" }]
   });
   if (!action) return;
-  showAlert("info", `Eliminando volumen '${volumeName}'...`);
+  showAlert("info", t("app.volumes.deleting", { name: volumeName }));
   try {
     const res = await fetch(`/api/volumes/${encodeURIComponent(volumeName)}`, { method: "DELETE" });
     let data;
@@ -2147,31 +2165,34 @@ async function deleteVolume(volumeName) {
       data = await res.json();
     } catch (_) {
       const text = await res.text();
-      showAlert("error", `Error del servidor (${res.status}): ${text.substring(0, 120)}`);
+      showAlert("error", t("app.common.serverError", { status: res.status, text: text.substring(0, 120) }));
       return;
     }
-    showAlert(data.success ? "success" : "error", data.message || "Operación procesada");
+    showAlert(data.success ? "success" : "error", data.message || t("app.common.processed"));
     loadVolumes();
   } catch (err) {
-    showAlert("error", "Error al eliminar volumen: " + err.message);
+    showAlert("error", t("app.volumes.deleteError", { error: err.message }));
   }
 }
 
+let volumeModalEnvId = null;
+
 async function openVolumeLocationModal(envId) {
+  volumeModalEnvId = envId;
   const env = allEnvironments.find(e => e.id === envId);
   const modal = document.getElementById("volume-locations-modal");
   if (!modal) return;
 
   document.getElementById("vol-modal-env-name").innerText = env ? env.name : envId;
-  document.getElementById("vol-modal-env-subtitle").innerText = `Ambiente ID: ${envId} • Proyecto: ${env?.project_name || 'flex-' + envId}`;
+  document.getElementById("vol-modal-env-subtitle").innerText = t("app.volumes.modalSubtitle", { id: envId, project: env?.project_name || 'flex-' + envId });
 
   const bannerEl = document.getElementById("vol-modal-type-banner");
   const listEl = document.getElementById("vol-modal-list");
   const cmdEl = document.getElementById("vol-modal-cli-cmd");
 
-  listEl.innerHTML = `<div class="py-4 text-center text-slate-400"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto mb-1"></i> Consultando rutas físicas del host...</div>`;
+  listEl.innerHTML = `<div class="py-4 text-center text-slate-400"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto mb-1"></i> ${t("app.volumes.loading")}</div>`;
   lucide.createIcons();
-  modal.showModal();
+  if (!modal.open) modal.showModal();
 
   try {
     const res = await fetch(`/api/environments/${envId}/volumes`);
@@ -2185,12 +2206,12 @@ async function openVolumeLocationModal(envId) {
         <div class="flex items-center gap-2">
           <i data-lucide="folder-check" class="w-4 h-4 flex-shrink-0"></i>
           <div>
-            <span class="font-bold">Carpeta Personalizada en tu Host:</span>
+            <span class="font-bold">${t("app.volumes.customFolder")}</span>
             <span class="font-mono ml-1 text-white">${escapeHtml(env.storage_path)}</span>
           </div>
         </div>
         <button onclick="copyVolPath('${escapeHtml(env.storage_path)}')" class="px-2.5 py-1 bg-[#668fb3]/20 hover:bg-[#668fb3]/30 text-white rounded text-[11px] font-semibold flex items-center gap-1 transition">
-          <i data-lucide="copy" class="w-3 h-3"></i> Copiar Ruta Base
+          <i data-lucide="copy" class="w-3 h-3"></i> ${t("app.volumes.copyBase")}
         </button>
       `;
       const isWindows = /^[a-zA-Z]:[/\\]/.test(env.storage_path) || env.storage_path.startsWith("\\\\");
@@ -2206,8 +2227,8 @@ async function openVolumeLocationModal(envId) {
         <div class="flex items-center gap-2">
           <i data-lucide="hard-drive" class="w-4 h-4 flex-shrink-0 text-slate-400"></i>
           <div>
-            <span class="font-bold text-white">Almacenamiento Estándar de Docker:</span>
-            <span class="text-slate-400 ml-1">Los volúmenes están aislados en el directorio raíz de Docker (/var/lib/docker/volumes/)</span>
+            <span class="font-bold text-white">${t("app.volumes.dockerStorage")}</span>
+            <span class="text-slate-400 ml-1">${t("app.volumes.dockerStorageText")}</span>
           </div>
         </div>
         <span class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono">Docker Managed</span>
@@ -2219,7 +2240,7 @@ async function openVolumeLocationModal(envId) {
 
     listEl.innerHTML = "";
     if (vols.length === 0) {
-      listEl.innerHTML = `<p class="text-slate-500 py-2">No se encontraron volúmenes asociados a este ambiente.</p>`;
+      listEl.innerHTML = `<p class="text-slate-500 py-2">${t("app.volumes.noneForEnv")}</p>`;
     } else {
       vols.forEach(v => {
         const row = document.createElement("div");
@@ -2234,15 +2255,15 @@ async function openVolumeLocationModal(envId) {
             </div>
             <div class="flex items-center gap-1.5 text-slate-400 font-mono text-[11px] truncate">
               <i data-lucide="corner-down-right" class="w-3 h-3 flex-shrink-0 text-slate-500"></i>
-              <span class="truncate ${v.is_custom ? 'text-[#668fb3] font-medium' : 'text-slate-400'}" title="${escapeHtml(v.host_path || 'No disponible')}">
-                ${escapeHtml(v.host_path || 'Ruta interna de Docker')}
+              <span class="truncate ${v.is_custom ? 'text-[#668fb3] font-medium' : 'text-slate-400'}" title="${escapeHtml(v.host_path || t("app.common.notAvailable"))}">
+                ${escapeHtml(v.host_path || t("app.volumes.internalPath"))}
               </span>
             </div>
           </div>
           <div class="flex items-center gap-1.5 flex-shrink-0">
             ${v.host_path ? `
-              <button onclick="copyVolPath('${escapeHtml(v.host_path)}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium rounded-lg flex items-center gap-1 transition" title="Copiar ruta">
-                <i data-lucide="copy" class="w-3 h-3"></i> Copiar
+              <button onclick="copyVolPath('${escapeHtml(v.host_path)}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium rounded-lg flex items-center gap-1 transition" title="${t("app.volumes.copyPath")}">
+                <i data-lucide="copy" class="w-3 h-3"></i> ${t("app.common.copy")}
               </button>
             ` : ''}
           </div>
@@ -2253,14 +2274,14 @@ async function openVolumeLocationModal(envId) {
 
     lucide.createIcons();
   } catch (err) {
-    listEl.innerHTML = `<p class="text-rose-400 py-2">Error al consultar volúmenes: ${escapeHtml(err.message)}</p>`;
+    listEl.innerHTML = `<p class="text-rose-400 py-2">${escapeHtml(t("app.volumes.loadError", { error: err.message }))}</p>`;
   }
 }
 
 function copyVolPath(path) {
   if (!path) return;
   navigator.clipboard.writeText(path).then(() => {
-    showAlert("success", `Ruta copiada al portapapeles: ${path}`);
+    showAlert("success", t("app.volumes.pathCopied", { path }));
   }).catch(() => {
     const ta = document.createElement("textarea");
     ta.value = path;
@@ -2268,14 +2289,14 @@ function copyVolPath(path) {
     ta.select();
     document.execCommand("copy");
     document.body.removeChild(ta);
-    showAlert("success", `Ruta copiada al portapapeles: ${path}`);
+    showAlert("success", t("app.volumes.pathCopied", { path }));
   });
 }
 
 function copyVolCliCmd() {
   if (!currentModalCliCmd) return;
   navigator.clipboard.writeText(currentModalCliCmd).then(() => {
-    showAlert("success", "Comando de terminal copiado.");
+    showAlert("success", t("app.volumes.cmdCopied"));
   }).catch(() => {
     const ta = document.createElement("textarea");
     ta.value = currentModalCliCmd;
@@ -2283,7 +2304,7 @@ function copyVolCliCmd() {
     ta.select();
     document.execCommand("copy");
     document.body.removeChild(ta);
-    showAlert("success", "Comando de terminal copiado.");
+    showAlert("success", t("app.volumes.cmdCopied"));
   });
 }
 
@@ -2298,7 +2319,7 @@ async function loadSnapshots() {
     if (snaps.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="5" class="py-6 text-center text-slate-500">No hay snapshots generados todavía.</td>
+          <td colspan="5" class="py-6 text-center text-slate-500">${t("app.snapshots.none")}</td>
         </tr>
       `;
       return;
@@ -2308,10 +2329,10 @@ async function loadSnapshots() {
       tr.innerHTML = `
         <td class="py-2.5 px-3 font-semibold text-white">${escapeHtml(s.name)}</td>
         <td class="py-2.5 px-3 text-slate-400 font-mono">${escapeHtml(s.env_id)}</td>
-        <td class="py-2.5 px-3 text-slate-400">${new Date(s.created_at).toLocaleString()}</td>
+        <td class="py-2.5 px-3 text-slate-400">${new Date(s.created_at).toLocaleString(currentLang)}</td>
         <td class="py-2.5 px-3 font-mono text-slate-300">${escapeHtml(s.size_human)}</td>
         <td class="py-2.5 px-3 text-right">
-          <button onclick="deleteSnapshot('${s.filename}')" class="p-1 hover:text-rose-400 text-slate-500 rounded" title="Eliminar">
+          <button onclick="deleteSnapshot('${s.filename}')" class="p-1 hover:text-rose-400 text-slate-500 rounded" title="${t("app.common.delete")}">
             <i data-lucide="trash" class="w-3.5 h-3.5"></i>
           </button>
         </td>
@@ -2332,13 +2353,13 @@ function promptCreateSnapshot() {
 
 async function createSnapshotForEnv(envId) {
   const { action, value: name } = await openActionDialog({
-    title: "Crear snapshot",
-    message: `<p>Se guardará una copia de las bases de datos de <strong class="text-white">${escapeHtml(envName(envId))}</strong>.</p>`,
-    input: { label: "Nombre del snapshot", value: `${envId}-listo` },
-    actions: [{ id: "ok", label: "Crear snapshot", style: "primary", gate: "value", default: true }]
+    title: t("app.actions.createSnapshot"),
+    message: `<p>${t("app.snapshots.createIntro", { name: `<strong class="text-white">${escapeHtml(envName(envId))}</strong>` })}</p>`,
+    input: { label: t("app.snapshots.nameLabel"), value: t("app.snapshots.defaultName", { id: envId }) },
+    actions: [{ id: "ok", label: t("app.actions.createSnapshot"), style: "primary", gate: "value", default: true }]
   });
   if (!action || !name) return;
-  showAlert("info", `Generando Snapshot para '${envId}' (dump de bases de datos)...`);
+  showAlert("info", t("app.snapshots.creating", { id: envId }));
   try {
     const res = await fetch(`/api/environments/${envId}/snapshots`, {
       method: "POST",
@@ -2349,15 +2370,15 @@ async function createSnapshotForEnv(envId) {
     showAlert(data.success ? "success" : "error", data.message);
     loadSnapshots();
   } catch (err) {
-    showAlert("error", "Error: " + err.message);
+    showAlert("error", t("app.common.error", { error: err.message }));
   }
 }
 
 async function deleteSnapshot(filename) {
   const { action } = await openActionDialog({
-    title: "Eliminar snapshot",
-    message: `<p>¿Eliminar el snapshot <span class="font-mono text-white break-all">${escapeHtml(filename)}</span>?</p>`,
-    actions: [{ id: "ok", label: "Eliminar snapshot", style: "danger" }]
+    title: t("app.snapshots.delete"),
+    message: `<p>${t("app.snapshots.deleteConfirm", { name: `<span class="font-mono text-white break-all">${escapeHtml(filename)}</span>` })}</p>`,
+    actions: [{ id: "ok", label: t("app.snapshots.delete"), style: "danger" }]
   });
   if (!action) return;
   try {
@@ -2366,7 +2387,7 @@ async function deleteSnapshot(filename) {
     showAlert(data.success ? "success" : "error", data.message);
     loadSnapshots();
   } catch (err) {
-    showAlert("error", "Error: " + err.message);
+    showAlert("error", t("app.common.error", { error: err.message }));
   }
 }
 
@@ -2405,7 +2426,7 @@ function openActionDialog({ title, message, actions, input }) {
               class="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
           </div>` : ""}
         <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
-          <button value="" class="whitespace-nowrap px-3.5 py-2 rounded-md text-sm font-medium text-slate-300 border border-slate-700 hover:bg-slate-800">Cancelar</button>
+          <button value="" class="whitespace-nowrap px-3.5 py-2 rounded-md text-sm font-medium text-slate-300 border border-slate-700 hover:bg-slate-800">${t("app.common.cancel")}</button>
           ${actions.map(a => `
             <button value="${a.id}" data-gate="${a.gate || ""}"
               class="whitespace-nowrap px-3.5 py-2 rounded-md text-sm font-medium transition disabled:opacity-40 disabled:cursor-not-allowed ${DIALOG_BUTTON_STYLES[a.style] || DIALOG_BUTTON_STYLES.primary}">${escapeHtml(a.label)}</button>`).join("")}

@@ -2,6 +2,7 @@
 Quadient Inspire Flex - Demo & PoC Sandbox Studio
 Web Server & Management API
 """
+import json
 import os
 import sys
 from flask import Flask, render_template, request, jsonify, send_from_directory
@@ -14,6 +15,7 @@ from manager.services.acr_service import ACRService
 from manager.services.docker_service import DockerService
 from manager.services.env_service import EnvService, VERTICAL_CATEGORIES
 from manager.services.backup_service import BackupService
+from manager.i18n import resolve_lang, localize_payload
 
 app = Flask(
     __name__,
@@ -29,9 +31,16 @@ if not os.path.exists(ENV_FILE) and os.path.exists(os.path.join(BASE_DIR, ".quad
 env_service = EnvService(BASE_DIR)
 backup_service = BackupService(BASE_DIR)
 
+@app.after_request
+def localize_response(response):
+    lang = resolve_lang(request.headers.get("X-Studio-Lang"), request.headers.get("Accept-Language"))
+    if response.is_json and lang != "es-MX":
+        response.set_data(json.dumps(localize_payload(response.get_json(), lang), ensure_ascii=False))
+    return response
+
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", default_lang=os.environ.get("STUDIO_LANG", ""))
 
 # ------------------------------------------------------------------------------
 # 1. Config & Azure Credentials

@@ -10,15 +10,26 @@ const toastNotificationBody = document.getElementById('toast-push-body');
 const toastNotificationTime = document.getElementById('toast-push-time');
 let currentFcmToken = null;
 let swRegistration = null;
+let fcmBadgeState = null; // último estado mostrado, para redibujarlo al cambiar de idioma
 
 /**
  * Actualiza la apariencia del badge de estado de Notificaciones en la barra superior
  */
-function updateFcmBadge(status, label, className = 'bg-secondary') {
+function updateFcmBadge(status, iconHtml, labelKey, className = 'bg-secondary') {
   if (!fcmStatusBadge) return;
+  fcmBadgeState = { status, iconHtml, labelKey, className };
   fcmStatusBadge.className = `badge badge-fcm ${className}`;
-  fcmStatusBadge.innerHTML = label;
+  fcmStatusBadge.innerHTML = `${iconHtml} ${t(labelKey)}`;
 }
+
+window.addEventListener('studio:languagechange', () => {
+  if (fcmBadgeState) {
+    const { status, iconHtml, labelKey, className } = fcmBadgeState;
+    updateFcmBadge(status, iconHtml, labelKey, className);
+  } else if (fcmStatusBadge) {
+    fcmStatusBadge.innerHTML = `<i class="bi bi-bell"></i> ${t('inbox.fcm.checking')}`;
+  }
+});
 
 /**
  * Registra el Service Worker de FCM
@@ -59,37 +70,37 @@ async function registerFCMServiceWorker() {
  */
 async function checkAndRequestFCMToken(isUserInitiated = false) {
   if (!('Notification' in window)) {
-    updateFcmBadge('unsupported', '<i class="bi bi-x-circle"></i> Push no soportado', 'bg-secondary');
+    updateFcmBadge('unsupported', '<i class="bi bi-x-circle"></i>', 'inbox.fcm.unsupported', 'bg-secondary');
     return;
   }
 
   if (!window.isFirebaseConfigured) {
-    updateFcmBadge('pending_config', '<i class="bi bi-gear"></i> Configura Firebase para Push', 'bg-warning text-dark');
+    updateFcmBadge('pending_config', '<i class="bi bi-gear"></i>', 'inbox.fcm.pendingConfig', 'bg-warning text-dark');
     return;
   }
 
   const permission = Notification.permission;
 
   if (permission === 'denied') {
-    updateFcmBadge('denied', '<i class="bi bi-slash-circle-fill"></i> Notificaciones bloqueadas', 'bg-danger');
+    updateFcmBadge('denied', '<i class="bi bi-slash-circle-fill"></i>', 'inbox.fcm.blocked', 'bg-danger');
     if (isUserInitiated) {
-      alert('Las notificaciones están bloqueadas en la configuración de tu navegador. Debes habilitarlas en el icono del candado en la barra de direcciones.');
+      alert(t('inbox.fcm.blockedAlert'));
     }
     return;
   }
 
   if (permission === 'default' && !isUserInitiated) {
-    updateFcmBadge('prompt', '<i class="bi bi-bell-fill"></i> Activar Notificaciones Push', 'bg-warning text-dark');
+    updateFcmBadge('prompt', '<i class="bi bi-bell-fill"></i>', 'inbox.fcm.prompt', 'bg-warning text-dark');
     return;
   }
 
   try {
-    updateFcmBadge('loading', '<span class="spinner-border spinner-border-sm me-1"></span> Conectando Push...', 'bg-info text-dark');
+    updateFcmBadge('loading', '<span class="spinner-border spinner-border-sm me-1"></span>', 'inbox.fcm.connecting', 'bg-info text-dark');
 
     // Solicitar permiso si no ha sido otorgado
     const userPermission = await Notification.requestPermission();
     if (userPermission !== 'granted') {
-      updateFcmBadge('denied', '<i class="bi bi-bell-slash"></i> Notificaciones rechazadas', 'bg-danger');
+      updateFcmBadge('denied', '<i class="bi bi-bell-slash"></i>', 'inbox.fcm.rejected', 'bg-danger');
       return;
     }
 
@@ -99,7 +110,7 @@ async function checkAndRequestFCMToken(isUserInitiated = false) {
     }
 
     if (!window.messaging) {
-      updateFcmBadge('error', '<i class="bi bi-exclamation-triangle"></i> Messaging no disponible', 'bg-danger');
+      updateFcmBadge('error', '<i class="bi bi-exclamation-triangle"></i>', 'inbox.fcm.messagingUnavailable', 'bg-danger');
       return;
     }
 
@@ -117,7 +128,7 @@ async function checkAndRequestFCMToken(isUserInitiated = false) {
     if (token) {
       currentFcmToken = token;
       console.log('🎯 Token FCM obtenido con éxito:', token);
-      updateFcmBadge('active', '<span class="pulse-dot"></span> Notificaciones Push Activas', 'bg-success text-white');
+      updateFcmBadge('active', '<span class="pulse-dot"></span>', 'inbox.fcm.active', 'bg-success text-white');
 
       // Guardar token en Firestore y notificar al servidor
       if (window.currentUser) {
@@ -125,11 +136,11 @@ async function checkAndRequestFCMToken(isUserInitiated = false) {
       }
     } else {
       console.warn('No se pudo obtener el token de registro de FCM.');
-      updateFcmBadge('no-token', '<i class="bi bi-exclamation-circle"></i> Sin token FCM', 'bg-warning text-dark');
+      updateFcmBadge('no-token', '<i class="bi bi-exclamation-circle"></i>', 'inbox.fcm.noToken', 'bg-warning text-dark');
     }
   } catch (err) {
     console.error('Error al obtener Token FCM:', err);
-    updateFcmBadge('error', '<i class="bi bi-exclamation-triangle"></i> Error en Push (Revisar VAPID)', 'bg-danger text-white');
+    updateFcmBadge('error', '<i class="bi bi-exclamation-triangle"></i>', 'inbox.fcm.error', 'bg-danger text-white');
   }
 }
 
@@ -173,8 +184,8 @@ if (window.messaging) {
   window.messaging.onMessage((payload) => {
     console.log('📬 Notificación Push recibida en primer plano:', payload);
 
-    const title = payload.notification?.title || payload.data?.pushTitle || payload.data?.title || 'Nuevo mensaje recibido';
-    const body = payload.notification?.body || payload.data?.pushBody || 'Has recibido un nuevo elemento en tu Inbox.';
+    const title = payload.notification?.title || payload.data?.pushTitle || payload.data?.title || t('inbox.toast.fallbackTitle');
+    const body = payload.notification?.body || payload.data?.pushBody || t('inbox.toast.fallbackBody');
     const inboxId = payload.data?.inboxId;
 
     // Mostrar Toast de Bootstrap
@@ -193,7 +204,7 @@ function showPushToast(title, body, inboxId) {
 
   if (toastNotificationTitle) toastNotificationTitle.textContent = title;
   if (toastNotificationBody) toastNotificationBody.textContent = body;
-  if (toastNotificationTime) toastNotificationTime.textContent = 'Ahora mismo';
+  if (toastNotificationTime) toastNotificationTime.textContent = t('inbox.toast.now');
 
   const toastElement = new bootstrap.Toast(toastNotification, {
     autohide: true,

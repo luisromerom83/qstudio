@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es" class="h-full bg-slate-950 text-slate-100">
+<html lang="es-MX" data-default-lang="{{ default_lang }}" class="h-full bg-slate-950 text-slate-100">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Quadient Inspire Flex | Demo & PoC Studio</title>
+  <title data-i18n="html.title">Quadient Inspire Flex | Demo & PoC Studio</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -89,61 +89,70 @@
           </div>
           <div class="min-w-0 flex items-baseline gap-2">
             <h1 class="text-sm font-semibold text-white tracking-tight whitespace-nowrap">Inspire Flex Studio</h1>
-            <span class="hidden sm:inline text-xs text-slate-400 whitespace-nowrap">Demos y PoC</span>
+            <span class="hidden sm:inline xl:hidden text-xs text-slate-400 whitespace-nowrap" data-i18n="html.header.tagline">Demos y PoC</span>
           </div>
         </div>
 
         <!-- Navigation Tabs (wide screens) -->
-        <nav aria-label="Secciones" class="hidden xl:flex items-center gap-1 text-sm">
+        <nav aria-label="Secciones" data-i18n-attr="aria-label:html.nav.label" class="hidden xl:flex items-center gap-1 text-sm">
         <button type="button" onclick="switchTab('catalog')" data-tab="catalog" aria-current="page" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-white bg-slate-800 border-slate-700">
           <i data-lucide="layout-grid" class="w-4 h-4 opacity-80"></i>
-          Catálogo
+          <span data-i18n="html.nav.catalog">Catálogo</span>
         </button>
         <button type="button" onclick="switchTab('services')" data-tab="services" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
           <i data-lucide="server" class="w-4 h-4 opacity-80"></i>
-          Servicios y logs
+          <span data-i18n="html.nav.services">Servicios y logs</span>
         </button>
         <button type="button" onclick="switchTab('acr')" data-tab="acr" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
           <i data-lucide="cloud-download" class="w-4 h-4 opacity-80"></i>
-          Versiones
+          <span data-i18n="html.nav.versions">Versiones</span>
         </button>
         <button type="button" onclick="switchTab('storage')" data-tab="storage" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
           <i data-lucide="hard-drive" class="w-4 h-4 opacity-80"></i>
-          Almacenamiento
+          <span data-i18n="html.nav.storage">Almacenamiento</span>
         </button>
         <button type="button" onclick="switchTab('settings')" data-tab="settings" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
           <i data-lucide="settings" class="w-4 h-4 opacity-80"></i>
-          Ajustes
+          <span data-i18n="html.nav.settings">Ajustes</span>
         </button>
         </nav>
 
-        <button type="button" onclick="openNewEnvModal()" class="shrink-0 inline-flex items-center gap-2 bg-[#C2410C] hover:bg-[#9A3412] text-white text-sm font-medium px-3.5 py-1.5 rounded-md transition whitespace-nowrap">
-          <i data-lucide="plus" class="w-4 h-4"></i>
-          <span>Nueva demo</span>
-        </button>
+        <div class="shrink-0 flex items-center gap-2">
+          <!-- Interface language -->
+          <select data-lang-select onchange="setLang(this.value)" aria-label="Idioma de la interfaz" data-i18n-attr="aria-label:html.header.language;title:html.header.language" title="Idioma de la interfaz"
+            class="bg-slate-900 border border-slate-700 hover:border-slate-600 text-xs text-slate-200 rounded-md pl-2 pr-7 py-1.5 focus:outline-none focus:border-brand-500 cursor-pointer">
+            <option value="es-MX" title="Español (México)">ES · MX</option>
+            <option value="en-US" title="English (US)">EN · US</option>
+            <option value="pt-BR" title="Português (Brasil)">PT · BR</option>
+          </select>
+          <button type="button" onclick="openNewEnvModal()" aria-label="Nueva demo" data-i18n-attr="aria-label:html.header.newDemo" class="shrink-0 inline-flex items-center gap-2 bg-[#C2410C] hover:bg-[#9A3412] text-white text-sm font-medium px-2.5 sm:px-3.5 py-1.5 rounded-md transition whitespace-nowrap">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span class="hidden sm:inline" data-i18n="html.header.newDemo">Nueva demo</span>
+          </button>
+        </div>
       </div>
 
       <!-- Navigation Tabs (narrow screens): scrollable row so every section stays reachable -->
-      <nav aria-label="Secciones" class="xl:hidden flex items-center gap-1 text-sm overflow-x-auto pb-2 -mx-1 px-1">
+      <nav aria-label="Secciones" data-i18n-attr="aria-label:html.nav.label" class="xl:hidden flex items-center gap-1 text-sm overflow-x-auto pb-2 -mx-1 px-1">
         <button type="button" onclick="switchTab('catalog')" data-tab="catalog" aria-current="page" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-white bg-slate-800 border-slate-700">
           <i data-lucide="layout-grid" class="w-4 h-4 opacity-80"></i>
-          Catálogo
+          <span data-i18n="html.nav.catalog">Catálogo</span>
         </button>
         <button type="button" onclick="switchTab('services')" data-tab="services" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
           <i data-lucide="server" class="w-4 h-4 opacity-80"></i>
-          Servicios y logs
+          <span data-i18n="html.nav.services">Servicios y logs</span>
         </button>
         <button type="button" onclick="switchTab('acr')" data-tab="acr" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
           <i data-lucide="cloud-download" class="w-4 h-4 opacity-80"></i>
-          Versiones
+          <span data-i18n="html.nav.versions">Versiones</span>
         </button>
         <button type="button" onclick="switchTab('storage')" data-tab="storage" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
           <i data-lucide="hard-drive" class="w-4 h-4 opacity-80"></i>
-          Almacenamiento
+          <span data-i18n="html.nav.storage">Almacenamiento</span>
         </button>
         <button type="button" onclick="switchTab('settings')" data-tab="settings" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
           <i data-lucide="settings" class="w-4 h-4 opacity-80"></i>
-          Ajustes
+          <span data-i18n="html.nav.settings">Ajustes</span>
         </button>
       </nav>
     </div>
@@ -160,7 +169,7 @@
         <i id="alert-icon" data-lucide="info" class="w-5 h-5 flex-shrink-0"></i>
         <span id="alert-text">Mensaje</span>
       </div>
-      <button type="button" onclick="dismissAlert()" aria-label="Cerrar notificación" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+      <button type="button" onclick="dismissAlert()" aria-label="Cerrar notificación" data-i18n-attr="aria-label:html.alert.close" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
     </div>
 
     <!-- --------------------------------------------------------------------- -->
@@ -169,8 +178,8 @@
     <section id="view-catalog" class="space-y-6">
       
       <div>
-        <h2 class="text-lg font-semibold text-white tracking-tight">Catálogo de demostraciones</h2>
-        <p class="text-sm text-slate-400 mt-0.5">Ambientes aislados de Inspire Flex por sector. Al activar una demo se detienen las demás para liberar memoria.</p>
+        <h2 class="text-lg font-semibold text-white tracking-tight" data-i18n="html.catalog.title">Catálogo de demostraciones</h2>
+        <p class="text-sm text-slate-400 mt-0.5" data-i18n="html.catalog.subtitle">Ambientes aislados de Inspire Flex por sector. Al activar una demo se detienen las demás para liberar memoria.</p>
       </div>
 
       <!-- Filter Bar & Search -->
@@ -181,7 +190,7 @@
         </div>
         <span id="env-count" class="hidden"></span>
         <button type="button" onclick="lastEnvSnapshot = ''; loadEnvironments()" class="shrink-0 text-xs text-slate-400 hover:text-slate-200 inline-flex items-center gap-1.5 whitespace-nowrap">
-          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refrescar
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span data-i18n="html.common.refresh">Refrescar</span>
         </button>
       </div>
 
@@ -197,23 +206,23 @@
     <section id="view-services" class="space-y-6 hidden">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
         <div class="flex items-center gap-3">
-          <label for="service-env-select" class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Ambiente Seleccionado:</label>
+          <label for="service-env-select" class="text-xs font-semibold text-slate-400 uppercase tracking-wider" data-i18n="html.services.selectedEnv">Ambiente Seleccionado:</label>
           <select id="service-env-select" onchange="renderServicesView()" class="bg-slate-950 border border-slate-700 text-sm rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-brand-500">
             <!-- Dynamic options -->
           </select>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <button type="button" onclick="editSelectedEnvironment()" class="whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/30 flex items-center gap-1.5 transition" title="Configurar Stacks y Servicios Opcionales">
-            <i data-lucide="settings-2" class="w-3.5 h-3.5"></i> Configurar servicios
+          <button type="button" onclick="editSelectedEnvironment()" class="whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/30 flex items-center gap-1.5 transition" title="Configurar Stacks y Servicios Opcionales" data-i18n-attr="title:html.services.configure.title">
+            <i data-lucide="settings-2" class="w-3.5 h-3.5"></i> <span data-i18n="html.services.configure">Configurar servicios</span>
           </button>
           <button type="button" onclick="startSelectedEnvironment()" class="whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 flex items-center gap-1.5 transition">
-            <i data-lucide="play" class="w-3.5 h-3.5"></i> Iniciar todo
+            <i data-lucide="play" class="w-3.5 h-3.5"></i> <span data-i18n="html.services.startAll">Iniciar todo</span>
           </button>
           <button type="button" onclick="stopSelectedEnvironment()" class="whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600/30 flex items-center gap-1.5 transition">
-            <i data-lucide="square" class="w-3.5 h-3.5"></i> Detener todo
+            <i data-lucide="square" class="w-3.5 h-3.5"></i> <span data-i18n="html.services.stopAll">Detener todo</span>
           </button>
-          <button type="button" onclick="deleteSelectedEnvironment()" class="whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 flex items-center gap-1.5 transition" title="Eliminar ambiente seleccionado">
-            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Eliminar ambiente
+          <button type="button" onclick="deleteSelectedEnvironment()" class="whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 flex items-center gap-1.5 transition" title="Eliminar ambiente seleccionado" data-i18n-attr="title:html.services.delete.title">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> <span data-i18n="html.services.delete">Eliminar ambiente</span>
           </button>
         </div>
       </div>
@@ -233,30 +242,30 @@
           <div>
             <h2 class="text-lg font-bold text-white flex items-center gap-2">
               <i data-lucide="cloud" class="w-5 h-5 text-cyan-400"></i>
-              Explorador de Versiones en Azure Container Registry
+              <span data-i18n="html.acr.title">Explorador de Versiones en Azure Container Registry</span>
             </h2>
-            <p class="text-xs text-slate-400 mt-1">Consulta en vivo las versiones disponibles en <span class="font-mono text-slate-300">quadientdistribution.azurecr.io/flex/interactive</span></p>
+            <p class="text-xs text-slate-400 mt-1" data-i18n-html="html.acr.subtitle">Consulta en vivo las versiones disponibles en <span class="font-mono text-slate-300">quadientdistribution.azurecr.io/flex/interactive</span></p>
           </div>
           <button onclick="loadAcrVersions()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg text-cyan-400 flex items-center gap-2 border border-slate-700">
-            <i data-lucide="refresh-cw" class="w-4 h-4"></i> Consultar Ahora
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i> <span data-i18n="html.acr.query">Consultar Ahora</span>
           </button>
         </div>
 
         <div id="acr-loading" class="hidden py-12 text-center text-slate-400">
           <i data-lucide="loader-2" class="w-8 h-8 animate-spin mx-auto text-cyan-400 mb-2"></i>
-          <span>Consultando API de Azure Container Registry...</span>
+          <span data-i18n="html.acr.loading">Consultando API de Azure Container Registry...</span>
         </div>
 
         <div id="acr-content" class="space-y-6">
           <div>
-            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Versiones Principales (Recomendadas)</h3>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3" data-i18n="html.acr.main">Versiones Principales (Recomendadas)</h3>
             <div id="acr-latest-tags" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               <!-- Rendered via JS -->
             </div>
           </div>
 
           <div>
-            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Hotfixes y Compilaciones Recientes</h3>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3" data-i18n="html.acr.hotfixes">Hotfixes y Compilaciones Recientes</h3>
             <div id="acr-hf-tags" class="flex flex-wrap gap-2">
               <!-- Rendered via JS -->
             </div>
@@ -275,9 +284,9 @@
         <div class="lg:col-span-1 bg-slate-900/50 p-6 rounded-2xl border border-slate-800 space-y-4">
           <h2 class="text-base font-bold text-white flex items-center gap-2">
             <i data-lucide="hard-drive" class="w-5 h-5 text-purple-400"></i>
-            Volúmenes de Persistencia
+            <span data-i18n="html.storage.volumes.title">Volúmenes de Persistencia</span>
           </h2>
-          <p class="text-xs text-slate-400">Almacenamientos independientes creados para Postgres e ICM por ambiente.</p>
+          <p class="text-xs text-slate-400" data-i18n="html.storage.volumes.subtitle">Almacenamientos independientes creados para Postgres e ICM por ambiente.</p>
           <div id="volumes-list" class="space-y-2 text-xs">
             <!-- Rendered via JS -->
           </div>
@@ -289,12 +298,12 @@
             <div>
               <h2 class="text-base font-bold text-white flex items-center gap-2">
                 <i data-lucide="archive" class="w-5 h-5 text-emerald-400"></i>
-                Snapshots & Respaldos de Demos
+                <span data-i18n="html.storage.snapshots.title">Snapshots & Respaldos de Demos</span>
               </h2>
-              <p class="text-xs text-slate-400 mt-1">Crea copias exactas del estado de tus demostraciones para congelar datos exitosos o exportar.</p>
+              <p class="text-xs text-slate-400 mt-1" data-i18n="html.storage.snapshots.subtitle">Crea copias exactas del estado de tus demostraciones para congelar datos exitosos o exportar.</p>
             </div>
             <button onclick="promptCreateSnapshot()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow">
-              <i data-lucide="camera" class="w-4 h-4"></i> Crear Snapshot
+              <i data-lucide="camera" class="w-4 h-4"></i> <span data-i18n="html.storage.snapshots.create">Crear Snapshot</span>
             </button>
           </div>
 
@@ -302,11 +311,11 @@
             <table class="w-full text-left text-xs text-slate-300">
               <thead class="bg-slate-950/60 uppercase font-semibold text-slate-500 border-b border-slate-800">
                 <tr>
-                  <th class="py-2.5 px-3">Nombre</th>
-                  <th class="py-2.5 px-3">Ambiente</th>
-                  <th class="py-2.5 px-3">Fecha</th>
-                  <th class="py-2.5 px-3">Tamaño</th>
-                  <th class="py-2.5 px-3 text-right">Acciones</th>
+                  <th class="py-2.5 px-3" data-i18n="html.storage.table.name">Nombre</th>
+                  <th class="py-2.5 px-3" data-i18n="html.storage.table.env">Ambiente</th>
+                  <th class="py-2.5 px-3" data-i18n="html.storage.table.date">Fecha</th>
+                  <th class="py-2.5 px-3" data-i18n="html.storage.table.size">Tamaño</th>
+                  <th class="py-2.5 px-3 text-right" data-i18n="html.storage.table.actions">Acciones</th>
                 </tr>
               </thead>
               <tbody id="snapshots-tbody" class="divide-y divide-slate-800/60">
@@ -326,40 +335,40 @@
         <div>
           <h2 class="text-lg font-bold text-white flex items-center gap-2">
             <i data-lucide="key" class="w-5 h-5 text-amber-400"></i>
-            Credenciales de Azure Container Registry & Licencia
+            <span data-i18n="html.settings.acr.title">Credenciales de Azure Container Registry & Licencia</span>
           </h2>
-          <p class="text-xs text-slate-400 mt-1">Configuración global utilizada para descargar imágenes y autenticar con Quadient Flex.</p>
+          <p class="text-xs text-slate-400 mt-1" data-i18n="html.settings.acr.subtitle">Configuración global utilizada para descargar imágenes y autenticar con Quadient Flex.</p>
         </div>
 
         <form id="settings-form" onsubmit="handleSaveSettings(event)" class="space-y-4">
           <div>
-            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Registro de Contenedores (ACR)</label>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.settings.registry">Registro de Contenedores (ACR)</label>
             <input type="text" id="setting-registry" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Usuario de Azure Registry</label>
+              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.settings.username">Usuario de Azure Registry</label>
               <input type="text" id="setting-username" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Token / Password de Azure</label>
+              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.settings.password">Token / Password de Azure</label>
               <input type="password" id="setting-password" placeholder="••••••••••••••••••••" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
-              <span class="text-[10px] text-slate-500">Dejar en blanco para mantener la contraseña actual.</span>
+              <span class="text-[10px] text-slate-500" data-i18n="html.settings.passwordHint">Dejar en blanco para mantener la contraseña actual.</span>
             </div>
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Servidor de Licencia Inspire (CX_LIC_SERVER)</label>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.settings.licServer">Servidor de Licencia Inspire (CX_LIC_SERVER)</label>
             <input type="text" id="setting-lic-server" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
           </div>
 
           <div class="pt-4 flex items-center justify-between border-t border-slate-800">
             <button type="button" onclick="testAcrConnection()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg text-slate-200 border border-slate-700 flex items-center gap-2">
-              <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i> Probar Conexión ACR
+              <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i> <span data-i18n="html.settings.testAcr">Probar Conexión ACR</span>
             </button>
             <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-xs font-semibold rounded-lg text-white shadow-lg">
-              Guardar Configuración
+              <span data-i18n="html.settings.save">Guardar Configuración</span>
             </button>
           </div>
         </form>
@@ -369,32 +378,32 @@
         <div>
           <h2 class="text-lg font-bold text-white flex items-center gap-2">
             <i data-lucide="bell-ring" class="w-5 h-5 text-amber-400"></i>
-            Firebase para Push Notifications Inbox
+            <span data-i18n="html.firebase.title">Firebase para Push Notifications Inbox</span>
           </h2>
-          <p class="text-xs text-slate-400 mt-1">Tu propio proyecto de Firebase para el servicio opcional Push Notifications Inbox. Se guarda solo en este equipo. En el proyecto deben estar habilitados Authentication (Email/Password), Firestore y Cloud Messaging.</p>
+          <p class="text-xs text-slate-400 mt-1" data-i18n="html.firebase.subtitle">Tu propio proyecto de Firebase para el servicio opcional Push Notifications Inbox. Se guarda solo en este equipo. En el proyecto deben estar habilitados Authentication (Email/Password), Firestore y Cloud Messaging.</p>
         </div>
 
         <form id="firebase-form" onsubmit="handleSaveFirebase(event)" class="space-y-4">
           <div id="firebase-status" class="text-xs text-slate-400"></div>
           <div>
-            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Cuenta de servicio (serviceAccountKey.json)</label>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.firebase.serviceAccount">Cuenta de servicio (serviceAccountKey.json)</label>
             <textarea id="setting-firebase-key" rows="4" spellcheck="false" placeholder='{"type": "service_account", "project_id": "...", ...}' class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500"></textarea>
-            <span class="text-[10px] text-slate-500">Firebase Console &gt; Configuración del proyecto &gt; Cuentas de servicio &gt; Generar nueva clave privada. Pega el JSON completo.</span>
+            <span class="text-[10px] text-slate-500" data-i18n-html="html.firebase.serviceAccountHint">Firebase Console &gt; Configuración del proyecto &gt; Cuentas de servicio &gt; Generar nueva clave privada. Pega el JSON completo.</span>
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Configuración web (firebaseConfig)</label>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.firebase.webConfig">Configuración web (firebaseConfig)</label>
             <textarea id="setting-firebase-web" rows="4" spellcheck="false" placeholder='const firebaseConfig = { apiKey: "...", authDomain: "...", projectId: "...", ... };' class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500"></textarea>
-            <span class="text-[10px] text-slate-500">Configuración del proyecto &gt; General &gt; Tus apps &gt; app web. Puedes pegar el bloque <code>const firebaseConfig = {...}</code> tal cual.</span>
+            <span class="text-[10px] text-slate-500" data-i18n-html="html.firebase.webConfigHint">Configuración del proyecto &gt; General &gt; Tus apps &gt; app web. Puedes pegar el bloque <code>const firebaseConfig = {...}</code> tal cual.</span>
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">VAPID key (Web Push)</label>
             <input type="text" id="setting-firebase-vapid" spellcheck="false" placeholder="BK..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
-            <span class="text-[10px] text-slate-500">Configuración del proyecto &gt; Cloud Messaging &gt; Certificados push web &gt; Par de claves.</span>
+            <span class="text-[10px] text-slate-500" data-i18n-html="html.firebase.vapidHint">Configuración del proyecto &gt; Cloud Messaging &gt; Certificados push web &gt; Par de claves.</span>
           </div>
-          <span class="block text-[10px] text-slate-500">Si ya está configurado, deja en blanco lo que no quieras cambiar. Los ambientes en ejecución toman los cambios al reactivarlos.</span>
+          <span class="block text-[10px] text-slate-500" data-i18n="html.firebase.keepHint">Si ya está configurado, deja en blanco lo que no quieras cambiar. Los ambientes en ejecución toman los cambios al reactivarlos.</span>
           <div class="pt-4 flex items-center justify-end border-t border-slate-800">
             <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-xs font-semibold rounded-lg text-white shadow-lg">
-              Guardar Firebase
+              <span data-i18n="html.firebase.save">Guardar Firebase</span>
             </button>
           </div>
         </form>
@@ -413,8 +422,8 @@
           <i data-lucide="sparkles" class="w-6 h-6"></i>
         </div>
         <div>
-          <h2 class="text-base font-bold text-white">Bienvenido a Demo & PoC Studio</h2>
-          <p class="text-xs text-slate-400">Configura tus credenciales de Azure Container Registry para comenzar</p>
+          <h2 class="text-base font-bold text-white" data-i18n="html.onboarding.title">Bienvenido a Demo & PoC Studio</h2>
+          <p class="text-xs text-slate-400" data-i18n="html.onboarding.subtitle">Configura tus credenciales de Azure Container Registry para comenzar</p>
         </div>
       </div>
 
@@ -424,24 +433,24 @@
           <input type="text" id="ob-registry" value="quadientdistribution.azurecr.io" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Usuario ACR</label>
-          <input type="text" id="ob-username" required placeholder="ej. usuario-acr" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.onboarding.username">Usuario ACR</label>
+          <input type="text" id="ob-username" required placeholder="ej. usuario-acr" data-i18n-attr="placeholder:html.onboarding.usernamePh" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Password / Token ACR</label>
+          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.onboarding.password">Password / Token ACR</label>
           <input type="password" id="ob-password" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Servidor de Licencia Inspire</label>
-          <input type="text" id="ob-lic" placeholder="ej. servidor-licencia.empresa.com/TOKEN" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.onboarding.licServer">Servidor de Licencia Inspire</label>
+          <input type="text" id="ob-lic" placeholder="ej. servidor-licencia.empresa.com/TOKEN" data-i18n-attr="placeholder:html.onboarding.licPh" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
         </div>
 
         <div class="pt-4 flex items-center justify-between border-t border-slate-800">
           <button type="button" onclick="testOnboardingConnection()" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg text-slate-200 border border-slate-700">
-            Probar Conexión
+            <span data-i18n="html.onboarding.test">Probar Conexión</span>
           </button>
           <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold shadow">
-            Guardar y Entrar
+            <span data-i18n="html.onboarding.submit">Guardar y Entrar</span>
           </button>
         </div>
       </form>
@@ -456,64 +465,64 @@
       <div class="flex items-center justify-between">
         <h2 class="text-base font-bold text-white flex items-center gap-2">
           <i data-lucide="plus-circle" class="w-5 h-5 text-brand-400"></i>
-          Crear Nueva Demo / PoC
+          <span data-i18n="html.newEnv.title">Crear Nueva Demo / PoC</span>
         </h2>
-        <button onclick="closeModal('new-env-modal')" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        <button aria-label="Cerrar" data-i18n-attr="aria-label:html.common.closeDialog" onclick="closeModal('new-env-modal')" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
 
       <form id="new-env-form" onsubmit="handleCreateEnvSubmit(event)" class="space-y-4">
         <div>
-          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Vertical de Industria</label>
+          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.newEnv.vertical">Vertical de Industria</label>
           <select id="new-env-vertical" onchange="handleVerticalChange()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
-            <option value="insurance" data-name="Seguros">Seguros (Pólizas, Siniestros)</option>
-            <option value="financials" data-name="Banca y Finanzas">Banca y Finanzas (Extractos, Créditos)</option>
-            <option value="telco" data-name="Telecomunicaciones">Telecomunicaciones (Facturación)</option>
-            <option value="healthcare" data-name="Salud">Salud & Farmacéutica</option>
-            <option value="retail" data-name="Retail & Consumo">Retail & Consumo</option>
-            <option value="poc" data-name="PoC Cliente Específico">PoC Cliente Específico</option>
-            <option value="other" data-name="General / Otra">Otra Vertical</option>
+            <option value="insurance" data-name="Seguros" data-i18n="html.vertical.insurance.label" data-i18n-attr="data-name:html.vertical.insurance.name">Seguros (Pólizas, Siniestros)</option>
+            <option value="financials" data-name="Banca y Finanzas" data-i18n="html.vertical.financials.label" data-i18n-attr="data-name:html.vertical.financials.name">Banca y Finanzas (Extractos, Créditos)</option>
+            <option value="telco" data-name="Telecomunicaciones" data-i18n="html.vertical.telco.label" data-i18n-attr="data-name:html.vertical.telco.name">Telecomunicaciones (Facturación)</option>
+            <option value="healthcare" data-name="Salud" data-i18n="html.vertical.healthcare.label" data-i18n-attr="data-name:html.vertical.healthcare.name">Salud & Farmacéutica</option>
+            <option value="retail" data-name="Retail & Consumo" data-i18n="html.vertical.retail.label" data-i18n-attr="data-name:html.vertical.retail.name">Retail & Consumo</option>
+            <option value="poc" data-name="PoC Cliente Específico" data-i18n="html.vertical.poc.label" data-i18n-attr="data-name:html.vertical.poc.name">PoC Cliente Específico</option>
+            <option value="other" data-name="General / Otra" data-i18n="html.vertical.other.label" data-i18n-attr="data-name:html.vertical.other.name">Otra Vertical</option>
           </select>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Nombre de la Demostración</label>
-          <input type="text" id="new-env-name" required placeholder="ej. Demo Seguros - Reclamaciones de Autos" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.newEnv.name">Nombre de la Demostración</label>
+          <input type="text" id="new-env-name" required placeholder="ej. Demo Seguros - Reclamaciones de Autos" data-i18n-attr="placeholder:html.newEnv.namePh" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Descripción o Notas de la Presentación</label>
-          <textarea id="new-env-desc" rows="2" placeholder="Plantillas interactivas para agentes y autoservicio..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500"></textarea>
+          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.newEnv.desc">Descripción o Notas de la Presentación</label>
+          <textarea id="new-env-desc" rows="2" placeholder="Plantillas interactivas para agentes y autoservicio..." data-i18n-attr="placeholder:html.newEnv.descPh" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500"></textarea>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Versión de Inspire</label>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.newEnv.version">Versión de Inspire</label>
             <input type="text" id="new-env-version" value="17.5-latest" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Puerto Interactive (Host)</label>
-            <input type="number" id="new-env-port" placeholder="Auto (ej. 30711)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.newEnv.port">Puerto Interactive (Host)</label>
+            <input type="number" id="new-env-port" placeholder="Auto (ej. 30711)" data-i18n-attr="placeholder:html.newEnv.portPh" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
           </div>
         </div>
 
         <!-- Custom Storage Directory (Host) -->
         <div>
           <div class="flex items-center justify-between mb-1">
-            <label class="block text-xs font-semibold text-slate-300 uppercase">Carpeta en el Host para Volúmenes (Opcional)</label>
+            <label class="block text-xs font-semibold text-slate-300 uppercase" data-i18n="html.newEnv.storage">Carpeta en el Host para Volúmenes (Opcional)</label>
             <span class="text-[10px] text-cyan-400 font-mono">Postgres, ICM & Filestore</span>
           </div>
           <div class="relative">
-            <input type="text" id="new-env-storage-path" placeholder="/home/usuario/demos o C:\Inspire\Demos (dejar en blanco para volumen estándar)" class="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-brand-500 placeholder:text-slate-600">
+            <input type="text" id="new-env-storage-path" placeholder="/home/usuario/demos o C:\Inspire\Demos (dejar en blanco para volumen estándar)" data-i18n-attr="placeholder:html.newEnv.storagePh" class="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-brand-500 placeholder:text-slate-600">
             <i data-lucide="hard-drive" class="w-4 h-4 text-slate-500 absolute left-3 top-2.5"></i>
           </div>
-          <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">
+          <p class="text-[11px] text-slate-400 mt-1 leading-relaxed" data-i18n-html="html.newEnv.storageHint">
             Linux: <code>/home/usuario/demos</code> | Windows: <code>C:\Inspire\Demos</code> o <code>C:/Inspire/Demos</code>. Si defines una ruta, los datos de Postgres, ICM y Filestore se guardarán en subcarpetas dentro de este folder físico. Si lo dejas vacío, Docker usará su volumen estándar (<code>/var/lib/docker/volumes/</code>).
           </p>
         </div>
 
         <!-- Componentes & Servicios Opcionales del Stack -->
         <div class="space-y-3 pt-2 border-t border-slate-800">
-          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider" data-i18n="html.stack.title">
             Arquitectura de Servicios & Componentes
           </label>
 
@@ -523,9 +532,9 @@
               <img src="/static/img/products/content-manager-white.png" alt="" aria-hidden="true" class="w-4 h-4 object-contain">
               <img src="/static/img/products/postgres-white.png" alt="" aria-hidden="true" class="w-4 h-4 object-contain">
               <span class="font-semibold text-white">PostgreSQL & Inspire ICM</span>
-              <span class="text-[10px] text-slate-400 hidden sm:inline">• Repositorio y configuración central</span>
+              <span class="text-[10px] text-slate-400 hidden sm:inline" data-i18n="html.stack.coreNew">• Repositorio y configuración central</span>
             </div>
-            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">Obligatorio</span>
+            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700" data-i18n="html.stack.required">Obligatorio</span>
           </div>
 
           <!-- GRUPO: INSPIRE INTERACTIVE -->
@@ -533,16 +542,16 @@
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
               <div class="flex items-center gap-2">
                 <img src="/static/img/products/interactive-white.png" alt="" aria-hidden="true" class="w-4 h-4 object-contain">
-                <span class="text-xs font-bold text-white uppercase tracking-wider">Grupo Inspire Interactive</span>
+                <span class="text-xs font-bold text-white uppercase tracking-wider" data-i18n="html.stack.interactiveGroup">Grupo Inspire Interactive</span>
               </div>
-              <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Puertos 30701 / 30354</span>
+              <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20" data-i18n="html.stack.interactivePorts">Puertos 30701 / 30354</span>
             </div>
 
             <!-- Checkbox Interactive Server -->
             <div class="flex items-start gap-3">
               <input type="checkbox" id="new-env-enable-interactive" onchange="toggleNewEnvInteractiveGroup()" checked class="mt-1 w-4 h-4 rounded border-slate-700 text-emerald-600 bg-slate-900 focus:ring-emerald-500 cursor-pointer">
               <label for="new-env-enable-interactive" class="cursor-pointer">
-                <span class="block text-xs font-semibold text-white">Activar Servidor Inspire Interactive</span>
+                <span class="block text-xs font-semibold text-white" data-i18n="html.stack.enableInteractive">Activar Servidor Inspire Interactive</span>
                 <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Base Server (30701) + Interactive IPS (30354).</span>
               </label>
             </div>
@@ -552,10 +561,10 @@
               <input type="checkbox" id="new-env-demo-mode" checked class="mt-1 w-4 h-4 rounded border-slate-700 text-emerald-600 bg-slate-950 focus:ring-emerald-500 cursor-pointer">
               <label for="new-env-demo-mode" class="cursor-pointer">
                 <span class="block text-xs font-semibold text-white flex items-center gap-1.5">
-                  Activar "Demo Mode" en Interactive
-                  <span class="text-[10px] font-normal px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Recomendado</span>
+                  <span data-i18n="html.stack.demoMode">Activar "Demo Mode" en Interactive</span>
+                  <span class="text-[10px] font-normal px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" data-i18n="html.stack.recommended">Recomendado</span>
                 </span>
-                <span class="block text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                <span class="block text-[11px] text-slate-400 mt-0.5 leading-relaxed" data-i18n-html="html.stack.demoModeHintNew">
                   Copia y monta automáticamente la configuración <code>demo-mode</code> (usuarios preconfigurados con contraseñas y avatares por vertical) en el directorio <code>config/demo-mode</code> de Inspire Interactive.
                 </span>
               </label>
@@ -567,16 +576,16 @@
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
               <div class="flex items-center gap-2">
                 <img src="/static/img/products/scaler-white.png" alt="" aria-hidden="true" class="w-4 h-4 object-contain">
-                <span class="text-xs font-bold text-white uppercase tracking-wider">Grupo Inspire Scaler</span>
+                <span class="text-xs font-bold text-white uppercase tracking-wider" data-i18n="html.stack.scalerGroup">Grupo Inspire Scaler</span>
               </div>
-              <span class="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">Puertos 30600 / 30354</span>
+              <span class="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20" data-i18n="html.stack.scalerPorts">Puertos 30600 / 30354</span>
             </div>
 
             <!-- Checkbox Scaler Server -->
             <div class="flex items-start gap-3">
               <input type="checkbox" id="new-env-enable-scaler" onchange="toggleScalerSharedFolder()" checked class="mt-1 w-4 h-4 rounded border-slate-700 text-amber-600 bg-slate-900 focus:ring-amber-500 cursor-pointer">
               <label for="new-env-enable-scaler" class="cursor-pointer">
-                <span class="block text-xs font-semibold text-white">Activar Servidor Inspire Scaler</span>
+                <span class="block text-xs font-semibold text-white" data-i18n="html.stack.enableScaler">Activar Servidor Inspire Scaler</span>
                 <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Scaler Server (30600) + Scaler IPS (30354).</span>
               </label>
             </div>
@@ -586,13 +595,13 @@
               <!-- Scaler sharedfolder input -->
               <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-1.5">
                 <div class="flex items-center justify-between">
-                  <label for="new-env-scaler-sharedfolder" class="block text-xs font-semibold text-amber-300">
+                  <label for="new-env-scaler-sharedfolder" class="block text-xs font-semibold text-amber-300" data-i18n="html.stack.sharedfolder">
                     Carpeta Local Compartida (sharedfolder)
                   </label>
                   <span class="text-[10px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded">/sharedfolder</span>
                 </div>
-                <input type="text" id="new-env-scaler-sharedfolder" placeholder="/home/usuario/scaler_share o C:\Inspire\sharedfolder (o dejar vacío para volumen estándar)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500 placeholder:text-slate-600">
-                <p class="text-[10px] text-slate-400 leading-relaxed">
+                <input type="text" id="new-env-scaler-sharedfolder" placeholder="/home/usuario/scaler_share o C:\Inspire\sharedfolder (o dejar vacío para volumen estándar)" data-i18n-attr="placeholder:html.stack.sharedfolderPhNew" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500 placeholder:text-slate-600">
+                <p class="text-[10px] text-slate-400 leading-relaxed" data-i18n-html="html.stack.sharedfolderHint">
                   Ruta en tu equipo local donde se compartirán archivos bidireccionalmente con el contenedor de Scaler (montado en <code>/sharedfolder</code>).
                 </p>
               </div>
@@ -600,13 +609,13 @@
               <!-- Scaler Jobs Directory input -->
               <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-1.5">
                 <div class="flex items-center justify-between">
-                  <label for="new-env-scaler-jobs-dir" class="block text-xs font-semibold text-amber-300">
+                  <label for="new-env-scaler-jobs-dir" class="block text-xs font-semibold text-amber-300" data-i18n="html.stack.jobsDir">
                     Jobs Directory (/opt/scalerSharedFolder)
                   </label>
                   <span class="text-[10px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded">/opt/scalerSharedFolder</span>
                 </div>
-                <input type="text" id="new-env-scaler-jobs-dir" placeholder="/home/usuario/scaler_jobs o C:\Inspire\jobs (o dejar vacío para volumen estándar)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500 placeholder:text-slate-600">
-                <p class="text-[10px] text-slate-400 leading-relaxed">
+                <input type="text" id="new-env-scaler-jobs-dir" placeholder="/home/usuario/scaler_jobs o C:\Inspire\jobs (o dejar vacío para volumen estándar)" data-i18n-attr="placeholder:html.stack.jobsDirPh" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500 placeholder:text-slate-600">
+                <p class="text-[10px] text-slate-400 leading-relaxed" data-i18n-html="html.stack.jobsDirHint">
                   Ruta en tu equipo local donde se almacenarán los jobs procesados por Scaler (montado en <code>/opt/scalerSharedFolder</code> en el contenedor). Si se deja vacío, se usa el volumen Docker predeterminado.
                 </p>
               </div>
@@ -618,7 +627,7 @@
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
               <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                 <i data-lucide="cpu" class="w-3.5 h-3.5 text-slate-400"></i>
-                Servicios Opcionales de Integración
+                <span data-i18n="html.stack.optional">Servicios Opcionales de Integración</span>
               </span>
             </div>
 
@@ -628,7 +637,7 @@
                 <input type="checkbox" id="new-env-enable-kafka" class="mt-1 w-4 h-4 rounded border-slate-700 text-brand-600 bg-slate-950 focus:ring-brand-500 cursor-pointer">
                 <label for="new-env-enable-kafka" class="cursor-pointer">
                   <span class="flex items-center gap-1.5 text-xs font-semibold text-white"><img src="/static/img/products/kafka-white.png" alt="" aria-hidden="true" class="w-3.5 h-3.5 object-contain">Apache Kafka</span>
-                  <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Broker KRaft (9092). Lo usan los casos de uso que publican en Kafka.</span>
+                  <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug" data-i18n="html.stack.kafkaHint">Broker KRaft (9092). Lo usan los casos de uso que publican en Kafka.</span>
                 </label>
               </div>
 
@@ -636,8 +645,8 @@
               <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-start gap-3 hover:border-slate-700 transition">
                 <input type="checkbox" id="new-env-enable-ftp" class="mt-1 w-4 h-4 rounded border-slate-700 text-brand-600 bg-slate-950 focus:ring-brand-500 cursor-pointer">
                 <label for="new-env-enable-ftp" class="cursor-pointer">
-                  <span class="flex items-center gap-1.5 text-xs font-semibold text-white"><img src="/static/img/products/ftp-white.png" alt="" aria-hidden="true" class="w-3.5 h-3.5 object-contain">Servidor FTP (vsftpd)</span>
-                  <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Puerto 21 con usuario por defecto <code>system:Password12345*</code>.</span>
+                  <span class="flex items-center gap-1.5 text-xs font-semibold text-white"><img src="/static/img/products/ftp-white.png" alt="" aria-hidden="true" class="w-3.5 h-3.5 object-contain"><span data-i18n="html.stack.ftp">Servidor FTP (vsftpd)</span></span>
+                  <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug" data-i18n-html="html.stack.ftpHintNew">Puerto 21 con usuario por defecto <code>system:Password12345*</code>.</span>
                 </label>
               </div>
             </div>
@@ -648,9 +657,9 @@
             <div class="border-b border-slate-800/80 pb-2">
               <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                 <img src="/static/img/products/use-cases-white.png" alt="" aria-hidden="true" class="w-4 h-4 object-contain">
-                Casos de Uso
+                <span data-i18n="html.stack.useCases">Casos de Uso</span>
               </span>
-              <p class="text-[11px] text-slate-400 mt-1 leading-snug">Apps demo que simulan los sistemas del cliente. Todas corren en un solo contenedor y un solo puerto, cada una en su propia ruta.</p>
+              <p class="text-[11px] text-slate-400 mt-1 leading-snug" data-i18n="html.stack.useCasesHint">Apps demo que simulan los sistemas del cliente. Todas corren en un solo contenedor y un solo puerto, cada una en su propia ruta.</p>
             </div>
             <div id="new-env-use-cases" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
           </div>
@@ -658,10 +667,10 @@
 
         <div class="pt-4 flex items-center justify-end gap-2 border-t border-slate-800">
           <button type="button" onclick="closeModal('new-env-modal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg text-slate-300">
-            Cancelar
+            <span data-i18n="html.common.cancel">Cancelar</span>
           </button>
           <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold shadow">
-            Crear Ambiente
+            <span data-i18n="html.newEnv.submit">Crear Ambiente</span>
           </button>
         </div>
       </form>
@@ -677,11 +686,11 @@
         <div>
           <h2 class="text-base font-bold text-white flex items-center gap-2">
             <i data-lucide="settings-2" class="w-5 h-5 text-amber-400"></i>
-            Configurar Stacks y Servicios
+            <span data-i18n="html.editEnv.title">Configurar Stacks y Servicios</span>
           </h2>
-          <p class="text-xs text-slate-400">Habilita o deshabilita stacks y herramientas opcionales para este sandbox</p>
+          <p class="text-xs text-slate-400" data-i18n="html.editEnv.subtitle">Habilita o deshabilita stacks y herramientas opcionales para este sandbox</p>
         </div>
-        <button onclick="closeModal('edit-env-modal')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+        <button aria-label="Cerrar" data-i18n-attr="aria-label:html.common.closeDialog" onclick="closeModal('edit-env-modal')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
@@ -690,18 +699,18 @@
         <input type="hidden" id="edit-env-id">
 
         <div>
-          <label class="block text-xs font-medium text-slate-300 mb-1">Nombre de la Demo</label>
+          <label class="block text-xs font-medium text-slate-300 mb-1" data-i18n="html.editEnv.name">Nombre de la Demo</label>
           <input type="text" id="edit-env-name" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
         </div>
 
         <div>
-          <label class="block text-xs font-medium text-slate-300 mb-1">Notas / Descripción</label>
+          <label class="block text-xs font-medium text-slate-300 mb-1" data-i18n="html.editEnv.desc">Notas / Descripción</label>
           <textarea id="edit-env-desc" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500"></textarea>
         </div>
 
         <!-- Componentes & Servicios Opcionales del Stack -->
         <div class="space-y-3 pt-2 border-t border-slate-800">
-          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider" data-i18n="html.stack.title">
             Arquitectura de Servicios & Componentes
           </label>
 
@@ -711,9 +720,9 @@
               <img src="/static/img/products/content-manager-white.png" alt="" aria-hidden="true" class="w-4 h-4 object-contain">
               <img src="/static/img/products/postgres-white.png" alt="" aria-hidden="true" class="w-4 h-4 object-contain">
               <span class="font-semibold text-white">PostgreSQL & Inspire ICM</span>
-              <span class="text-[10px] text-slate-400 hidden sm:inline">• Core central indispensable</span>
+              <span class="text-[10px] text-slate-400 hidden sm:inline" data-i18n="html.stack.coreEdit">• Core central indispensable</span>
             </div>
-            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">Obligatorio</span>
+            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700" data-i18n="html.stack.required">Obligatorio</span>
           </div>
 
           <!-- GRUPO: INSPIRE INTERACTIVE -->
@@ -721,16 +730,16 @@
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
               <div class="flex items-center gap-2">
                 <img src="/static/img/products/interactive-white.png" alt="" aria-hidden="true" class="w-4 h-4 object-contain">
-                <span class="text-xs font-bold text-white uppercase tracking-wider">Grupo Inspire Interactive</span>
+                <span class="text-xs font-bold text-white uppercase tracking-wider" data-i18n="html.stack.interactiveGroup">Grupo Inspire Interactive</span>
               </div>
-              <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Puertos 30701 / 30354</span>
+              <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20" data-i18n="html.stack.interactivePorts">Puertos 30701 / 30354</span>
             </div>
 
             <!-- Checkbox Interactive Server -->
             <div class="flex items-start gap-3">
               <input type="checkbox" id="edit-env-enable-interactive" onchange="toggleEditInteractiveGroup()" class="mt-1 w-4 h-4 rounded border-slate-700 text-emerald-600 bg-slate-900 focus:ring-emerald-500 cursor-pointer">
               <label for="edit-env-enable-interactive" class="cursor-pointer">
-                <span class="block text-xs font-semibold text-white">Activar Servidor Inspire Interactive</span>
+                <span class="block text-xs font-semibold text-white" data-i18n="html.stack.enableInteractive">Activar Servidor Inspire Interactive</span>
                 <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Base Server (30701) + Interactive IPS (30354).</span>
               </label>
             </div>
@@ -740,9 +749,9 @@
               <input type="checkbox" id="edit-env-demo-mode" class="mt-1 w-4 h-4 rounded border-slate-700 text-emerald-600 bg-slate-950 focus:ring-emerald-500 cursor-pointer">
               <label for="edit-env-demo-mode" class="cursor-pointer">
                 <span class="block text-xs font-semibold text-white flex items-center gap-1.5">
-                  Activar "Demo Mode" en Interactive
+                  <span data-i18n="html.stack.demoMode">Activar "Demo Mode" en Interactive</span>
                 </span>
-                <span class="block text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                <span class="block text-[11px] text-slate-400 mt-0.5 leading-relaxed" data-i18n-html="html.stack.demoModeHintEdit">
                   Monta automáticamente usuarios preconfigurados con contraseñas y avatares por vertical en <code>config/demo-mode</code>.
                 </span>
               </label>
@@ -754,16 +763,16 @@
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
               <div class="flex items-center gap-2">
                 <img src="/static/img/products/scaler-white.png" alt="" aria-hidden="true" class="w-4 h-4 object-contain">
-                <span class="text-xs font-bold text-white uppercase tracking-wider">Grupo Inspire Scaler</span>
+                <span class="text-xs font-bold text-white uppercase tracking-wider" data-i18n="html.stack.scalerGroup">Grupo Inspire Scaler</span>
               </div>
-              <span class="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">Puertos 30600 / 30354</span>
+              <span class="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20" data-i18n="html.stack.scalerPorts">Puertos 30600 / 30354</span>
             </div>
 
             <!-- Checkbox Scaler Server -->
             <div class="flex items-start gap-3">
               <input type="checkbox" id="edit-env-enable-scaler" onchange="toggleEditScalerGroup()" class="mt-1 w-4 h-4 rounded border-slate-700 text-amber-600 bg-slate-900 focus:ring-amber-500 cursor-pointer">
               <label for="edit-env-enable-scaler" class="cursor-pointer">
-                <span class="block text-xs font-semibold text-white">Activar Servidor Inspire Scaler</span>
+                <span class="block text-xs font-semibold text-white" data-i18n="html.stack.enableScaler">Activar Servidor Inspire Scaler</span>
                 <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Scaler Server (30600) + Scaler IPS (30354).</span>
               </label>
             </div>
@@ -773,13 +782,13 @@
               <!-- Scaler sharedfolder input -->
               <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-1.5">
                 <div class="flex items-center justify-between">
-                  <label for="edit-env-scaler-sharedfolder" class="block text-xs font-semibold text-amber-300">
+                  <label for="edit-env-scaler-sharedfolder" class="block text-xs font-semibold text-amber-300" data-i18n="html.stack.sharedfolder">
                     Carpeta Local Compartida (sharedfolder)
                   </label>
                   <span class="text-[10px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded">/sharedfolder</span>
                 </div>
-                <input type="text" id="edit-env-scaler-sharedfolder" placeholder="/home/usuario/scaler_share o C:\Inspire\sharedfolder" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500 placeholder:text-slate-600">
-                <p class="text-[10px] text-slate-400 leading-relaxed">
+                <input type="text" id="edit-env-scaler-sharedfolder" placeholder="/home/usuario/scaler_share o C:\Inspire\sharedfolder" data-i18n-attr="placeholder:html.stack.sharedfolderPhEdit" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500 placeholder:text-slate-600">
+                <p class="text-[10px] text-slate-400 leading-relaxed" data-i18n-html="html.stack.sharedfolderHint">
                   Ruta en tu equipo local donde se compartirán archivos bidireccionalmente con el contenedor de Scaler (montado en <code>/sharedfolder</code>).
                 </p>
               </div>
@@ -787,13 +796,13 @@
               <!-- Scaler Jobs Directory input -->
               <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-1.5">
                 <div class="flex items-center justify-between">
-                  <label for="edit-env-scaler-jobs-dir" class="block text-xs font-semibold text-amber-300">
+                  <label for="edit-env-scaler-jobs-dir" class="block text-xs font-semibold text-amber-300" data-i18n="html.stack.jobsDir">
                     Jobs Directory (/opt/scalerSharedFolder)
                   </label>
                   <span class="text-[10px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded">/opt/scalerSharedFolder</span>
                 </div>
-                <input type="text" id="edit-env-scaler-jobs-dir" placeholder="/home/usuario/scaler_jobs o C:\Inspire\jobs (o dejar vacío para volumen estándar)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500 placeholder:text-slate-600">
-                <p class="text-[10px] text-slate-400 leading-relaxed">
+                <input type="text" id="edit-env-scaler-jobs-dir" placeholder="/home/usuario/scaler_jobs o C:\Inspire\jobs (o dejar vacío para volumen estándar)" data-i18n-attr="placeholder:html.stack.jobsDirPh" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500 placeholder:text-slate-600">
+                <p class="text-[10px] text-slate-400 leading-relaxed" data-i18n-html="html.stack.jobsDirHint">
                   Ruta en tu equipo local donde se almacenarán los jobs procesados por Scaler (montado en <code>/opt/scalerSharedFolder</code> en el contenedor). Si se deja vacío, se usa el volumen Docker predeterminado.
                 </p>
               </div>
@@ -805,7 +814,7 @@
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
               <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                 <i data-lucide="cpu" class="w-3.5 h-3.5 text-slate-400"></i>
-                Servicios Opcionales de Integración
+                <span data-i18n="html.stack.optional">Servicios Opcionales de Integración</span>
               </span>
             </div>
 
@@ -815,7 +824,7 @@
                 <input type="checkbox" id="edit-env-enable-kafka" class="mt-1 w-4 h-4 rounded border-slate-700 text-brand-600 bg-slate-950 focus:ring-brand-500 cursor-pointer">
                 <label for="edit-env-enable-kafka" class="cursor-pointer">
                   <span class="flex items-center gap-1.5 text-xs font-semibold text-white"><img src="/static/img/products/kafka-white.png" alt="" aria-hidden="true" class="w-3.5 h-3.5 object-contain">Apache Kafka</span>
-                  <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Broker KRaft (9092). Lo usan los casos de uso que publican en Kafka.</span>
+                  <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug" data-i18n="html.stack.kafkaHint">Broker KRaft (9092). Lo usan los casos de uso que publican en Kafka.</span>
                 </label>
               </div>
 
@@ -823,8 +832,8 @@
               <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-start gap-3 hover:border-slate-700 transition">
                 <input type="checkbox" id="edit-env-enable-ftp" class="mt-1 w-4 h-4 rounded border-slate-700 text-brand-600 bg-slate-950 focus:ring-brand-500 cursor-pointer">
                 <label for="edit-env-enable-ftp" class="cursor-pointer">
-                  <span class="flex items-center gap-1.5 text-xs font-semibold text-white"><img src="/static/img/products/ftp-white.png" alt="" aria-hidden="true" class="w-3.5 h-3.5 object-contain">Servidor FTP (vsftpd)</span>
-                  <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">Puerto 21 con usuario <code>system:Password12345*</code>.</span>
+                  <span class="flex items-center gap-1.5 text-xs font-semibold text-white"><img src="/static/img/products/ftp-white.png" alt="" aria-hidden="true" class="w-3.5 h-3.5 object-contain"><span data-i18n="html.stack.ftp">Servidor FTP (vsftpd)</span></span>
+                  <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug" data-i18n-html="html.stack.ftpHintEdit">Puerto 21 con usuario <code>system:Password12345*</code>.</span>
                 </label>
               </div>
             </div>
@@ -835,9 +844,9 @@
             <div class="border-b border-slate-800/80 pb-2">
               <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                 <img src="/static/img/products/use-cases-white.png" alt="" aria-hidden="true" class="w-4 h-4 object-contain">
-                Casos de Uso
+                <span data-i18n="html.stack.useCases">Casos de Uso</span>
               </span>
-              <p class="text-[11px] text-slate-400 mt-1 leading-snug">Apps demo que simulan los sistemas del cliente. Todas corren en un solo contenedor y un solo puerto, cada una en su propia ruta.</p>
+              <p class="text-[11px] text-slate-400 mt-1 leading-snug" data-i18n="html.stack.useCasesHint">Apps demo que simulan los sistemas del cliente. Todas corren en un solo contenedor y un solo puerto, cada una en su propia ruta.</p>
             </div>
             <div id="edit-env-use-cases" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
           </div>
@@ -845,10 +854,10 @@
 
         <div class="pt-4 flex items-center justify-end gap-2 border-t border-slate-800">
           <button type="button" onclick="closeModal('edit-env-modal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg text-slate-300">
-            Cancelar
+            <span data-i18n="html.common.cancel">Cancelar</span>
           </button>
           <button type="submit" class="px-5 py-2 bg-[#C2410C] hover:bg-[#9A3412] text-white rounded-lg text-xs font-semibold shadow">
-            Guardar Cambios
+            <span data-i18n="html.editEnv.submit">Guardar Cambios</span>
           </button>
         </div>
       </form>
@@ -864,15 +873,15 @@
         <div>
           <h2 class="text-base font-bold text-white flex items-center gap-2">
             <i data-lucide="terminal" class="w-5 h-5 text-emerald-400"></i>
-            Logs del Contenedor: <span id="logs-container-name" class="font-mono text-brand-400">--</span>
+            <span data-i18n="html.logs.title">Logs del Contenedor:</span> <span id="logs-container-name" class="font-mono text-brand-400">--</span>
           </h2>
           <p id="logs-container-subtitle" class="text-xs text-slate-400">Últimos registros de ejecución</p>
         </div>
         <div class="flex items-center gap-2">
-          <button onclick="refreshCurrentLogs()" class="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 hover:text-white" title="Refrescar">
+          <button onclick="refreshCurrentLogs()" class="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 hover:text-white" title="Refrescar" data-i18n-attr="title:html.common.refreshTitle;aria-label:html.common.refreshTitle">
             <i data-lucide="refresh-cw" class="w-4 h-4"></i>
           </button>
-          <button onclick="closeModal('logs-modal')" class="p-1.5 text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+          <button aria-label="Cerrar" data-i18n-attr="aria-label:html.common.closeDialog" onclick="closeModal('logs-modal')" class="p-1.5 text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
         </div>
       </div>
 
@@ -892,12 +901,12 @@
           </div>
           <div>
             <h2 class="text-base font-bold text-white flex items-center gap-2">
-              Ubicación Física de Volúmenes: <span id="vol-modal-env-name" class="text-brand-400 font-semibold">--</span>
+              <span data-i18n="html.volumes.title">Ubicación Física de Volúmenes:</span> <span id="vol-modal-env-name" class="text-brand-400 font-semibold">--</span>
             </h2>
             <p id="vol-modal-env-subtitle" class="text-xs text-slate-400 font-mono">ID: --</p>
           </div>
         </div>
-        <button onclick="closeModal('volume-locations-modal')" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        <button aria-label="Cerrar" data-i18n-attr="aria-label:html.common.closeDialog" onclick="closeModal('volume-locations-modal')" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
 
       <!-- Storage Type Summary Banner -->
@@ -908,7 +917,7 @@
       <!-- Volumes Table -->
       <div class="space-y-2">
         <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-          <i data-lucide="layers" class="w-3.5 h-3.5 text-slate-400"></i> Rutas en tu Sistema de Archivos Físico (Host)
+          <i data-lucide="layers" class="w-3.5 h-3.5 text-slate-400"></i> <span data-i18n="html.volumes.paths">Rutas en tu Sistema de Archivos Físico (Host)</span>
         </h3>
         <div id="vol-modal-list" class="space-y-2 text-xs">
           <!-- Rendered dynamically -->
@@ -918,11 +927,11 @@
       <!-- Quick Command Tip -->
       <div class="p-3 bg-slate-950 rounded-xl border border-slate-800/80 text-xs space-y-1.5">
         <span class="text-slate-400 flex items-center gap-1.5 font-medium">
-          <i data-lucide="terminal" class="w-3.5 h-3.5 text-emerald-400"></i> Comando rápido para inspeccionar en tu terminal:
+          <i data-lucide="terminal" class="w-3.5 h-3.5 text-emerald-400"></i> <span data-i18n="html.volumes.cmd">Comando rápido para inspeccionar en tu terminal:</span>
         </span>
         <div class="flex items-center justify-between bg-black/60 px-3 py-1.5 rounded-lg border border-slate-800 font-mono text-[11px] text-emerald-400">
           <span id="vol-modal-cli-cmd" class="truncate">ls -la ...</span>
-          <button onclick="copyVolCliCmd()" class="text-slate-400 hover:text-white ml-2 flex-shrink-0" title="Copiar comando">
+          <button onclick="copyVolCliCmd()" class="text-slate-400 hover:text-white ml-2 flex-shrink-0" title="Copiar comando" data-i18n-attr="title:html.volumes.copy;aria-label:html.volumes.copy">
             <i data-lucide="copy" class="w-3.5 h-3.5"></i>
           </button>
         </div>
@@ -930,11 +939,17 @@
 
       <div class="pt-2 flex justify-end border-t border-slate-800">
         <button onclick="closeModal('volume-locations-modal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg text-slate-300">
-          Cerrar
+          <span data-i18n="html.common.close">Cerrar</span>
         </button>
       </div>
     </div>
   </dialog>
+
+  <!-- Interface language (dictionaries register before i18n.js reads them) -->
+  <script src="/static/i18n/es-MX.js"></script>
+  <script src="/static/i18n/en-US.js"></script>
+  <script src="/static/i18n/pt-BR.js"></script>
+  <script src="/static/i18n.js"></script>
 
   <!-- Application Logic -->
   <script src="/static/app.js"></script>

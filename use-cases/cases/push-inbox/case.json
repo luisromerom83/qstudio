@@ -3,6 +3,16 @@
   "name": "Push Notifications Inbox",
   "description": "App web con login, bandeja de mensajes HTML y notificaciones push (Firebase). Recibe documentos vía POST /push-inbox/api/inbox/send.",
   "icon": "🔔",
-  "requires": ["firebase"],
-  "order": 20
+  "requires": [
+    "firebase"
+  ],
+  "order": 20,
+  "i18n": {
+    "en-US": {
+      "description": "Web app with sign-in, an HTML message inbox and push notifications (Firebase). Receives documents via POST /push-inbox/api/inbox/send."
+    },
+    "pt-BR": {
+      "description": "App web com login, caixa de entrada de mensagens HTML e notificações push (Firebase). Recebe documentos via POST /push-inbox/api/inbox/send."
+    }
+  }
 }

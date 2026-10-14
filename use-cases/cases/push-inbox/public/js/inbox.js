@@ -74,7 +74,7 @@ function initInboxListener(userId) {
         inboxListContainer.innerHTML = `
           <div class="p-3 text-danger text-center">
             <i class="bi bi-exclamation-triangle-fill fs-4 d-block mb-2"></i>
-            Error al sincronizar con Firestore.<br><small>${error.message}</small>
+            ${t('inbox.list.syncError')}<br><small>${escapeHtml(error.message)}</small>
           </div>
         `;
       }
@@ -135,10 +135,10 @@ function renderInboxList() {
     inboxListContainer.innerHTML = `
       <div class="text-center p-4 text-muted">
         <i class="bi bi-inbox fs-1 d-block mb-2 text-secondary opacity-50"></i>
-        <h6>No hay mensajes ${currentFilter === 'unread' ? 'sin leer' : 'aquí'}</h6>
-        <p class="small text-secondary mb-3">Los elementos enviados desde la API externa aparecerán aquí en tiempo real.</p>
+        <h6>${t(currentFilter === 'unread' ? 'inbox.list.emptyUnread' : 'inbox.list.emptyAll')}</h6>
+        <p class="small text-secondary mb-3">${t('inbox.list.emptyHint')}</p>
         <button class="btn btn-sm btn-outline-primary" onclick="document.getElementById('nav-tester-tab').click()">
-          <i class="bi bi-send-plus me-1"></i> Probar envío vía API
+          <i class="bi bi-send-plus me-1"></i> ${t('inbox.list.tryApi')}
         </button>
       </div>
     `;
@@ -157,18 +157,18 @@ function renderInboxList() {
         <div class="d-flex justify-content-between align-items-start mb-1">
           <div class="d-flex align-items-center gap-2 text-truncate pe-2">
             ${isUnread ? '<span class="unread-dot"></span>' : ''}
-            <span class="fw-semibold inbox-item-title text-truncate">${escapeHtml(item.title || 'Sin Título')}</span>
+            <span class="fw-semibold inbox-item-title text-truncate">${escapeHtml(item.title || t('inbox.list.untitled'))}</span>
           </div>
           <small class="text-muted flex-shrink-0" style="font-size: 0.75rem;">${dateFormatted}</small>
         </div>
         <div class="small text-muted text-truncate mb-1">
-          ${item.pushBody ? escapeHtml(item.pushBody) : 'Contenido HTML disponible'}
+          ${item.pushBody ? escapeHtml(item.pushBody) : t('inbox.list.htmlAvailable')}
         </div>
         <div class="d-flex align-items-center gap-1">
           <span class="badge bg-light text-secondary border" style="font-size: 0.65rem;">
             <i class="bi bi-code-slash me-1"></i>HTML
           </span>
-          ${isUnread ? '<span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.65rem;">Nuevo</span>' : ''}
+          ${isUnread ? `<span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.65rem;">${t('inbox.list.new')}</span>` : ''}
         </div>
       </div>
     `;
@@ -283,13 +283,13 @@ function displayHtmlContent(item) {
   viewerEmptyState.classList.add('d-none');
   viewerContent.classList.remove('d-none');
 
-  if (viewerTitle) viewerTitle.textContent = item.title || 'Sin Título';
-  if (viewerDate) viewerDate.textContent = `Recibido: ${formatFullDate(item.createdAt)}`;
+  if (viewerTitle) viewerTitle.textContent = item.title || t('inbox.list.untitled');
+  if (viewerDate) viewerDate.textContent = t('inbox.viewer.received', { date: formatFullDate(item.createdAt) });
 
   // Inyectar HTML en el iframe de forma aislada
   const doc = viewerFrame.contentWindow.document;
   doc.open();
-  doc.write(item.html || '<p class="text-muted p-3">No hay contenido HTML para mostrar.</p>');
+  doc.write(item.html || `<p class="text-muted p-3">${t('inbox.viewer.noHtml')}</p>`);
   doc.close();
 }
 
@@ -339,7 +339,7 @@ if (btnMarkUnread) {
 if (btnDeleteMessage) {
   btnDeleteMessage.addEventListener('click', async () => {
     if (!selectedItemId || !window.currentUser || !window.db) return;
-    if (!confirm('¿Estás seguro de que deseas eliminar este mensaje de tu Inbox?')) return;
+    if (!confirm(t('inbox.viewer.confirmDelete'))) return;
 
     try {
       await window.db
@@ -353,7 +353,7 @@ if (btnDeleteMessage) {
       renderInboxList();
     } catch (err) {
       console.error('Error al eliminar mensaje:', err);
-      alert('Error al eliminar: ' + err.message);
+      alert(t('inbox.viewer.deleteError', { error: err.message }));
     }
   });
 }
@@ -460,9 +460,9 @@ function formatDate(dateStr) {
     const now = new Date();
     const isToday = d.toDateString() === now.toDateString();
     if (isToday) {
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return d.toLocaleTimeString(currentLang, { hour: '2-digit', minute: '2-digit' });
     }
-    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    return d.toLocaleDateString(currentLang, { month: 'short', day: 'numeric' });
   } catch (e) {
     return dateStr;
   }
@@ -471,7 +471,7 @@ function formatDate(dateStr) {
 function formatFullDate(dateStr) {
   if (!dateStr) return '';
   try {
-    return new Date(dateStr).toLocaleString();
+    return new Date(dateStr).toLocaleString(currentLang);
   } catch (e) {
     return dateStr;
   }
@@ -485,6 +485,16 @@ function escapeHtml(string) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+// Al cambiar de idioma se redibujan la lista y la cabecera del visor (el HTML del mensaje es contenido, no se toca)
+window.addEventListener('studio:languagechange', () => {
+  renderInboxList();
+  const item = selectedItemId && currentItems.find(i => i.id === selectedItemId);
+  if (item) {
+    if (viewerTitle) viewerTitle.textContent = item.title || t('inbox.list.untitled');
+    if (viewerDate) viewerDate.textContent = t('inbox.viewer.received', { date: formatFullDate(item.createdAt) });
+  }
+});
 
 // Exportar globalmente
 window.initInboxListener = initInboxListener;

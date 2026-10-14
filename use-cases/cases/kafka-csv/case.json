@@ -4,5 +4,15 @@
   "description": "Formularios de negocio (factura digital, solicitud de contacto) que publican un mensaje JSON en un tópico de Kafka con los datos de la notificación push.",
   "icon": "⚡",
   "requires": ["kafka"],
-  "order": 10
+  "order": 10,
+  "i18n": {
+    "en-US": {
+      "name": "Forms to Kafka",
+      "description": "Business forms (digital invoice, contact request) that publish a JSON message to a Kafka topic with the push notification data."
+    },
+    "pt-BR": {
+      "name": "Formulários para Kafka",
+      "description": "Formulários de negócio (fatura digital, solicitação de contato) que publicam uma mensagem JSON em um tópico do Kafka com os dados da notificação push."
+    }
+  }
 }

@@ -21,6 +21,15 @@ if (configParam) {
   }
 }
 
+// Fallback texts in the device language (the SW can't read the page's language choice)
+const SW_TEXTS = {
+  'es-MX': { title: 'Nuevo mensaje en tu Inbox', body: 'Tienes un nuevo contenido disponible.' },
+  'en-US': { title: 'New message in your Inbox', body: 'You have new content available.' },
+  'pt-BR': { title: 'Nova mensagem no seu Inbox', body: 'Você tem um novo conteúdo disponível.' }
+};
+const swLang = ({ en: 'en-US', pt: 'pt-BR' })[String(self.navigator.language || '').slice(0, 2).toLowerCase()] || 'es-MX';
+const swText = SW_TEXTS[swLang];
+
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
@@ -41,12 +50,12 @@ try {
     // Solo mostramos una notificación manual si es un mensaje data-only (sin payload.notification)
     // para evitar que el usuario reciba NOTIFICACIONES DUPLICADAS.
     if (!payload.notification) {
-      const notificationTitle = payload.data?.pushTitle || payload.data?.title || 'Nuevo mensaje en tu Inbox';
+      const notificationTitle = payload.data?.pushTitle || payload.data?.title || swText.title;
       const inboxId = payload.data?.inboxId || '';
       const targetUrl = inboxId ? `/?inboxId=${inboxId}` : (payload.data?.url || '/');
 
       const notificationOptions = {
-        body: payload.data?.pushBody || payload.data?.body || 'Tienes un nuevo contenido disponible.',
+        body: payload.data?.pushBody || payload.data?.body || swText.body,
         icon: 'assets/icon-192.png',
         badge: 'assets/badge-72.png',
         data: {

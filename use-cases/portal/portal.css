@@ -80,3 +80,18 @@ body {
   .case { grid-template-columns: auto 1fr; }
   .case-path { grid-column: 2; }
 }
+
+.page-header-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+.lang-select {
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.lang-select:hover { border-color: var(--border-hover); }
+.lang-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

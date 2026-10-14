@@ -14,6 +14,10 @@ services:
     restart: unless-stopped
     ports:
       - "8090:8090"
+    environment:
+      # Idioma por defecto de la interfaz: es-MX, en-US o pt-BR.
+      # Cada usuario puede cambiarlo desde el selector; vacío = idioma del navegador.
+      - STUDIO_LANG=${STUDIO_LANG:-}
     security_opt:
       - label=disable
     volumes:

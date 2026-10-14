@@ -9,6 +9,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const { createLocalizer } = require('./shared/i18n-server');
 
 const PORT = process.env.PORT || 3000;
 const CASES_DIR = path.join(__dirname, 'cases');
@@ -30,6 +31,18 @@ function loadCases() {
 
 const cases = loadCases();
 
+// Server messages in the page's language: each case may ship cases/<id>/i18n/server.js with its CATALOG
+const catalog = {};
+for (const c of cases) {
+  const file = path.join(CASES_DIR, c.id, 'i18n', 'server.js');
+  if (fs.existsSync(file)) Object.assign(catalog, require(file).CATALOG);
+}
+const localizer = createLocalizer(catalog);
+app.use(localizer.middleware);
+
+// Shared front-end helpers (i18n core) for the portal and every case
+app.use('/shared', express.static(path.join(__dirname, 'shared'), { index: false }));
+
 for (const c of cases) {
   const base = `/${c.id}`;
   // Sin la barra final las rutas relativas del frontend resolverían fuera del caso
@@ -46,8 +59,10 @@ for (const c of cases) {
 }
 
 app.get('/api/cases', (req, res) => {
-  res.json(cases.map(({ module, ...meta }) => ({
+  // case.json may carry i18n: { "en-US": { name, description }, ... }; Spanish is the base text
+  res.json(cases.map(({ module, i18n, ...meta }) => ({
     ...meta,
+    ...((i18n || {})[req.lang] || {}),
     path: `/${meta.id}/`,
     status: typeof module.status === 'function' ? module.status() : { ready: true }
   })));

@@ -14,6 +14,68 @@ let defaultUserIds = {
   'Quadient Inspire DAS': 'xbaGznvBRTbXKT0YOVEH30959486'
 };
 
+// UI state that is redrawn when the language changes (texts come from the i18n dictionaries)
+let kafkaBroker = null;          // null = config not loaded yet, '' = environment without broker
+let statusState = { ok: true, key: 'kafka.status.ready' };
+let lastBanner = null;           // () => [type, title, text]
+let quickPreviewVisible = false;
+let isSendingNow = false;
+let consoleIsEmpty = true;
+let sampleLang = 'es-MX';        // language of the sample values currently in the form
+
+// Dictionary lookup in a specific language (to recognise untouched sample values)
+function tIn(lang, key) {
+  const dict = window.I18N_MESSAGES[lang] || {};
+  return dict[key] ?? (window.I18N_MESSAGES['es-MX'] || {})[key];
+}
+
+// ==========================================
+// Sample data prefilled in the forms
+// Only human-readable values switch with the language; JSON keys, ids, emails and amounts never change.
+// ==========================================
+const SAMPLE_INPUTS = {
+  f_billing_period: 'kafka.sample.billingPeriod',
+  f_company_name: 'kafka.sample.companyName',
+  f_status: 'kafka.sample.status',
+  f_item1_name: 'kafka.sample.item1Name',
+  f_item2_name: 'kafka.sample.item2Name',
+  f_tax: 'kafka.sample.tax',
+  c_location_city: 'kafka.sample.city',
+  c_notes: 'kafka.sample.notes'
+};
+
+const SAMPLE_SELECTS = {
+  c_service_type: ['kafka.sample.service.1', 'kafka.sample.service.2', 'kafka.sample.service.3', 'kafka.sample.service.4'],
+  c_request_type: ['kafka.sample.request.1', 'kafka.sample.request.2', 'kafka.sample.request.3'],
+  c_contact_time: ['kafka.sample.time.1', 'kafka.sample.time.2', 'kafka.sample.time.3']
+};
+
+// Replace sample values written in fromLang, keeping anything the user typed
+function applySampleData(fromLang) {
+  const swap = (el, key) => {
+    if (el && (!el.value.trim() || el.value === tIn(fromLang, key))) el.value = t(key);
+  };
+  Object.entries(SAMPLE_INPUTS).forEach(([id, key]) => swap(document.getElementById(id), key));
+
+  Object.entries(SAMPLE_SELECTS).forEach(([id, keys]) => {
+    const select = document.getElementById(id);
+    if (!select) return;
+    const index = Math.max(0, select.selectedIndex);
+    select.innerHTML = '<option></option>'.repeat(keys.length);
+    keys.forEach((key, i) => {
+      select.options[i].value = t(key);
+      select.options[i].textContent = t(key);
+    });
+    select.selectedIndex = index;
+  });
+
+  Object.values(USE_CASE_PRESETS).forEach(preset => {
+    swap(document.getElementById('push_title'), preset.pushTitleKey);
+    swap(document.getElementById('push_content'), preset.pushContentKey);
+  });
+  sampleLang = currentLang;
+}
+
 // ==========================================
 // Navegación entre pantallas (sección 1 y 2)
 // ==========================================
@@ -37,25 +99,26 @@ function switchMainScreen(screenId) {
     screenKafkaView.style.display = 'block';
   }
 
-  logToConsole(`Navegación: ${screenId === 'data' ? 'Sección 1 (formulario)' : 'Sección 2 (servidor Kafka, JSON y logs)'}`);
+  logToConsole(t('kafka.log.navigation', { section: t(screenId === 'data' ? 'kafka.log.section1' : 'kafka.log.section2') }));
   updateLivePreview();
 }
 
 // ==========================================
 // Selector de formulario (1 y 2)
 // ==========================================
+// useCase is the identifier sent in the root "use_case" field; Scaler may route on it, so it is not translated
 const USE_CASE_PRESETS = {
   1: {
-    title: 'Factura / Recibo digital',
+    titleKey: 'kafka.form1.title',
     useCase: 'Factura / Recibo Digital',
-    pushTitle: 'Tu factura de septiembre está disponible',
-    pushContent: 'Estimado cliente, tu factura digital de septiembre por $ 1,450.00 fue generada correctamente.'
+    pushTitleKey: 'kafka.sample.form1.pushTitle',
+    pushContentKey: 'kafka.sample.form1.pushContent'
   },
   2: {
-    title: 'Solicitud de contacto comercial',
+    titleKey: 'kafka.form2.title',
     useCase: 'Solicitud de Contacto Comercial',
-    pushTitle: 'Confirmación de solicitud comercial',
-    pushContent: 'Recibimos tu solicitud de contacto. Un asesor se comunicará contigo en breve.'
+    pushTitleKey: 'kafka.sample.form2.pushTitle',
+    pushContentKey: 'kafka.sample.form2.pushContent'
   }
 };
 
@@ -79,18 +142,18 @@ function switchUseCase(caseNum) {
   btn2.classList.toggle('active', caseNum === 2);
   panel1.style.display = caseNum === 1 ? 'block' : 'none';
   panel2.style.display = caseNum === 2 ? 'block' : 'none';
-  heading.textContent = `Formulario: ${preset.title}`;
+  heading.textContent = t('kafka.formB.heading', { title: t(preset.titleKey) });
   if (useCaseInput) useCaseInput.value = preset.useCase;
 
   // Sugerir el push del formulario salvo que el usuario lo haya editado
-  if (!pushTitleInput.value.trim() || pushTitleInput.value === other.pushTitle) {
-    pushTitleInput.value = preset.pushTitle;
+  if (!pushTitleInput.value.trim() || pushTitleInput.value === t(other.pushTitleKey)) {
+    pushTitleInput.value = t(preset.pushTitleKey);
   }
-  if (!pushContentInput.value.trim() || pushContentInput.value === other.pushContent) {
-    pushContentInput.value = preset.pushContent;
+  if (!pushContentInput.value.trim() || pushContentInput.value === t(other.pushContentKey)) {
+    pushContentInput.value = t(preset.pushContentKey);
   }
 
-  logToConsole(`Formulario seleccionado: [${caseNum}] ${preset.title}`);
+  logToConsole(t('kafka.log.formSelected', { num: caseNum, title: t(preset.titleKey) }));
 
   updateLivePreview();
 }
@@ -111,7 +174,7 @@ function selectIntegration(integrationValue) {
   if (!userIdInput.value.trim() || userIdInput.value === previousDefault) {
     userIdInput.value = defaultUserIds[integrationValue] || '';
   }
-  logToConsole(`Destino de integración: "${integrationValue}" • user_id: ${userIdInput.value}`);
+  logToConsole(t('kafka.log.integration', { integration: integrationValue, userId: userIdInput.value }));
 
   updateLivePreview();
 }
@@ -196,10 +259,11 @@ function handleGeneratePreview() {
   const alertBox = document.getElementById('quick-preview-alert');
   const alertText = document.getElementById('quick-preview-text');
   if (alertBox) {
-    alertText.textContent = `Vista previa actualizada para el formulario ${currentUseCase}. Lista para enviar.`;
+    quickPreviewVisible = true;
+    alertText.textContent = t('kafka.preview.updated', { num: currentUseCase });
     alertBox.style.display = 'flex';
   }
-  logToConsole(`Vista previa generada para el formulario ${currentUseCase}.`);
+  logToConsole(t('kafka.log.previewGenerated', { num: currentUseCase }));
 }
 
 // ==========================================
@@ -211,11 +275,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     form.addEventListener('submit', handleFormSubmit);
   }
 
+  renderLangSelect();
+  clearConsole();
+  applySampleData('es-MX');
   await loadServerConfig();
   selectIntegration('3rd Party');
   switchUseCase(1);
 
-  logToConsole('Formularios a Kafka inicializado.');
+  logToConsole(t('kafka.log.initialized'));
+});
+
+// ==========================================
+// Idioma de la interfaz
+// ==========================================
+function renderLangSelect() {
+  const slot = document.getElementById('lang-slot');
+  if (slot) slot.innerHTML = langSelectHtml('lang-select');
+  applyI18n(slot || document);
+  // Back to the portal in the same language
+  const back = document.getElementById('back-to-portal');
+  if (back) back.href = `../?lang=${encodeURIComponent(currentLang)}`;
+}
+
+// applyI18n already reset the static texts; redraw what JS writes
+window.addEventListener('studio:languagechange', () => {
+  renderLangSelect();
+  applySampleData(sampleLang);
+  // Only the heading: switchUseCase would also reset the use_case identifier the user may have edited
+  document.getElementById('usecase-form-heading').textContent =
+    t('kafka.formB.heading', { title: t(USE_CASE_PRESETS[currentUseCase].titleKey) });
+  renderHostHint();
+  setStatus(statusState.ok, statusState.key);
+  setSendingState(isSendingNow);
+  if (lastBanner) showBanner(...lastBanner());
+  if (quickPreviewVisible) document.getElementById('quick-preview-text').textContent = t('kafka.preview.updated', { num: currentUseCase });
+  if (consoleIsEmpty) clearConsole();
+  logToConsole(t('kafka.log.language', { lang: currentLang }));
+  updateLivePreview();
 });
 
 async function loadServerConfig() {
@@ -224,24 +320,30 @@ async function loadServerConfig() {
     const cfg = await res.json();
     if (cfg.default_user_ids) defaultUserIds = cfg.default_user_ids;
     document.getElementById('topic').value = cfg.kafka_topic || '';
-    const broker = cfg.kafka_bootstrap_servers || (cfg.kafka_host ? `${cfg.kafka_host}:${cfg.kafka_port}` : '');
-    document.getElementById('host-hint').textContent = broker
-      ? `Vacío: usa el broker del ambiente (${broker})`
-      : 'Este ambiente no tiene broker de Kafka: indica host y puerto';
-    if (!broker) setStatus(false, 'Sin broker configurado');
+    kafkaBroker = cfg.kafka_bootstrap_servers || (cfg.kafka_host ? `${cfg.kafka_host}:${cfg.kafka_port}` : '');
+    renderHostHint();
+    if (!kafkaBroker) setStatus(false, 'kafka.status.noBroker');
   } catch (err) {
-    setStatus(false, 'Servidor no disponible');
-    logToConsole(`[ERROR] No se pudo leer la configuración: ${err.message}`);
+    setStatus(false, 'kafka.status.unavailable');
+    logToConsole(t('kafka.log.configError', { error: err.message }));
   }
   document.getElementById('default-user-3rd').textContent = defaultUserIds['3rd Party'] || '';
   document.getElementById('default-user-das').textContent = defaultUserIds['Quadient Inspire DAS'] || '';
 }
 
-function setStatus(ok, text) {
+function renderHostHint() {
+  if (kafkaBroker === null) return;
+  document.getElementById('host-hint').textContent = kafkaBroker
+    ? t('kafka.config.hostHintBroker', { broker: kafkaBroker })
+    : t('kafka.config.hostHintNoBroker');
+}
+
+function setStatus(ok, key) {
+  statusState = { ok, key };
   const pill = document.getElementById('status-indicator');
   pill.classList.toggle('status-online', ok);
   pill.classList.toggle('status-offline', !ok);
-  document.getElementById('status-text').textContent = text;
+  document.getElementById('status-text').textContent = t(key);
 }
 
 async function handleFormSubmit(e) {
@@ -250,7 +352,7 @@ async function handleFormSubmit(e) {
   const topicInput = document.getElementById('topic');
   const topic = (topicInput.value || "").trim();
   if (!topic) {
-    showBanner('error', 'Falta un dato obligatorio', 'Indica el nombre del tópico de Kafka en la sección 2.');
+    setBanner(() => ['error', t('kafka.banner.missingTitle'), t('kafka.banner.missingText')]);
     switchMainScreen('kafka');
     topicInput.focus();
     return;
@@ -273,8 +375,8 @@ async function handleFormSubmit(e) {
   };
 
   setSendingState(true);
-  logToConsole(`Enviando a Kafka en el tópico '${topic}'...`);
-  logToConsole(`Caso de uso: "${payload.use_case}" | Destino: "${payload.integration}" | user_id: "${payload.user_id}"`);
+  logToConsole(t('kafka.log.sending', { topic }));
+  logToConsole(t('kafka.log.sendDetails', { useCase: payload.use_case, integration: payload.integration, userId: payload.user_id }));
 
   const startTime = performance.now();
 
@@ -296,26 +398,27 @@ async function handleFormSubmit(e) {
 
       updateMetrics(statsTotalSent, statsTotalTime, sentCount > 0 ? (sentCount / Math.max(elapsedSeconds, 0.01)).toFixed(1) : '0', statsTotalErrors);
 
-      const successTitle = 'Publicado en Apache Kafka';
-      const successMsg = `Se publicó 1 mensaje JSON (formulario ${currentUseCase}) en el tópico '${topic}' de '${data.bootstrap_servers}'.`;
-      showBanner('success', successTitle, successMsg);
-      logToConsole(`[OK] ${successMsg} Tiempo: ${elapsedSeconds}s`);
+      const sentForm = currentUseCase;
+      const successText = () => t('kafka.banner.successText', { num: sentForm, topic, servers: data.bootstrap_servers });
+      setBanner(() => ['success', t('kafka.banner.successTitle'), successText()]);
+      logToConsole(t('kafka.log.ok', { message: successText(), seconds: elapsedSeconds }));
 
       switchMainScreen('kafka');
     } else {
       statsTotalErrors++;
       updateMetrics(statsTotalSent, statsTotalTime, '0', statsTotalErrors);
-      const errMsg = data.error || 'Error desconocido al procesar la solicitud.';
-      showBanner('error', 'Error al enviar a Kafka', errMsg);
-      logToConsole(`[ERROR] Falló el envío a Kafka: ${errMsg}`);
+      // data.error already comes in the interface language (server-side catalog)
+      const errMsg = data.error || t('kafka.error.unknown');
+      setBanner(() => ['error', t('kafka.banner.sendErrorTitle'), data.error || t('kafka.error.unknown')]);
+      logToConsole(t('kafka.log.sendFailed', { error: errMsg }));
       switchMainScreen('kafka');
     }
   } catch (err) {
     statsTotalErrors++;
     updateMetrics(statsTotalSent, statsTotalTime, '0', statsTotalErrors);
-    const errMsg = err.message || 'Error de comunicación con el servidor.';
-    showBanner('error', 'Error de red / conexión', errMsg);
-    logToConsole(`[ERROR] Excepción de red: ${errMsg}`);
+    const errMsg = err.message || t('kafka.error.network');
+    setBanner(() => ['error', t('kafka.banner.networkTitle'), err.message || t('kafka.error.network')]);
+    logToConsole(t('kafka.log.networkError', { error: errMsg }));
     switchMainScreen('kafka');
   } finally {
     setSendingState(false);
@@ -326,6 +429,7 @@ async function handleFormSubmit(e) {
 // Estado de envío
 // ==========================================
 function setSendingState(isSending) {
+  isSendingNow = isSending;
   const btnSend = document.getElementById('btn-send');
   const btnSend2 = document.getElementById('btn-send-screen2');
   const spinner = document.getElementById('btn-send-spinner');
@@ -335,12 +439,18 @@ function setSendingState(isSending) {
   if (btnSend2) btnSend2.disabled = isSending;
 
   if (spinner) spinner.style.display = isSending ? 'inline-block' : 'none';
-  if (btnText) btnText.textContent = isSending ? 'Enviando a Kafka...' : '🚀 Enviar a Kafka';
+  if (btnText) btnText.textContent = t(isSending ? 'kafka.actions.sending' : 'kafka.actions.send');
 }
 
 // ==========================================
 // Banner de resultado
 // ==========================================
+// Remember how to rebuild the banner so it follows language changes
+function setBanner(build) {
+  lastBanner = build;
+  showBanner(...build());
+}
+
 function showBanner(type, title, text) {
   const banner = document.getElementById('result-banner');
   const bannerIcon = document.getElementById('banner-icon');
@@ -385,11 +495,12 @@ function logToConsole(message) {
   if (!consoleOutput) return;
 
   const now = new Date();
-  const timeStr = now.toLocaleTimeString('es', { hour12: false });
+  const timeStr = now.toLocaleTimeString(currentLang, { hour12: false });
   const logLine = `[${timeStr}] ${message}\n`;
 
-  if (consoleOutput.textContent === 'Esperando acciones del usuario...') {
+  if (consoleIsEmpty) {
     consoleOutput.textContent = logLine;
+    consoleIsEmpty = false;
   } else {
     consoleOutput.textContent += logLine;
   }
@@ -399,7 +510,8 @@ function logToConsole(message) {
 function clearConsole() {
   const consoleOutput = document.getElementById('console-output');
   if (consoleOutput) {
-    consoleOutput.textContent = 'Esperando acciones del usuario...';
+    consoleOutput.textContent = t('kafka.console.waiting');
+    consoleIsEmpty = true;
   }
 }
 
@@ -408,7 +520,7 @@ function copyConsoleLogs() {
   if (!consoleOutput) return;
 
   navigator.clipboard.writeText(consoleOutput.textContent).then(() => {
-    alert('Logs copiados al portapapeles.');
+    alert(t('kafka.console.copied'));
   }).catch(err => {
     console.error('Error al copiar logs:', err);
   });

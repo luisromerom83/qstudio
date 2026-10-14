@@ -10,14 +10,14 @@ const testerSnippetCurl = document.getElementById('snippet-curl');
 const testerSnippetJs = document.getElementById('snippet-js');
 const testerSnippetPython = document.getElementById('snippet-python');
 
-// Plantillas de ejemplo de HTML
-const HTML_TEMPLATES = {
-  factura: {
-    title: "Factura Electrónica #FAC-2026-9810",
-    pushTitle: "📄 Nueva Factura Disponible",
-    pushBody: "Tu factura de septiembre por $1,450.00 MXN ya está disponible en tu Inbox.",
+// Plantillas de ejemplo de HTML (los textos salen del diccionario del idioma activo)
+const SAMPLE_TEMPLATE_BUILDERS = {
+  factura: () => ({
+    title: t('inbox.sample.invoice.title'),
+    pushTitle: t('inbox.sample.invoice.pushTitle'),
+    pushBody: t('inbox.sample.invoice.pushBody'),
     html: `<!DOCTYPE html>
-<html>
+<html lang="${currentLang}">
 <head>
   <meta charset="utf-8">
   <style>
@@ -38,56 +38,56 @@ const HTML_TEMPLATES = {
   <div class="invoice-card">
     <div class="header">
       <div>
-        <div class="company">Empresa Servicios Digitales S.A.</div>
-        <div class="invoice-title">RFC: ESD120304XYZ · Folio Fiscal: 9A8B7C-6543</div>
+        <div class="company">${t('inbox.sample.invoice.company')}</div>
+        <div class="invoice-title">${t('inbox.sample.invoice.taxLine')}</div>
       </div>
       <div style="text-align: right;">
-        <span style="background: #dcfce7; color: #15803d; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600;">PAGADA</span>
+        <span style="background: #dcfce7; color: #15803d; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600;">${t('inbox.sample.invoice.paid')}</span>
       </div>
     </div>
     
-    <p>Estimado/a cliente, confirmamos el pago de su suscripción mensual correspondiente a Septiembre 2026.</p>
+    <p>${t('inbox.sample.invoice.greeting')}</p>
     
     <table>
       <thead>
         <tr>
-          <th>Concepto</th>
-          <th style="text-align: center;">Cantidad</th>
-          <th style="text-align: right;">Total</th>
+          <th>${t('inbox.sample.invoice.colConcept')}</th>
+          <th style="text-align: center;">${t('inbox.sample.invoice.colQty')}</th>
+          <th style="text-align: right;">${t('inbox.sample.invoice.colTotal')}</th>
         </tr>
       </thead>
       <tbody>
         <tr>
-          <td>Suscripción Plan Corporativo Cloud</td>
+          <td>${t('inbox.sample.invoice.line1')}</td>
           <td style="text-align: center;">1</td>
-          <td style="text-align: right;">$1,250.00</td>
+          <td style="text-align: right;">${t('inbox.sample.invoice.line1Amount')}</td>
         </tr>
         <tr>
-          <td>Servicio de Notificaciones Push Adicionales</td>
+          <td>${t('inbox.sample.invoice.line2')}</td>
           <td style="text-align: center;">1</td>
-          <td style="text-align: right;">$200.00</td>
+          <td style="text-align: right;">${t('inbox.sample.invoice.line2Amount')}</td>
         </tr>
       </tbody>
     </table>
 
     <div class="amount-box">
-      <div style="font-size: 13px; color: #475569;">Total Facturado (IVA incluido)</div>
-      <div class="amount-value">$1,450.00 MXN</div>
+      <div style="font-size: 13px; color: #475569;">${t('inbox.sample.invoice.totalLabel')}</div>
+      <div class="amount-value">${t('inbox.sample.invoice.totalAmount')}</div>
     </div>
 
     <div class="footer">
-      Gracias por su preferencia · Si tiene dudas, contáctenos en soporte@empresa.com
+      ${t('inbox.sample.invoice.footer')}
     </div>
   </div>
 </body>
 </html>`
-  },
-  alerta: {
-    title: "Alerta de Seguridad: Nuevo inicio de sesión detectado",
-    pushTitle: "⚠️ Alerta de Seguridad",
-    pushBody: "Se detectó un nuevo inicio de sesión en tu cuenta desde un dispositivo nuevo.",
+  }),
+  alerta: () => ({
+    title: t('inbox.sample.alert.title'),
+    pushTitle: t('inbox.sample.alert.pushTitle'),
+    pushBody: t('inbox.sample.alert.pushBody'),
     html: `<!DOCTYPE html>
-<html>
+<html lang="${currentLang}">
 <head>
   <meta charset="utf-8">
   <style>
@@ -99,25 +99,25 @@ const HTML_TEMPLATES = {
 </head>
 <body>
   <div class="box">
-    <div class="title">🛡️ Aviso de Seguridad en tu Cuenta</div>
-    <p>Hemos detectado un inicio de sesión reciente en tu cuenta desde una nueva ubicación o dispositivo:</p>
+    <div class="title">${t('inbox.sample.alert.heading')}</div>
+    <p>${t('inbox.sample.alert.intro')}</p>
     <ul>
-      <li><strong>Fecha:</strong> ${new Date().toLocaleString()}</li>
+      <li><strong>${t('inbox.sample.alert.date')}</strong> ${new Date().toLocaleString(currentLang)}</li>
       <li><strong>IP:</strong> 187.190.45.12</li>
-      <li><strong>Navegador:</strong> Google Chrome / Linux</li>
+      <li><strong>${t('inbox.sample.alert.browser')}</strong> Google Chrome / Linux</li>
     </ul>
-    <p>Si fuiste tú, puedes ignorar este mensaje con tranquilidad. Si no reconoces esta actividad, por favor asegura tu cuenta inmediatamente.</p>
-    <a href="#" class="btn">Proteger mi cuenta</a>
+    <p>${t('inbox.sample.alert.ignore')}</p>
+    <a href="#" class="btn">${t('inbox.sample.alert.button')}</a>
   </div>
 </body>
 </html>`
-  },
-  boletin: {
-    title: "Novedades del Mes: Lanzamiento de Nuevas Funcionalidades",
-    pushTitle: "🚀 Nuevas funcionalidades en la plataforma",
-    pushBody: "Descubre las últimas mejoras que preparamos para ti este mes.",
+  }),
+  boletin: () => ({
+    title: t('inbox.sample.news.title'),
+    pushTitle: t('inbox.sample.news.pushTitle'),
+    pushBody: t('inbox.sample.news.pushBody'),
     html: `<!DOCTYPE html>
-<html>
+<html lang="${currentLang}">
 <head>
   <meta charset="utf-8">
   <style>
@@ -132,32 +132,37 @@ const HTML_TEMPLATES = {
 <body>
   <div class="card">
     <div class="banner">
-      <h2 style="margin: 0;">¡Novedades de la Plataforma!</h2>
-      <p style="margin: 8px 0 0 0; opacity: 0.9;">Edición Septiembre 2026</p>
+      <h2 style="margin: 0;">${t('inbox.sample.news.heading')}</h2>
+      <p style="margin: 8px 0 0 0; opacity: 0.9;">${t('inbox.sample.news.edition')}</p>
     </div>
     <div class="content">
-      <p>Nos emociona compartirte las actualizaciones más recientes que optimizarán tu flujo de trabajo:</p>
+      <p>${t('inbox.sample.news.intro')}</p>
       <div class="feature">
-        <h4>✨ 1. Notificaciones Push Web Instantáneas</h4>
-        <p>Ahora recibes actualizaciones al segundo directamente en tu navegador, sin necesidad de recargar.</p>
+        <h4>${t('inbox.sample.news.f1Title')}</h4>
+        <p>${t('inbox.sample.news.f1Text')}</p>
       </div>
       <div class="feature">
-        <h4>📬 2. Bandeja de Entrada HTML Rica</h4>
-        <p>Visualiza facturas, estados de cuenta y comunicaciones formateadas con soporte completo de estilos.</p>
+        <h4>${t('inbox.sample.news.f2Title')}</h4>
+        <p>${t('inbox.sample.news.f2Text')}</p>
       </div>
     </div>
   </div>
 </body>
 </html>`
-  }
+  })
 };
+
+// Valores de la última plantilla cargada: si el usuario no los editó, se recargan al cambiar de idioma
+let loadedTemplate = null;
 
 /**
  * Cargar plantilla seleccionada en el formulario
  */
 function loadTemplate(templateKey) {
-  const tpl = HTML_TEMPLATES[templateKey];
-  if (!tpl) return;
+  const build = SAMPLE_TEMPLATE_BUILDERS[templateKey];
+  if (!build) return;
+  const tpl = build();
+  loadedTemplate = { key: templateKey, values: tpl };
 
   const inputTitle = document.getElementById('tester-title');
   const inputPushTitle = document.getElementById('tester-push-title');
@@ -182,11 +187,11 @@ if (testerTemplateSelect) {
  * Actualizar snippets de código dinámicamente con los valores actuales del formulario
  */
 function updateApiExamples() {
-  const userEmail = document.getElementById('tester-user-email')?.value || 'usuario@ejemplo.com';
-  const title = document.getElementById('tester-title')?.value || 'Factura Septiembre';
-  const pushTitle = document.getElementById('tester-push-title')?.value || 'Nueva Factura';
-  const pushBody = document.getElementById('tester-push-body')?.value || 'Tu factura está lista.';
-  const html = document.getElementById('tester-html')?.value || '<h1>Factura</h1>';
+  const userEmail = document.getElementById('tester-user-email')?.value || t('inbox.tester.defaultEmail');
+  const title = document.getElementById('tester-title')?.value || t('inbox.tester.defaultTitle');
+  const pushTitle = document.getElementById('tester-push-title')?.value || t('inbox.tester.defaultPushTitle');
+  const pushBody = document.getElementById('tester-push-body')?.value || t('inbox.tester.defaultPushBody');
+  const html = document.getElementById('tester-html')?.value || `<h1>${t('inbox.tester.defaultHtmlHeading')}</h1>`;
 
   const endpoint = new URL('api/inbox/send', window.location.href).href;
 
@@ -208,7 +213,7 @@ function updateApiExamples() {
 
   // 2. Snippet JavaScript
   if (testerSnippetJs) {
-    testerSnippetJs.textContent = `// Enviar HTML y Push desde cualquier app JS / Node
+    testerSnippetJs.textContent = `// ${t('inbox.tester.snippetJsComment')}
 await fetch("${endpoint}", {
   method: "POST",
   headers: {
@@ -220,7 +225,7 @@ await fetch("${endpoint}", {
 
   // 3. Snippet Python
   if (testerSnippetPython) {
-    testerSnippetPython.textContent = `# Enviar HTML y Push desde Python
+    testerSnippetPython.textContent = `# ${t('inbox.tester.snippetPyComment')}
 import requests
 
 payload = ${JSON.stringify(payload, null, 4)}
@@ -256,13 +261,13 @@ if (formApiTester) {
     const html = document.getElementById('tester-html').value;
 
     if (!userEmail) {
-      alert('Por favor especifica el correo del destinatario.');
+      alert(t('inbox.tester.recipientRequired'));
       return;
     }
 
     try {
       btnSubmit.disabled = true;
-      btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando a la API...';
+      btnSubmit.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>${t('inbox.tester.sending')}`;
 
       const response = await fetch('api/inbox/send', {
         method: 'POST',
@@ -283,25 +288,25 @@ if (formApiTester) {
       if (response.ok) {
         showTesterResult(
           'success',
-          `✅ <strong>¡Mensaje HTML y Push enviados con éxito!</strong><br>` +
-          `• ID en Inbox: <code>${data.inboxId}</code><br>` +
-          `• Notificaciones Push enviadas: <strong>${data.pushResult?.successCount || 0}</strong> dispositivo(s).<br>` +
-          `• Revisa tu pestaña <strong>Bandeja de Entrada</strong> para ver el nuevo elemento recibido.`
+          `✅ <strong>${t('inbox.tester.successTitle')}</strong><br>` +
+          `• ${t('inbox.tester.successInboxId', { id: escapeHtml(data.inboxId) })}<br>` +
+          `• ${t('inbox.tester.successPushCount', { count: data.pushResult?.successCount || 0 })}<br>` +
+          `• ${t('inbox.tester.successCheckInbox')}`
         );
       } else {
         showTesterResult(
           'danger',
-          `❌ <strong>Error de la API (${response.status}):</strong> ${data.error || 'Ocurrió un error.'}<br>` +
-          (data.details ? `<small class="text-muted">${data.details}</small>` : '') +
-          (data.help ? `<br><small class="text-primary">${data.help}</small>` : '')
+          `❌ <strong>${t('inbox.tester.apiError', { status: response.status })}</strong> ${escapeHtml(data.error || t('inbox.tester.genericError'))}<br>` +
+          (data.details ? `<small class="text-muted">${escapeHtml(data.details)}</small>` : '') +
+          (data.help ? `<br><small class="text-primary">${escapeHtml(data.help)}</small>` : '')
         );
       }
     } catch (err) {
       console.error('Error enviando a la API:', err);
-      showTesterResult('danger', `❌ Error de conexión con la API: ${err.message}`);
+      showTesterResult('danger', `❌ ${t('inbox.tester.connectionError', { error: escapeHtml(err.message) })}`);
     } finally {
       btnSubmit.disabled = false;
-      btnSubmit.innerHTML = '<i class="bi bi-send-fill me-2"></i>Enviar vía API ahora';
+      btnSubmit.innerHTML = `<i class="bi bi-send-fill me-2"></i><span data-i18n="inbox.tester.send">${t('inbox.tester.send')}</span>`;
     }
   });
 }
@@ -311,7 +316,7 @@ function showTesterResult(type, html) {
   testerResultAlert.className = `alert alert-${type} alert-dismissible fade show mt-3`;
   testerResultAlert.innerHTML = `
     ${html}
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="${t('inbox.common.close')}"></button>
   `;
   testerResultAlert.classList.remove('d-none');
 }
@@ -325,7 +330,7 @@ function copyToClipboard(elementId, btnElement) {
 
   navigator.clipboard.writeText(el.textContent).then(() => {
     const originalHtml = btnElement.innerHTML;
-    btnElement.innerHTML = '<i class="bi bi-check2 me-1"></i>¡Copiado!';
+    btnElement.innerHTML = `<i class="bi bi-check2 me-1"></i>${t('inbox.tester.copied')}`;
     btnElement.classList.replace('btn-outline-light', 'btn-success');
     setTimeout(() => {
       btnElement.innerHTML = originalHtml;
@@ -339,6 +344,25 @@ function copyToClipboard(elementId, btnElement) {
 // Inicializar plantilla por defecto al cargar
 window.addEventListener('DOMContentLoaded', () => {
   loadTemplate('factura');
+});
+
+// Al cambiar de idioma: la plantilla se recarga si el usuario no la editó; los snippets siempre se regeneran
+function testerFormMatchesTemplate() {
+  if (!loadedTemplate) return false;
+  const v = loadedTemplate.values;
+  return document.getElementById('tester-title')?.value === v.title
+    && document.getElementById('tester-push-title')?.value === v.pushTitle
+    && document.getElementById('tester-push-body')?.value === v.pushBody
+    && document.getElementById('tester-html')?.value === v.html;
+}
+
+window.addEventListener('studio:languagechange', () => {
+  if (testerFormMatchesTemplate()) {
+    loadTemplate(loadedTemplate.key);
+  } else {
+    updateApiExamples();
+  }
+  if (testerResultAlert) testerResultAlert.classList.add('d-none');
 });
 
 // Exportar globalmente

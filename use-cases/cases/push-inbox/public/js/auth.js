@@ -19,34 +19,25 @@ const loginAlert = document.getElementById('login-alert');
 const registerAlert = document.getElementById('register-alert');
 
 /**
- * Traduce códigos de error de Firebase a mensajes amigables en español
+ * Traduce códigos de error de Firebase a mensajes amigables en el idioma de la interfaz
  */
+const FIREBASE_AUTH_ERROR_KEYS = {
+  'auth/invalid-email': 'invalidEmail',
+  'auth/user-disabled': 'userDisabled',
+  'auth/user-not-found': 'userNotFound',
+  'auth/wrong-password': 'wrongPassword',
+  'auth/invalid-credential': 'invalidCredential',
+  'auth/email-already-in-use': 'emailInUse',
+  'auth/operation-not-allowed': 'operationNotAllowed',
+  'auth/weak-password': 'weakPassword',
+  'auth/network-request-failed': 'network',
+  'auth/too-many-requests': 'tooManyRequests'
+};
+
 function translateFirebaseError(error) {
-  const code = error.code || '';
-  switch (code) {
-    case 'auth/invalid-email':
-      return 'El formato del correo electrónico no es válido.';
-    case 'auth/user-disabled':
-      return 'Esta cuenta de usuario ha sido inhabilitada.';
-    case 'auth/user-not-found':
-      return 'No se encontró ninguna cuenta con este correo electrónico.';
-    case 'auth/wrong-password':
-      return 'Contraseña incorrecta. Por favor, verifica tus datos.';
-    case 'auth/invalid-credential':
-      return 'Credenciales inválidas. Verifica tu correo y contraseña.';
-    case 'auth/email-already-in-use':
-      return 'Este correo electrónico ya se encuentra registrado. Intenta iniciar sesión.';
-    case 'auth/operation-not-allowed':
-      return 'El proveedor de correo/contraseña no está habilitado en la consola de Firebase.';
-    case 'auth/weak-password':
-      return 'La contraseña debe tener al menos 6 caracteres.';
-    case 'auth/network-request-failed':
-      return 'Error de conexión. Comprueba tu conexión a internet.';
-    case 'auth/too-many-requests':
-      return 'Demasiados intentos fallidos. Inténtalo más tarde.';
-    default:
-      return error.message || 'Ocurrió un error inesperado al autenticar.';
-  }
+  const key = FIREBASE_AUTH_ERROR_KEYS[error.code || ''];
+  if (key) return t(`inbox.auth.errors.${key}`);
+  return error.message || t('inbox.auth.errors.unexpected');
 }
 
 /**
@@ -58,7 +49,7 @@ function showAlert(element, message, type = 'danger') {
   element.innerHTML = `
     <i class="bi ${type === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'} me-2"></i>
     ${message}
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="${t('inbox.common.close')}"></button>
   `;
   element.classList.remove('d-none');
 }
@@ -86,13 +77,13 @@ if (formLogin) {
 
     if (!window.isFirebaseConfigured) {
       // Modo demostración si aún no han configurado las claves
-      showAlert(loginAlert, 'Firebase aún no está configurado con tus credenciales. Haz clic en el botón "⚙️ Configurar Firebase" arriba a la derecha para ingresar tus datos, o bien prueba con el modo demo.', 'warning');
+      showAlert(loginAlert, t('inbox.auth.notConfiguredLogin'), 'warning');
       return;
     }
 
     try {
       btnSubmit.disabled = true;
-      btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Iniciando sesión...';
+      btnSubmit.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>${t('inbox.auth.signingIn')}`;
 
       await window.auth.signInWithEmailAndPassword(email, password);
       // El observador onAuthStateChanged se encargará de cambiar la vista
@@ -101,7 +92,7 @@ if (formLogin) {
       showAlert(loginAlert, translateFirebaseError(err), 'danger');
     } finally {
       btnSubmit.disabled = false;
-      btnSubmit.innerHTML = '<i class="bi bi-box-arrow-in-right me-2"></i>Iniciar Sesión';
+      btnSubmit.innerHTML = `<i class="bi bi-box-arrow-in-right me-2"></i><span data-i18n="inbox.auth.loginButton">${t('inbox.auth.loginButton')}</span>`;
     }
   });
 }
@@ -120,23 +111,23 @@ if (formRegister) {
     const btnSubmit = formRegister.querySelector('button[type="submit"]');
 
     if (password !== passwordConfirm) {
-      showAlert(registerAlert, 'Las contraseñas no coinciden. Por favor verifícalas.', 'warning');
+      showAlert(registerAlert, t('inbox.auth.passwordMismatch'), 'warning');
       return;
     }
 
     if (password.length < 6) {
-      showAlert(registerAlert, 'La contraseña debe tener al menos 6 caracteres.', 'warning');
+      showAlert(registerAlert, t('inbox.auth.errors.weakPassword'), 'warning');
       return;
     }
 
     if (!window.isFirebaseConfigured) {
-      showAlert(registerAlert, 'Firebase aún no está configurado con tus credenciales reales. Haz clic en el botón "⚙️ Configurar Firebase" arriba para ingresar tus datos de Firebase Console.', 'warning');
+      showAlert(registerAlert, t('inbox.auth.notConfiguredRegister'), 'warning');
       return;
     }
 
     try {
       btnSubmit.disabled = true;
-      btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Registrando usuario...';
+      btnSubmit.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>${t('inbox.auth.registering')}`;
 
       const userCredential = await window.auth.createUserWithEmailAndPassword(email, password);
       const user = userCredential.user;
@@ -150,16 +141,22 @@ if (formRegister) {
         }, { merge: true });
       }
 
-      showAlert(registerAlert, '¡Cuenta creada con éxito! Redirigiendo a tu bandeja de entrada...', 'success');
+      showAlert(registerAlert, t('inbox.auth.accountCreated'), 'success');
     } catch (err) {
       console.error('Error al registrar usuario:', err);
       showAlert(registerAlert, translateFirebaseError(err), 'danger');
     } finally {
       btnSubmit.disabled = false;
-      btnSubmit.innerHTML = '<i class="bi bi-person-plus-fill me-2"></i>Crear Cuenta';
+      btnSubmit.innerHTML = `<i class="bi bi-person-plus-fill me-2"></i><span data-i18n="inbox.auth.createButton">${t('inbox.auth.createButton')}</span>`;
     }
   });
 }
+
+// Las alertas ya mostradas quedarían en el idioma anterior: se ocultan al cambiarlo
+window.addEventListener('studio:languagechange', () => {
+  hideAlert(loginAlert);
+  hideAlert(registerAlert);
+});
 
 /**
  * Cierre de Sesión (Logout)

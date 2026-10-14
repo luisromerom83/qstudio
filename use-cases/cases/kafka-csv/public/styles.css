@@ -119,6 +119,24 @@ body {
   gap: 0.75rem;
 }
 
+/* Interface language selector (ES · MX / EN · US / PT · BR) */
+.lang-select {
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 9999px;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+}
+
+.lang-select:focus-visible {
+  outline: 2px solid var(--text-secondary);
+  outline-offset: 2px;
+}
+
 .brand-headings h1 {
   font-size: 1.3rem;
   font-weight: 700;
@@ -1185,5 +1203,17 @@ textarea {
     flex-direction: column;
     gap: 0.25rem;
     text-align: center;
+  }
+}
+
+/* The header gained the language selector: let it wrap on narrow screens */
+@media (max-width: 768px) {
+  .app-header {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .header-badges {
+    flex-wrap: wrap;
   }
 }
