@@ -205,9 +205,9 @@
     <!-- --------------------------------------------------------------------- -->
     <section id="view-services" class="space-y-6 hidden">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 min-w-0">
           <label for="service-env-select" class="text-xs font-semibold text-slate-400 uppercase tracking-wider" data-i18n="html.services.selectedEnv">Ambiente Seleccionado:</label>
-          <select id="service-env-select" onchange="renderServicesView()" class="bg-slate-950 border border-slate-700 text-sm rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-brand-500">
+          <select id="service-env-select" onchange="renderServicesView()" class="min-w-0 max-w-full bg-slate-950 border border-slate-700 text-sm rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-brand-500">
             <!-- Dynamic options -->
           </select>
         </div>

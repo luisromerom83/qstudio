@@ -331,6 +331,8 @@ function fillDasForm(das) {
   renderDasUserRows(das.users || []);
   document.getElementById("setting-das-api-key").placeholder = das.api_key ? t("app.das.apiKeyStored") : "";
   renderDasStatus(das);
+  // The Digital Services box in the services view links to this cloud URL
+  renderServicesView();
 }
 
 const DAS_INPUT_CLASS = "w-full bg-slate-950 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-brand-500";
@@ -554,7 +556,8 @@ const PRODUCT_HINTS = {
   scaler: { name: "Scaler", key: "scaler" },
   interactive: { name: "Interactive", key: "interactive" },
   "production-server": { name: "Production Server", key: "productionServer" },
-  icm: { name: "Content Manager (ICM)", key: "icm" }
+  icm: { name: "Content Manager (ICM)", key: "icm" },
+  "digital-services": { name: "Digital Services", key: "digitalServices" }
 };
 
 // Info button that opens the product's description in the floating hint
@@ -1714,34 +1717,29 @@ function renderServicesView() {
     </div>
   `;
 
+  // Same column count for the use case tiles and the row below them, so Digital Services sits under its tile
+  const useCaseCols = envUseCases.length >= 3 ? "md:grid-cols-3" : envUseCases.length === 2 ? "md:grid-cols-2" : "";
+  const dasIndex = envUseCases.findIndex(c => c.id === "das-inbox");
+  const hasDigitalServices = dasIndex >= 0;
+  const useCaseColCount = Math.min(envUseCases.length, 3) || 1;
+  // The direct use cases → Scaler line leaves from the middle of the other tiles, clear of the Digital Services box
+  const otherCols = Array.from({ length: useCaseColCount }, (_, i) => i).filter(i => i !== dasIndex);
+  const useCasesFlowX = hasDigitalServices && otherCols.length
+    ? otherCols.reduce((sum, i) => sum + (i + 0.5) / useCaseColCount, 0) / otherCols.length
+    : 0.5;
+  const useCasesDirectFlow = !hasDigitalServices || otherCols.length > 0;
+
   // ── TOP: USE CASES — the case names are the protagonists ──
   const useCasesUp = useCasesContainer && useCasesContainer.state === "running";
   const useCasesBaseUrl = `http://${window.location.hostname || "localhost"}:${env.ports?.use_cases || 3000}`;
   const useCasesSection = hasUseCases ? `
-    <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl" data-flow-source="use-cases" data-flow-bidir>
+    <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl" ${useCasesDirectFlow ? `data-flow-source="use-cases" data-flow-bidir data-flow-x="${useCasesFlowX}"` : ""}>
       <div class="bg-[#A35F78] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
         ${productIcon("use-cases", "white", "w-5 h-5")}
         <span>${t("app.services.useCasesBanner")}</span>
       </div>
 
       <div class="p-4 sm:p-5 bg-slate-900/60 space-y-4">
-        <div class="grid grid-cols-1 ${envUseCases.length >= 3 ? "md:grid-cols-3" : envUseCases.length === 2 ? "md:grid-cols-2" : ""} gap-4">
-          ${envUseCases.length ? envUseCases.map(c => `
-            <a href="${escapeHtml(`${useCasesBaseUrl}/${c.id}/?lang=${currentLang}`)}" target="_blank" rel="noopener noreferrer"
-               class="use-case-tile group rounded-xl border-2 p-4 sm:p-5 flex items-start gap-4 transition ${useCasesUp ? "border-[#A35F78]/60 bg-slate-950/80 hover:border-[#A35F78] hover:bg-slate-950" : "border-slate-800 bg-slate-900/40 pointer-events-none opacity-60"}">
-              <span class="text-3xl sm:text-4xl leading-none" aria-hidden="true">${escapeHtml(c.icon || "📄")}</span>
-              <span class="min-w-0 flex-1 space-y-1.5">
-                <span class="block text-lg sm:text-xl font-black text-white leading-tight">${escapeHtml(useCaseText(c, "name"))}</span>
-                ${c.description ? `<span class="block text-xs text-slate-400 leading-relaxed">${escapeHtml(useCaseText(c, "description"))}</span>` : ""}
-                <span class="flex items-center gap-2 pt-1 text-[11px] font-mono text-rose-300">
-                  /${escapeHtml(c.id)}/
-                  <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"></i>
-                </span>
-              </span>
-            </a>`).join("") : `
-            <p class="text-xs text-slate-500">${t("app.services.noUseCasesSelected")}</p>`}
-        </div>
-
         <div class="grid grid-cols-1 ${(env.use_cases || []).includes("push-inbox") ? "lg:grid-cols-2" : ""} gap-4 items-start">
           ${renderNodeBox({
             title: t("app.services.useCasesPortal"),
@@ -1763,9 +1761,71 @@ function renderServicesView() {
             </div>
           ` : ""}
         </div>
+
+        <div class="grid grid-cols-1 ${useCaseCols} gap-4">
+          ${envUseCases.length ? envUseCases.map(c => `
+            <a href="${escapeHtml(`${useCasesBaseUrl}/${c.id}/?lang=${currentLang}`)}" target="_blank" rel="noopener noreferrer"
+               class="use-case-tile group rounded-xl border-2 p-4 sm:p-5 flex items-start gap-4 transition ${useCasesUp ? "border-[#A35F78]/60 bg-slate-950/80 hover:border-[#A35F78] hover:bg-slate-950" : "border-slate-800 bg-slate-900/40 pointer-events-none opacity-60"}">
+              <span class="text-3xl sm:text-4xl leading-none" aria-hidden="true">${escapeHtml(c.icon || "📄")}</span>
+              <span class="min-w-0 flex-1 space-y-1.5">
+                <span class="block text-lg sm:text-xl font-black text-white leading-tight">${escapeHtml(useCaseText(c, "name"))}</span>
+                ${c.description ? `<span class="block text-xs text-slate-400 leading-relaxed">${escapeHtml(useCaseText(c, "description"))}</span>` : ""}
+                <span class="flex items-center gap-2 pt-1 text-[11px] font-mono text-rose-300">
+                  /${escapeHtml(c.id)}/
+                  <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"></i>
+                </span>
+              </span>
+            </a>`).join("") : `
+            <p class="text-xs text-slate-500">${t("app.services.noUseCasesSelected")}</p>`}
+        </div>
       </div>
 
       ${scalerExchange(t("app.services.flowUseCases"), "arrow-down-up")}
+    </div>
+  ` : "";
+
+  // ── CLOUD: Digital Services between the Digital Advantage Inbox tile and Scaler ──
+  const dsCloudUrl = (lastDasStatus && lastDasStatus.cloud_url) || "";
+  const dsUrl = dsCloudUrl ? `${dsCloudUrl}/digitalservices` : "";
+  const dsColStart = ["", "md:col-start-2", "md:col-start-3"][Math.min(dasIndex, 2)] || "";
+  const digitalServicesSection = hasDigitalServices ? `
+    <div class="grid grid-cols-1 ${useCaseCols} gap-4">
+      <div class="${dsColStart} flex flex-col items-center">
+        <div class="flex flex-col items-center py-2 text-sky-300" aria-hidden="true">
+          <i data-lucide="arrow-up-down" class="w-4 h-4"></i>
+          <span class="mt-1 text-[10px] font-mono px-2 py-0.5 rounded-full border border-sky-500/40 bg-slate-950">HTTPS · SDK</span>
+        </div>
+        <div class="group-box w-full flex flex-col rounded-2xl border-2 border-sky-500/40 overflow-hidden bg-slate-900/90 shadow-xl"
+          data-flow-source="digital-services" data-flow-bidir data-flow-protocol="HTTPS · long polling">
+          <div class="bg-[#2F6E9E] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
+            ${productIcon("digital-services", "white", "w-5 h-5")}
+            <span>Digital Services</span>
+            ${productHint("digital-services")}
+          </div>
+          <div class="p-4 bg-slate-900/60 space-y-3">
+            <div class="flex items-center justify-center gap-1.5 text-[11px] text-sky-200">
+              <i data-lucide="cloud" class="w-3.5 h-3.5"></i> ${t("app.services.dsCloud")}
+            </div>
+            ${dsUrl ? `
+              <a href="${escapeHtml(dsUrl)}" target="_blank" rel="noopener noreferrer"
+                 class="flex items-center justify-between gap-2 rounded-md border border-slate-700 px-3 py-2 text-xs text-slate-100 hover:bg-slate-800 hover:border-slate-600 transition"
+                 title="${escapeHtml(t("app.catalog.openInNewTab", { name: "Digital Services" }))}">
+                <span class="min-w-0">
+                  <span class="block font-semibold">${t("app.services.dsOpen")}</span>
+                  <span class="block font-mono text-[10px] text-slate-400 truncate">${escapeHtml(dsUrl.replace(/^https?:\/\//, ""))}</span>
+                </span>
+                <i data-lucide="external-link" class="w-3.5 h-3.5 flex-shrink-0"></i>
+              </a>` : `
+              <p class="text-[11px] text-amber-300">${t("app.services.dsNotConfigured")}</p>`}
+            <ul class="space-y-1.5 text-[11px] text-slate-300">
+              <li class="flex items-start gap-2"><i data-lucide="shield-check" class="w-3.5 h-3.5 mt-0.5 text-sky-300 flex-shrink-0"></i>${t("app.services.dsTransfer")}</li>
+              <li class="flex items-start gap-2"><i data-lucide="file-text" class="w-3.5 h-3.5 mt-0.5 text-sky-300 flex-shrink-0"></i>${t("app.services.dsContent")}</li>
+              <li class="flex items-start gap-2"><i data-lucide="user-check" class="w-3.5 h-3.5 mt-0.5 text-sky-300 flex-shrink-0"></i>${t("app.services.dsAuth")}</li>
+            </ul>
+          </div>
+          ${scalerExchange(t("app.services.flowDigitalServices"), "arrow-down-up")}
+        </div>
+      </div>
     </div>
   ` : "";
 
@@ -1936,6 +1996,7 @@ function renderServicesView() {
         <svg id="hub-flow-svg" class="hidden lg:block absolute inset-0 w-full h-full pointer-events-none overflow-visible" aria-hidden="true"></svg>
 
         ${useCasesSection}
+        ${digitalServicesSection}
         ${useCasesSection ? `
           <div class="h-10 lg:h-20 flex items-center justify-center">
             <i data-lucide="arrow-down-up" class="lg:hidden w-5 h-5 text-amber-300"></i>
@@ -2051,7 +2112,7 @@ function drawHubFlow() {
 
   const paths = [
     ...above.sort((a, b) => a.r.left - b.r.left).map((m, i, list) =>
-      line(m, m.r.left + m.r.width / 2 - box.left, m.r.bottom - box.top + 2, spread(list, i), t.top - box.top - 3, true)),
+      line(m, m.r.left + m.r.width * (parseFloat(m.el.dataset.flowX) || 0.5) - box.left, m.r.bottom - box.top + 2, spread(list, i), t.top - box.top - 3, true)),
     ...below.sort((a, b) => a.r.left - b.r.left).map((m, i, list) =>
       line(m, m.r.left + m.r.width / 2 - box.left, m.r.top - box.top - 2, spread(list, i), t.bottom - box.top + 3, false))
   ].join("");
