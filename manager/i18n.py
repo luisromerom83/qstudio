@@ -94,6 +94,44 @@ CATALOG: Dict[str, Dict[str, str]] = {
         "pt-BR": "Firebase configurado com o projeto {project}",
     },
 
+    # ── Quadient Cloud for the Digital Advantage inbox (env_service.py) ──
+    "La URL de Quadient Cloud debe tener el formato https://<empresa>.quadientcloud.eu": {
+        "en-US": "The Quadient Cloud URL must look like https://<company>.quadientcloud.eu",
+        "pt-BR": "A URL do Quadient Cloud deve ter o formato https://<empresa>.quadientcloud.eu",
+    },
+    "El Application ID debe ser numérico": {
+        "en-US": "The Application ID must be numeric",
+        "pt-BR": "O Application ID deve ser numérico",
+    },
+    "Falta el Client ID de la aplicación": {
+        "en-US": "The application's Client ID is missing",
+        "pt-BR": "Falta o Client ID da aplicação",
+    },
+    "Falta el API key de Integrated Server-Side Authentication": {
+        "en-US": "The Integrated Server-Side Authentication API key is missing",
+        "pt-BR": "Falta a API key de Integrated Server-Side Authentication",
+    },
+    "La vigencia del token debe estar entre 60 y 86400 segundos": {
+        "en-US": "The token lifetime must be between 60 and 86400 seconds",
+        "pt-BR": "A validade do token deve estar entre 60 e 86400 segundos",
+    },
+    "Cada usuario necesita usuario y contraseña": {
+        "en-US": "Every user needs a username and a password",
+        "pt-BR": "Cada usuário precisa de usuário e senha",
+    },
+    "El usuario '{user}' está repetido": {
+        "en-US": "User '{user}' is listed more than once",
+        "pt-BR": "O usuário '{user}' está repetido",
+    },
+    "Agrega al menos un usuario para la app": {
+        "en-US": "Add at least one user for the app",
+        "pt-BR": "Adicione pelo menos um usuário para o app",
+    },
+    "Quadient Cloud configurado ({url})": {
+        "en-US": "Quadient Cloud configured ({url})",
+        "pt-BR": "Quadient Cloud configurado ({url})",
+    },
+
     # ── Environments: create / update / delete (env_service.py, app.py) ──
     "Ambiente no encontrado": {
         "en-US": "Environment not found",
@@ -126,6 +164,10 @@ CATALOG: Dict[str, Dict[str, str]] = {
     "No se pudo recrear el volumen {volume} con la nueva carpeta: {detail}": {
         "en-US": "Couldn't recreate volume {volume} with the new folder: {detail}",
         "pt-BR": "Não foi possível recriar o volume {volume} com a nova pasta: {detail}",
+    },
+    "Este ambiente no tiene Kafka habilitado": {
+        "en-US": "This environment doesn't have Kafka enabled",
+        "pt-BR": "Este ambiente não tem o Kafka habilitado",
     },
     "Puerto de Interactive inválido": {
         "en-US": "Invalid Interactive port",

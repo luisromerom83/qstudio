@@ -1,0 +1,16 @@
+{
+  "id": "das-inbox",
+  "name": "Digital Advantage Inbox",
+  "description": "App web con login y bandeja de documentos de Quadient Cloud Digital Services. Los documentos DAS envían sus datos a la nube y Scaler los recibe con Digital Services Input.",
+  "icon": "☁️",
+  "requires": ["das"],
+  "order": 30,
+  "i18n": {
+    "en-US": {
+      "description": "Web app with sign-in and an inbox of Quadient Cloud Digital Services documents. DAS documents send their data to the cloud and Scaler receives it with Digital Services Input."
+    },
+    "pt-BR": {
+      "description": "App web com login e caixa de documentos do Quadient Cloud Digital Services. Os documentos DAS enviam seus dados para a nuvem e o Scaler os recebe com o Digital Services Input."
+    }
+  }
+}

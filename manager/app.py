@@ -59,6 +59,7 @@ def get_config():
         },
         "needs_onboarding": is_onboarding_needed,
         "firebase": env_service.get_firebase_status(),
+        "das": env_service.get_das_status(),
         "use_cases": env_service.get_use_case_catalog(),
         "verticals": VERTICAL_CATEGORIES
     })
@@ -127,6 +128,11 @@ def update_firebase_config():
     )
     return jsonify({"success": ok, "message": msg, "firebase": env_service.get_firebase_status()}), (200 if ok else 400)
 
+@app.route("/api/config/das", methods=["POST"])
+def update_das_config():
+    ok, msg = env_service.save_das_settings(request.json or {})
+    return jsonify({"success": ok, "message": msg, "das": env_service.get_das_status()}), (200 if ok else 400)
+
 @app.route("/api/config/test", methods=["POST"])
 def test_config():
     data = request.json or {}
@@ -169,6 +175,15 @@ def get_environment(env_id):
     if not env:
         return jsonify({"success": False, "message": "Ambiente no encontrado"}), 404
     return jsonify({"success": True, "environment": env})
+
+@app.route("/api/environments/<env_id>/icm-env-vars", methods=["GET"])
+def download_icm_env_vars(env_id):
+    ok, msg, data = env_service.build_icm_env_vars(env_id)
+    if not ok:
+        return jsonify({"success": False, "message": msg}), 404
+    response = app.response_class(json.dumps(data, ensure_ascii=False, indent=2), mimetype="application/json")
+    response.headers["Content-Disposition"] = f'attachment; filename="ICMEnvVars-{env_id}.json"'
+    return response
 
 @app.route("/api/environments/<env_id>", methods=["PUT"])
 def update_environment(env_id):

@@ -1,0 +1,95 @@
+:root {
+  --das-bg: #f4f6fa;
+  --das-surface: #ffffff;
+  --das-border: #e3e7ef;
+  --das-brand: #0d6efd;
+}
+
+body {
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  background: var(--das-bg);
+  min-height: 100vh;
+}
+
+.navbar-app {
+  background: var(--das-surface);
+  border-bottom: 1px solid var(--das-border);
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.6rem;
+  background: var(--das-brand);
+  color: #fff;
+}
+
+.brand-mark-lg {
+  width: 3rem;
+  height: 3rem;
+  font-size: 1.4rem;
+  border-radius: 0.9rem;
+}
+
+.narrow {
+  max-width: 720px;
+}
+
+#view-login .narrow,
+#view-config .narrow {
+  max-width: 420px;
+}
+
+.doc-item {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+  padding: 0.9rem 1rem;
+}
+
+.doc-icon {
+  flex: 0 0 auto;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 110, 253, 0.1);
+  color: var(--das-brand);
+}
+
+.doc-item .doc-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.doc-item .doc-desc {
+  font-size: 0.85rem;
+  color: #5c6675;
+  overflow-wrap: anywhere;
+}
+
+.doc-item .doc-date {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: #8a93a3;
+  white-space: nowrap;
+}
+
+#doc-frame {
+  display: block;
+  width: 100%;
+  min-height: calc(100vh - 58px);
+  border: none;
+  background: var(--das-surface);
+}
+
+#lang-select-slot select {
+  font-size: 0.75rem;
+  padding: 0.2rem 1.6rem 0.2rem 0.5rem;
+}

@@ -55,6 +55,8 @@ window.addEventListener("studio:languagechange", () => {
   populateServicesSelect();
   renderServicesView();
   renderFirebaseStatus(lastFirebaseStatus);
+  renderDasStatus(lastDasStatus);
+  if (document.getElementById("das-users-rows")) renderDasUserRows(readDasUserRows());
   loadVolumes();
   if (!document.getElementById("view-storage")?.classList.contains("hidden")) loadSnapshots();
   ["new", "edit"].forEach(prefix => {
@@ -129,6 +131,7 @@ async function checkConfigAndOnboarding() {
     document.getElementById("setting-username").value = creds.username || "";
     document.getElementById("setting-lic-server").value = creds.license_server || "";
     renderFirebaseStatus(data.firebase);
+    fillDasForm(data.das);
 
     if (data.needs_onboarding) {
       const modal = document.getElementById("onboarding-modal");
@@ -242,7 +245,8 @@ function renderFirebaseStatus(fb) {
 // ------------------------------------------------------------------------------
 const USE_CASE_REQUIREMENTS = {
   kafka: "app.useCases.requires.kafka",
-  firebase: "app.useCases.requires.firebase"
+  firebase: "app.useCases.requires.firebase",
+  das: "app.useCases.requires.das"
 };
 
 function renderUseCaseCheckboxes(prefix, selected) {
@@ -301,6 +305,109 @@ async function handleSaveFirebase(e) {
     if (data.success) {
       Object.values(fields).forEach(el => { el.value = ""; });
       renderFirebaseStatus(data.firebase);
+    }
+  } catch (err) {
+    showAlert("error", t("app.common.networkError", { error: err.message }));
+  }
+}
+
+let lastDasStatus = null;
+
+function renderDasStatus(das) {
+  lastDasStatus = das;
+  const el = document.getElementById("das-status");
+  if (!el) return;
+  el.textContent = das && das.configured
+    ? t("app.das.configured", { url: das.cloud_url, app: das.app_id })
+    : t("app.das.notConfigured");
+}
+
+function fillDasForm(das) {
+  if (!das) return;
+  document.getElementById("setting-das-url").value = das.cloud_url || "";
+  document.getElementById("setting-das-app-id").value = das.app_id || "";
+  document.getElementById("setting-das-client-id").value = das.client_id || "";
+  document.getElementById("setting-das-lifetime").value = das.token_lifetime || 1500;
+  renderDasUserRows(das.users || []);
+  document.getElementById("setting-das-api-key").placeholder = das.api_key ? t("app.das.apiKeyStored") : "";
+  renderDasStatus(das);
+}
+
+const DAS_INPUT_CLASS = "w-full bg-slate-950 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-brand-500";
+
+function dasUserRowHtml(user = {}) {
+  const field = (name, label, placeholder, type = "text") => `
+    <label class="block">
+      <span class="sm:hidden block text-[10px] font-semibold uppercase text-slate-500 mb-0.5">${label}</span>
+      <input type="${type}" data-das-field="${name}" value="${escapeHtml(user[name] || "")}" placeholder="${escapeHtml(placeholder)}"
+        spellcheck="false" autocomplete="off" aria-label="${label}" class="${DAS_INPUT_CLASS}">
+    </label>`;
+  return `
+    <div class="das-user-row grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_2rem] gap-2 px-3 py-2 items-end sm:items-center">
+      ${field("username", t("html.das.colUser"), "demo")}
+      ${field("password", t("html.das.colPassword"), "")}
+      ${field("subject", "Subject", t("app.das.subjectPlaceholder"))}
+      <button type="button" onclick="removeDasUserRow(this)" title="${t("app.das.removeUser")}" aria-label="${t("app.das.removeUser")}"
+        class="justify-self-end w-8 h-8 flex items-center justify-center rounded-md text-slate-500 hover:text-rose-400 hover:bg-slate-900 transition">
+        <i data-lucide="trash-2" class="w-4 h-4"></i>
+      </button>
+    </div>`;
+}
+
+function syncDasUsersEmpty() {
+  const empty = !document.querySelector("#das-users-rows .das-user-row");
+  document.getElementById("das-users-empty").classList.toggle("hidden", !empty);
+}
+
+function renderDasUserRows(users) {
+  document.getElementById("das-users-rows").innerHTML = users.map(dasUserRowHtml).join("");
+  syncDasUsersEmpty();
+  lucide.createIcons();
+}
+
+function addDasUserRow() {
+  const rows = document.getElementById("das-users-rows");
+  rows.insertAdjacentHTML("beforeend", dasUserRowHtml());
+  syncDasUsersEmpty();
+  lucide.createIcons();
+  rows.lastElementChild.querySelector("input").focus();
+}
+
+function removeDasUserRow(button) {
+  button.closest(".das-user-row").remove();
+  syncDasUsersEmpty();
+}
+
+function readDasUserRows() {
+  return Array.from(document.querySelectorAll("#das-users-rows .das-user-row")).map(row => {
+    const user = {};
+    row.querySelectorAll("[data-das-field]").forEach(input => { user[input.dataset.dasField] = input.value.trim(); });
+    return user;
+  });
+}
+
+async function handleSaveDas(e) {
+  e.preventDefault();
+  const value = id => document.getElementById(id).value.trim();
+  const payload = {
+    cloud_url: value("setting-das-url"),
+    app_id: value("setting-das-app-id"),
+    client_id: value("setting-das-client-id"),
+    api_key: value("setting-das-api-key"),
+    token_lifetime: value("setting-das-lifetime"),
+    users: readDasUserRows()
+  };
+  try {
+    const res = await fetch("/api/config/das", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    showAlert(data.success ? "success" : "error", data.message);
+    if (data.success) {
+      document.getElementById("setting-das-api-key").value = "";
+      fillDasForm(data.das);
     }
   } catch (err) {
     showAlert("error", t("app.common.networkError", { error: err.message }));
@@ -943,6 +1050,7 @@ function openEditEnvModal(envId) {
 
   const chkKafka = document.getElementById("edit-env-enable-kafka");
   if (chkKafka) chkKafka.checked = Boolean(env.enable_kafka);
+  renderIcmEnvVarsBox(env);
 
   renderUseCaseCheckboxes("edit", env.use_cases || []);
 
@@ -956,6 +1064,38 @@ function openEditEnvModal(envId) {
   toggleEditInteractiveGroup();
   document.getElementById("edit-env-modal").showModal();
   lucide.createIcons();
+}
+
+// ICMEnvVars.json with this environment's Kafka server and port, only once Kafka is saved as enabled
+function renderIcmEnvVarsBox(env) {
+  const box = document.getElementById("edit-icm-env-vars");
+  if (!box) return;
+  if (!env || !env.enable_kafka) {
+    box.classList.add("hidden");
+    box.innerHTML = "";
+    return;
+  }
+  const server = `${env.project_name}-kafka`;
+  box.classList.remove("hidden");
+  box.innerHTML = `
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/80 border border-slate-800 rounded-xl p-3">
+      <div class="min-w-0 space-y-1">
+        <span class="flex items-center gap-1.5 text-xs font-semibold text-white">
+          ${productIcon("content-manager", "white", "w-3.5 h-3.5")}
+          ${escapeHtml(t("app.icmEnvVars.title"))}
+        </span>
+        <span class="block text-[11px] text-slate-400 leading-snug">${escapeHtml(t("app.icmEnvVars.hint"))}</span>
+        <span class="flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-mono text-slate-300">
+          <span><span class="text-slate-500">kafkaserver</span> ${escapeHtml(server)}</span>
+          <span><span class="text-slate-500">kafkaport</span> 9092</span>
+        </span>
+      </div>
+      <a href="/api/environments/${encodeURIComponent(env.id)}/icm-env-vars" download="ICMEnvVars-${escapeHtml(env.id)}.json"
+         class="shrink-0 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-slate-700 text-slate-100 hover:bg-slate-800 hover:border-slate-600 transition">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+        ${escapeHtml(t("app.icmEnvVars.download"))}
+      </a>
+    </div>`;
 }
 
 async function handleEditEnvSubmit(e) {

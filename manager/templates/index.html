@@ -400,10 +400,73 @@
             <input type="text" id="setting-firebase-vapid" spellcheck="false" placeholder="BK..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
             <span class="text-[10px] text-slate-500" data-i18n-html="html.firebase.vapidHint">Configuración del proyecto &gt; Cloud Messaging &gt; Certificados push web &gt; Par de claves.</span>
           </div>
-          <span class="block text-[10px] text-slate-500" data-i18n="html.firebase.keepHint">Si ya está configurado, deja en blanco lo que no quieras cambiar. Los ambientes en ejecución toman los cambios al reactivarlos.</span>
+          <span class="block text-[10px] text-slate-500" data-i18n="html.firebase.keepHint">Si ya está configurado, deja en blanco lo que no quieras cambiar. Al guardar, los ambientes en ejecución con Push Notifications Inbox lo reinician con la nueva configuración.</span>
           <div class="pt-4 flex items-center justify-end border-t border-slate-800">
             <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-xs font-semibold rounded-lg text-white shadow-lg">
               <span data-i18n="html.firebase.save">Guardar Firebase</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="cloud" class="w-5 h-5 text-sky-400"></i>
+            <span data-i18n="html.das.title">Quadient Cloud para Digital Advantage Inbox</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-1" data-i18n="html.das.subtitle">Aplicación de Quadient Cloud Digital Services a la que entra el caso de uso Digital Advantage Inbox. Se guarda solo en este equipo. La aplicación debe tener habilitada la autenticación Integrated Server-Side Authentication.</p>
+        </div>
+
+        <form id="das-form" onsubmit="handleSaveDas(event)" class="space-y-4">
+          <div id="das-status" class="text-xs text-slate-400"></div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.das.cloudUrl">URL de Quadient Cloud</label>
+            <input type="url" id="setting-das-url" spellcheck="false" placeholder="https://empresa.quadientcloud.eu" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Application ID</label>
+              <input type="text" id="setting-das-app-id" inputmode="numeric" spellcheck="false" placeholder="123456789" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Client ID</label>
+              <input type="text" id="setting-das-client-id" spellcheck="false" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
+            </div>
+          </div>
+          <span class="block text-[10px] text-slate-500 -mt-2" data-i18n-html="html.das.appHint">Quadient Cloud &gt; Digital Services &gt; Applications: despliega los detalles de la aplicación.</span>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.das.apiKey">API key (Integrated Server-Side Authentication)</label>
+            <input type="password" id="setting-das-api-key" autocomplete="new-password" spellcheck="false" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
+            <span class="block mt-1 text-[10px] leading-snug text-slate-500" data-i18n-html="html.das.apiKeyHint">Digital Services &gt; Authentications &gt; Integrated Server Side Authentication &gt; Edit &gt; generar llave. Solo la usa el servidor del caso de uso; nunca llega al navegador. Déjalo en blanco para conservar la guardada.</span>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.das.tokenLifetime">Vigencia del token (segundos)</label>
+            <input type="number" id="setting-das-lifetime" min="60" max="86400" value="1500" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-semibold text-slate-300 uppercase" data-i18n="html.das.users">Usuarios de la app</label>
+              <button type="button" onclick="addDasUserRow()" class="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-slate-700 text-slate-200 hover:border-brand-500 hover:text-white transition">
+                <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> <span data-i18n="html.das.addUser">Agregar usuario</span>
+              </button>
+            </div>
+            <div class="rounded-lg border border-slate-700 overflow-hidden">
+              <div class="hidden sm:grid grid-cols-[1fr_1fr_1fr_2rem] gap-2 px-3 py-1.5 bg-slate-900 text-[10px] font-semibold uppercase text-slate-500 border-b border-slate-800">
+                <span data-i18n="html.das.colUser">Usuario</span>
+                <span data-i18n="html.das.colPassword">Contraseña</span>
+                <span>Subject</span>
+                <span></span>
+              </div>
+              <div id="das-users-rows" class="divide-y divide-slate-800 bg-slate-950"></div>
+              <p id="das-users-empty" class="hidden px-3 py-3 text-[11px] text-slate-500" data-i18n="html.das.noUsers">Sin usuarios. Agrega al menos uno.</p>
+            </div>
+            <span class="block mt-1 text-[10px] leading-snug text-slate-500" data-i18n-html="html.das.usersHint">Usuario y contraseña son solo para entrar a la app. El subject es el owner (userId) de los documentos en Digital Services: cada usuario ve los documentos públicos y los suyos. Si lo dejas vacío, se usa el nombre de usuario.</span>
+          </div>
+          <span class="block text-[10px] text-slate-500" data-i18n="html.das.reactivateHint">Al guardar, los ambientes en ejecución con este caso de uso lo reinician con la nueva configuración (tarda unos segundos).</span>
+          <div class="pt-4 flex items-center justify-end border-t border-slate-800">
+            <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-xs font-semibold rounded-lg text-white shadow-lg">
+              <span data-i18n="html.das.save">Guardar Quadient Cloud</span>
             </button>
           </div>
         </form>
@@ -837,6 +900,9 @@
                 </label>
               </div>
             </div>
+
+            <!-- ICM environment variables for this environment's Kafka broker -->
+            <div id="edit-icm-env-vars" class="hidden"></div>
           </div>
 
           <!-- GRUPO: CASOS DE USO -->

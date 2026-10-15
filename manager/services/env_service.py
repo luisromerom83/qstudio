@@ -81,6 +81,7 @@ class EnvService:
         self.root_compose = os.path.join(self.base_dir, "docker-compose.yml")
         self.firebase_key_file = os.path.join(self.data_dir, "firebase-service-account.json")
         self.firebase_web_file = os.path.join(self.data_dir, "firebase-web.json")
+        self.das_file = os.path.join(self.data_dir, "das-cloud.json")
         self.use_cases_dir = os.path.join(self.base_dir, "use-cases")
         self.root_env = os.path.join(self.data_dir, ".quadient_credentials.env")
         if not os.path.exists(self.root_env) and os.path.exists(os.path.join(self.base_dir, ".quadient_credentials.env")):
@@ -154,11 +155,95 @@ class EnvService:
 
         self._write_secret_json(self.firebase_key_file, key)
         self._write_secret_json(self.firebase_web_file, web)
-        # Running environments only see the new settings after their next activation
-        for env in self.list_environments():
-            if env.get("use_cases") and env.get("compose_file"):
-                self._write_use_cases_env(os.path.dirname(env["compose_file"]), env["use_cases"])
+        self._apply_use_case_settings("push-inbox")
         return True, f"Firebase configurado con el proyecto {key.get('project_id')}"
+
+    def get_das_status(self) -> Dict[str, Any]:
+        """Quadient Cloud settings for the Digital Advantage inbox; the API key is reported only as present or not."""
+        das = self._read_json(self.das_file) or {}
+        return {
+            "configured": bool(das.get("cloud_url") and das.get("app_id") and das.get("client_id") and das.get("api_key") and das.get("users")),
+            "cloud_url": das.get("cloud_url", ""),
+            "app_id": das.get("app_id", ""),
+            "client_id": das.get("client_id", ""),
+            "api_key": bool(das.get("api_key")),
+            "token_lifetime": das.get("token_lifetime", 1500),
+            "users": das.get("users", []),
+        }
+
+    def save_das_settings(self, data: Dict[str, Any]) -> Tuple[bool, str]:
+        """Validates and stores the Quadient Cloud application the DAS inbox signs in to.
+
+        An empty API key keeps the stored one; the other fields are always replaced."""
+        das = self._read_json(self.das_file) or {}
+
+        cloud_url = str(data.get("cloud_url") or "").strip().rstrip("/")
+        if not re.match(r"^https://[A-Za-z0-9.-]+(:\d+)?$", cloud_url):
+            return False, "La URL de Quadient Cloud debe tener el formato https://<empresa>.quadientcloud.eu"
+        app_id = str(data.get("app_id") or "").strip()
+        if not app_id.isdigit():
+            return False, "El Application ID debe ser numérico"
+        client_id = str(data.get("client_id") or "").strip()
+        if not client_id:
+            return False, "Falta el Client ID de la aplicación"
+        api_key = str(data.get("api_key") or "").strip() or das.get("api_key", "")
+        if not api_key:
+            return False, "Falta el API key de Integrated Server-Side Authentication"
+        try:
+            lifetime = int(data.get("token_lifetime") or 1500)
+        except (TypeError, ValueError):
+            lifetime = 0
+        if not 60 <= lifetime <= 86400:
+            return False, "La vigencia del token debe estar entre 60 y 86400 segundos"
+
+        # [{username, password, subject}]; the subject defaults to the username
+        users = []
+        raw_users = data.get("users") if isinstance(data.get("users"), list) else []
+        for raw in raw_users:
+            if not isinstance(raw, dict):
+                continue
+            username = str(raw.get("username") or "").strip()
+            password = str(raw.get("password") or "").strip()
+            subject = str(raw.get("subject") or "").strip()
+            if not (username or password or subject):
+                continue
+            if not username or not password:
+                return False, "Cada usuario necesita usuario y contraseña"
+            if any(u["username"] == username for u in users):
+                return False, f"El usuario '{username}' está repetido"
+            users.append({"username": username, "password": password, "subject": subject or username})
+        if not users:
+            return False, "Agrega al menos un usuario para la app"
+
+        self._write_secret_json(self.das_file, {
+            "cloud_url": cloud_url, "app_id": app_id, "client_id": client_id,
+            "api_key": api_key, "token_lifetime": lifetime, "users": users,
+        })
+        self._apply_use_case_settings("das-inbox")
+        return True, f"Quadient Cloud configurado ({cloud_url})"
+
+    def _apply_use_case_settings(self, case_id: str) -> None:
+        """Rewrites every environment's use-cases.env and recreates the running use-cases containers that host
+        case_id: the container reads its env_file only when it is created, so a restart would keep the old values."""
+        for env in self.list_environments():
+            if not (env.get("use_cases") and env.get("compose_file")):
+                continue
+            target_dir = os.path.dirname(env["compose_file"])
+            self._write_use_cases_env(target_dir, env["use_cases"])
+            if case_id not in env["use_cases"]:
+                continue
+            project_name = env["project_name"]
+            code, out, _ = DockerService._run_cmd(f"docker inspect --format='{{{{.State.Running}}}}' {shlex.quote(project_name + '-use-cases')}")
+            if code != 0 or out.strip() != "true":
+                continue
+            env_file = env.get("env_file", "")
+            env_flag = f"--env-file {shlex.quote(env_file)} " if env_file and os.path.exists(env_file) else ""
+            code, out, err = DockerService._run_cmd(
+                f"docker compose -f {shlex.quote(env['compose_file'])} -p {shlex.quote(project_name)} "
+                f"{env_flag}up -d --no-deps --force-recreate use-cases",
+                timeout=120, cwd=target_dir)
+            if code != 0:
+                print(f"[use-cases] No se pudo recrear {project_name}-use-cases: {err or out}")
 
     def get_use_case_catalog(self) -> List[Dict[str, Any]]:
         """Use cases bundled in use-cases/cases/<id>/case.json, in display order."""
@@ -226,10 +311,12 @@ class EnvService:
         return changed
 
     def _write_use_cases_env(self, target_dir: str, use_cases: List[str]) -> None:
-        """Writes use-cases.env; Firebase secrets travel here (never in the compose file) and only when the inbox is enabled."""
+        """Writes use-cases.env; Firebase and Quadient Cloud secrets travel here (never in the compose file), only for the cases that use them."""
         lines = ["# Generated by Studio Manager"]
         if "push-inbox" in use_cases:
             lines.extend(self._firebase_env_lines())
+        if "das-inbox" in use_cases:
+            lines.extend(self._das_env_lines())
         path = os.path.join(target_dir, "use-cases.env")
         with open(path, "w", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
@@ -250,6 +337,19 @@ class EnvService:
         if web.get("vapid_key"):
             lines.append("FIREBASE_VAPID_KEY=" + web["vapid_key"])
         return lines
+
+    def _das_env_lines(self) -> List[str]:
+        das = self._read_json(self.das_file) or {}
+        if not das:
+            return []
+        return [
+            "DAS_CLOUD_URL=" + das.get("cloud_url", ""),
+            "DAS_APP_ID=" + str(das.get("app_id", "")),
+            "DAS_CLIENT_ID=" + das.get("client_id", ""),
+            "DAS_API_KEY=" + das.get("api_key", ""),
+            "DAS_TOKEN_LIFETIME=" + str(das.get("token_lifetime", 1500)),
+            "DAS_USERS=" + base64.b64encode(json.dumps(das.get("users", [])).encode("utf-8")).decode("ascii"),
+        ]
 
     def get_progress(self, env_id: str) -> Optional[Dict[str, Any]]:
         with self._progress_lock:
@@ -759,6 +859,31 @@ class EnvService:
 
         self._save_environments(envs)
         return True, "Ambiente y configuración de servicios actualizados correctamente"
+
+    def build_icm_env_vars(self, env_id: str) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+        """ICM environment variables (manager/resources/ICMEnvVars.json) pointing at this
+        environment's Kafka broker, ready to import into ICM."""
+        env = self.get_environment(env_id)
+        if not env:
+            return False, "Ambiente no encontrado", None
+        if not env.get("enable_kafka"):
+            return False, "Este ambiente no tiene Kafka habilitado", None
+        template = os.path.join(self.base_dir, "manager", "resources", "ICMEnvVars.json")
+        with open(template, encoding="utf-8") as f:
+            data = json.load(f)
+        # ICM, Scaler and Kafka share the compose network: the container name and the internal
+        # PLAINTEXT listener (9092) resolve there, not the port published on the host
+        values = {"kafkaserver": {"String": f"{env['project_name']}-kafka"}, "kafkaport": {"Number": 9092}}
+
+        def fill(node: Dict[str, Any]) -> None:
+            for child in node.get("Children", []):
+                name = str(child.get("Name", "")).lower()
+                if name in values:
+                    child["Value"] = values[name]
+                fill(child)
+
+        fill(data.get("Root", {}))
+        return True, "", data
 
     def _scaler_volume_targets(self, target: Dict[str, Any]) -> Dict[str, Optional[str]]:
         """Volume name -> host folder it must be bound to (None = Docker-managed)."""

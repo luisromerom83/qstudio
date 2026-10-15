@@ -21,8 +21,13 @@ __pycache__/
 # Firebase Admin key for the push inbox (pasted in Settings)
 manager/data/firebase-service-account.json
 manager/data/firebase-web.json
+# Quadient Cloud settings for the DAS inbox (API key)
+manager/data/das-cloud.json
 inbox.env
 use-cases.env
 
 # Node
 node_modules/
+
+# Quadient Advantage Web SDK: proprietary, copied locally (see the README next to it)
+use-cases/cases/das-inbox/public/vendor/web-runtime.js
