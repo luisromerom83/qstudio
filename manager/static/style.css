@@ -181,3 +181,47 @@ dialog::backdrop {
   outline: 2px solid #C99A62;
   outline-offset: 2px;
 }
+
+/* Environment modal tabs */
+.env-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid #1e293b; /* slate-800 */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.env-tabs::-webkit-scrollbar {
+  display: none;
+}
+.env-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.75rem;
+  margin-bottom: -1px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: #94a3b8; /* slate-400 */
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.env-tab:hover {
+  color: #e2e8f0; /* slate-200 */
+}
+.env-tab[aria-selected="true"] {
+  color: #ffffff;
+  border-bottom-color: #C2410C;
+}
+.env-tab:focus-visible {
+  outline: 2px solid #C2410C;
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+/* Same height on every tab so the dialog doesn't jump while switching; long tabs scroll inside
+   and the Save button stays in view */
+.env-tab-panels {
+  height: min(30rem, calc(100vh - 16rem));
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}

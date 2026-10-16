@@ -3,20 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title data-i18n="kafka.pageTitle">Formularios a Kafka</title>
+  <title data-i18n="kafka.pageTitle">Entrega de Factura Digital con push notifications</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <!-- Logo and colors of this environment, from Studio Manager -->
+  <script src="/branding.js"></script>
 </head>
 <body>
   <div class="app-container">
     <!-- Encabezado -->
     <header class="app-header">
       <div class="brand">
-        <div class="brand-mark" aria-hidden="true">⚡</div>
+        <div class="brand-mark" aria-hidden="true" data-brand-logo>⚡</div>
         <div class="brand-headings">
-          <h1 data-i18n="kafka.pageTitle">Formularios a Kafka</h1>
+          <h1 data-i18n="kafka.pageTitle">Entrega de Factura Digital con push notifications</h1>
           <p class="subtitle" data-i18n="kafka.header.subtitle">Captura de datos de negocio y publicación del mensaje con la notificación push en Apache Kafka</p>
         </div>
       </div>
@@ -77,7 +79,8 @@
                 </div>
               </button>
 
-              <button type="button" class="usecase-tab-card" id="btn-usecase-2" onclick="switchUseCase(2)">
+              <!-- Oculto por ahora: la demo solo usa el formulario de factura -->
+              <button type="button" class="usecase-tab-card" id="btn-usecase-2" onclick="switchUseCase(2)" hidden>
                 <div class="usecase-tab-icon">📞</div>
                 <div class="usecase-tab-info">
                   <div class="usecase-tab-badge" data-i18n="kafka.form2.badge">Formulario 2</div>
@@ -303,12 +306,13 @@
             <div class="step-header">
               <div class="step-badge">C</div>
               <div>
-                <h3 class="step-title" data-i18n="kafka.integration.title">Destino de integración</h3>
-                <p class="step-desc" data-i18n-html="kafka.integration.desc">Selecciona la plataforma de destino. El <code>user_id</code> se completa con el valor por defecto de cada opción y puedes cambiarlo.</p>
+                <h3 class="step-title" data-i18n="kafka.integration.recipientTitle">Usuario destinatario</h3>
+                <p class="step-desc" data-i18n-html="kafka.integration.desc" hidden>Selecciona la plataforma de destino. El <code>user_id</code> se completa con el valor por defecto de cada opción y puedes cambiarlo.</p>
               </div>
             </div>
 
-            <div class="integration-cards-grid" style="margin-top: 1.1rem;">
+            <!-- Oculto por ahora: todo se envía a Quadient Inspire DAS -->
+            <div class="integration-cards-grid" style="margin-top: 1.1rem;" hidden>
               <!-- Opción 1: 3rd Party -->
               <div class="integration-card active" id="card-int-3rd" onclick="selectIntegration('3rd Party')">
                 <div class="int-card-radio-mark">
@@ -365,7 +369,7 @@
             </div>
           </div>
 
-          <input type="hidden" id="integration" name="integration" value="3rd Party">
+          <input type="hidden" id="integration" name="integration" value="Quadient Inspire DAS">
 
           <!-- Alerta rápida -->
           <div id="quick-preview-alert" class="quick-alert" style="display: none;">
@@ -421,7 +425,7 @@
             <div class="form-group">
               <label for="port" data-i18n="kafka.config.portLabel">Puerto</label>
               <input type="number" id="port" name="port" placeholder="9092">
-              <span class="hint" data-i18n="kafka.config.portHint">Solo se usa si indicas un host</span>
+              <span class="hint" data-i18n="kafka.config.portHint">Puerto del broker de Kafka</span>
             </div>
             <div class="form-group">
               <label for="topic"><span data-i18n="kafka.config.topicLabel">Tópico de destino</span> <span class="required">*</span></label>
@@ -512,7 +516,7 @@
     </form>
 
     <footer class="app-footer">
-      <span><span data-i18n="kafka.pageTitle">Formularios a Kafka</span> &bull; <span data-i18n="kafka.footer.demo">Caso de uso demo</span></span>
+      <span><span data-i18n="kafka.pageTitle">Entrega de Factura Digital con push notifications</span> &bull; <span data-i18n="kafka.footer.demo">Caso de uso demo</span></span>
       <span>API: <code>POST /kafka-csv/api/send</code></span>
     </footer>
   </div>

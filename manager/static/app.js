@@ -7,7 +7,8 @@ let currentFilter = "all";
 let activeContainerForLogs = null;
 let logPollInterval = null;
 let verticals = [];             // from /api/config
-let useCaseCatalog = [];        // from /api/config: bundled use cases (use-cases/cases/*/case.json)
+let useCaseCatalog = [];        // from /api/config: bundled use cases (use-cases/cases/*/case.json) plus custom demos
+let dasDemos = [];              // from /api/config: custom demos (anonymous Quadient Cloud documents)
 const busyEnvs = new Map();     // envId -> {kind: "activate"|"stop", label, step, total}
 let lastEnvSnapshot = "";
 
@@ -60,7 +61,9 @@ window.addEventListener("studio:languagechange", () => {
   loadVolumes();
   if (!document.getElementById("view-storage")?.classList.contains("hidden")) loadSnapshots();
   ["new", "edit"].forEach(prefix => {
-    if (document.getElementById(`${prefix}-env-modal`)?.open) renderUseCaseCheckboxes(prefix, selectedUseCases(prefix));
+    if (!document.getElementById(`${prefix}-env-modal`)?.open) return;
+    renderUseCaseCheckboxes(prefix, selectedUseCases(prefix));
+    renderBrandingFields(prefix);
   });
   if (document.getElementById("logs-modal")?.open && activeContainerForLogs) renderLogsSubtitle(activeContainerForLogs);
   if (document.getElementById("volume-locations-modal")?.open && volumeModalEnvId) openVolumeLocationModal(volumeModalEnvId);
@@ -132,6 +135,9 @@ async function checkConfigAndOnboarding() {
     document.getElementById("setting-lic-server").value = creds.license_server || "";
     renderFirebaseStatus(data.firebase);
     fillDasForm(data.das);
+    dasDemos = data.das_demos || [];
+    renderDemosList();
+    resetDemoForm();
 
     if (data.needs_onboarding) {
       const modal = document.getElementById("onboarding-modal");
@@ -241,6 +247,121 @@ function renderFirebaseStatus(fb) {
 }
 
 // ------------------------------------------------------------------------------
+// Custom demos: one anonymous Quadient Cloud document each, published as its own use case
+// ------------------------------------------------------------------------------
+function renderDemosList() {
+  const list = document.getElementById("demos-list");
+  if (!list) return;
+  list.classList.toggle("hidden", !dasDemos.length);
+  document.getElementById("demos-empty").classList.toggle("hidden", dasDemos.length > 0);
+  list.innerHTML = dasDemos.map(d => `
+    <div class="flex items-start justify-between gap-3 px-3 py-2.5">
+      <div class="min-w-0">
+        <p class="text-xs font-semibold text-white truncate">${escapeHtml(d.name)} <code class="text-[10px] text-slate-500 font-normal">/${escapeHtml(d.id)}/</code></p>
+        <p class="text-[10px] font-mono text-slate-500 truncate">App ${escapeHtml(d.app_id)} · Doc ${escapeHtml(d.document_id)}</p>
+        ${d.description ? `<p class="text-[11px] text-slate-400 truncate">${escapeHtml(d.description)}</p>` : ""}
+      </div>
+      <div class="flex items-center gap-1 flex-shrink-0">
+        ${iconButton("pencil", t("app.demos.edit"), `editDemo('${escapeHtml(d.id)}')`)}
+        ${iconButton("trash-2", t("app.demos.delete"), `deleteDemo('${escapeHtml(d.id)}')`, { danger: true })}
+      </div>
+    </div>`).join("");
+  lucide.createIcons();
+}
+
+function fillDemoForm(demo) {
+  const set = (id, value) => { document.getElementById(id).value = value || ""; };
+  set("setting-demo-id", demo.id);
+  set("setting-demo-name", demo.name);
+  set("setting-demo-description", demo.description);
+  // A new demo starts from the Quadient Cloud URL of the Digital Advantage Inbox
+  set("setting-demo-url", demo.cloud_url || (lastDasStatus && lastDasStatus.cloud_url));
+  set("setting-demo-app-id", demo.app_id);
+  set("setting-demo-client-id", demo.client_id);
+  set("setting-demo-document-id", demo.document_id);
+  const editing = Boolean(demo.id);
+  const title = document.getElementById("demo-form-title");
+  title.dataset.i18n = editing ? "html.demos.editTitle" : "html.demos.newTitle";
+  title.textContent = t(title.dataset.i18n);
+  const submit = document.getElementById("demo-submit-label");
+  submit.dataset.i18n = editing ? "html.demos.save" : "html.demos.add";
+  submit.textContent = t(submit.dataset.i18n);
+  document.getElementById("demo-cancel").classList.toggle("hidden", !editing);
+}
+
+function resetDemoForm() {
+  if (document.getElementById("demo-form")) fillDemoForm({});
+}
+
+function editDemo(id) {
+  const demo = dasDemos.find(d => d.id === id);
+  if (!demo) return;
+  fillDemoForm(demo);
+  document.getElementById("demo-form").scrollIntoView({ behavior: "smooth", block: "center" });
+  document.getElementById("setting-demo-name").focus();
+}
+
+function applyDemosResponse(data) {
+  dasDemos = data.das_demos || dasDemos;
+  if (data.use_cases) useCaseCatalog = data.use_cases;
+  renderDemosList();
+}
+
+async function handleSaveDemo(e) {
+  e.preventDefault();
+  const value = id => document.getElementById(id).value.trim();
+  const payload = {
+    id: value("setting-demo-id"),
+    name: value("setting-demo-name"),
+    description: value("setting-demo-description"),
+    cloud_url: value("setting-demo-url"),
+    app_id: value("setting-demo-app-id"),
+    client_id: value("setting-demo-client-id"),
+    document_id: value("setting-demo-document-id")
+  };
+  try {
+    const res = await fetch("/api/config/das-demos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    showAlert(data.success ? "success" : "error", data.message);
+    if (data.success) {
+      applyDemosResponse(data);
+      resetDemoForm();
+    }
+  } catch (err) {
+    showAlert("error", t("app.common.networkError", { error: err.message }));
+  }
+}
+
+async function deleteDemo(id) {
+  const demo = dasDemos.find(d => d.id === id);
+  if (!demo) return;
+  const usedBy = allEnvironments.filter(env => (env.use_cases || []).includes(id)).map(env => env.name);
+  const { action } = await openActionDialog({
+    title: t("app.demos.deleteTitle"),
+    message: `<p>${t("app.demos.deleteBody", { name: escapeHtml(demo.name) })}</p>` +
+      (usedBy.length ? `<p class="text-amber-300">${t("app.demos.deleteUsedBy", { envs: escapeHtml(usedBy.join(", ")) })}</p>` : ""),
+    actions: [{ id: "delete", label: t("app.demos.delete"), style: "danger" }]
+  });
+  if (action !== "delete") return;
+  try {
+    const res = await fetch(`/api/config/das-demos/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const data = await res.json();
+    showAlert(data.success ? "success" : "error", data.message);
+    if (data.success) {
+      applyDemosResponse(data);
+      if (document.getElementById("setting-demo-id").value === id) resetDemoForm();
+      if (usedBy.length) loadEnvironments();
+    }
+  } catch (err) {
+    showAlert("error", t("app.common.networkError", { error: err.message }));
+  }
+}
+
+// ------------------------------------------------------------------------------
 // Use cases (one checkbox per bundled case)
 // ------------------------------------------------------------------------------
 const USE_CASE_REQUIREMENTS = {
@@ -256,7 +377,7 @@ function renderUseCaseCheckboxes(prefix, selected) {
     container.innerHTML = `<p class="text-[11px] text-slate-500">${t("app.useCases.noneAvailable")}</p>`;
     return;
   }
-  container.innerHTML = useCaseCatalog.map(c => {
+  const checkbox = c => {
     const id = `${prefix}-env-uc-${c.id}`;
     const reqs = (c.requires || []).map(r => USE_CASE_REQUIREMENTS[r]).filter(Boolean).map(key => t(key)).join(" ");
     return `
@@ -269,7 +390,15 @@ function renderUseCaseCheckboxes(prefix, selected) {
           <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">${escapeHtml(useCaseText(c, "description"))}${reqs ? ` <span class="text-slate-500">${escapeHtml(reqs)}</span>` : ""}</span>
         </label>
       </div>`;
-  }).join("");
+  };
+  const bundled = useCaseCatalog.filter(c => !c.custom);
+  const custom = useCaseCatalog.filter(c => c.custom);
+  container.innerHTML = bundled.map(checkbox).join("") + (custom.length ? `
+    <p class="col-span-full pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+      <i data-lucide="file-text" class="w-3.5 h-3.5"></i>${t("html.demos.title")}
+    </p>
+    ${custom.map(checkbox).join("")}` : "");
+  lucide.createIcons();
 }
 
 function handleUseCaseToggle(prefix, checkbox) {
@@ -452,7 +581,7 @@ async function loadEnvironments() {
     populateServicesSelect();
 
     // Skip re-rendering when nothing changed (auto-refresh runs every few seconds)
-    const snapshot = JSON.stringify(allEnvironments.map(e => [e.id, e.name, e.status, e.version, e.description, e.vertical_id, e.demo_mode, e.storage_path, e.ports, e.enable_interactive, e.enable_scaler]));
+    const snapshot = JSON.stringify(allEnvironments.map(e => [e.id, e.name, e.status, e.version, e.description, e.vertical_id, e.demo_mode, e.storage_path, e.ports, e.enable_interactive, e.enable_scaler, e.branding]));
     if (snapshot !== lastEnvSnapshot) {
       lastEnvSnapshot = snapshot;
       renderFilterPills();
@@ -495,6 +624,15 @@ function filterVertical(catId) {
   currentFilter = catId;
   renderFilterPills();
   renderEnvironments();
+}
+
+// Customer logo in the card's corner; white chip so dark logos stay visible on the dark card
+function envLogo(env) {
+  const b = env.branding;
+  if (!b || !b.has_logo) return "";
+  return `<span class="inline-flex items-center justify-center bg-white rounded-md px-1.5 py-1 shadow-sm">
+    <img src="/api/environments/${encodeURIComponent(env.id)}/logo?v=${b.logo_rev}" alt="${escapeHtml(t("app.branding.logoAlt", { name: env.name }))}"
+      class="h-7 w-auto max-w-[96px] object-contain"></span>`;
 }
 
 function statusBadge(env, busy) {
@@ -715,7 +853,10 @@ function renderEnvironments() {
             </div>
             <h3 class="mt-1.5 text-base font-semibold text-white line-clamp-2 break-words" title="${escapeHtml(env.name)}">${escapeHtml(env.name)}</h3>
           </div>
-          ${statusBadge(env, busy)}
+          <div class="flex flex-col items-end gap-2 shrink-0">
+            ${envLogo(env)}
+            ${statusBadge(env, busy)}
+          </div>
         </div>
 
         <p class="text-sm text-slate-400 line-clamp-2">${escapeHtml(env.description || t("app.catalog.noNotes"))}</p>
@@ -919,10 +1060,12 @@ function openNewEnvModal() {
   const chkKafka = document.getElementById("new-env-enable-kafka");
   if (chkKafka) chkKafka.checked = false;
   renderUseCaseCheckboxes("new", []);
+  resetBrandingDraft("new", null);
   const chkFtp = document.getElementById("new-env-enable-ftp");
   if (chkFtp) chkFtp.checked = false;
   toggleScalerSharedFolder();
   toggleNewEnvInteractiveGroup();
+  switchEnvTab("new", "general");
   modal.showModal();
   lucide.createIcons();
 }
@@ -974,7 +1117,8 @@ async function handleCreateEnvSubmit(e) {
     scaler_jobs_dir: scalerJobsDir,
     enable_kafka: enableKafka,
     use_cases: selectedUseCases("new"),
-    enable_ftp: enableFtp
+    enable_ftp: enableFtp,
+    branding: brandingPayload("new")
   };
   if (port) {
     payload.interactive_port = parseInt(port);
@@ -1000,6 +1144,192 @@ async function handleCreateEnvSubmit(e) {
   } catch (err) {
     showAlert("error", t("app.common.error", { error: err.message }));
   }
+}
+
+// ------------------------------------------------------------------------------
+// Environment modal tabs (General, Inspire, Integrations, Use cases, Look & feel)
+// ------------------------------------------------------------------------------
+function switchEnvTab(prefix, tab, focus = false) {
+  const modal = document.getElementById(`${prefix}-env-modal`);
+  if (!modal) return;
+  modal.querySelectorAll("[data-env-tab]").forEach(btn => {
+    const active = btn.dataset.envTab === tab;
+    btn.setAttribute("aria-selected", String(active));
+    btn.tabIndex = active ? 0 : -1;
+    if (active && focus) btn.focus();
+  });
+  modal.querySelectorAll("[data-env-tab-panel]").forEach(panel => {
+    panel.classList.toggle("hidden", panel.dataset.envTabPanel !== tab);
+  });
+}
+
+function handleEnvTabKey(prefix, e) {
+  const tabs = Array.from(e.currentTarget.querySelectorAll("[data-env-tab]"));
+  const current = tabs.findIndex(btn => btn.getAttribute("aria-selected") === "true");
+  const next = { ArrowRight: current + 1, ArrowLeft: current - 1, Home: 0, End: tabs.length - 1 }[e.key];
+  if (next === undefined) return;
+  e.preventDefault();
+  switchEnvTab(prefix, tabs[(next + tabs.length) % tabs.length].dataset.envTab, true);
+}
+
+// A required field left empty on a hidden tab would block the submit silently: bring its tab forward
+document.addEventListener("invalid", (e) => {
+  const panel = e.target.closest && e.target.closest("[data-env-tab-panel]");
+  const modal = panel && panel.closest("dialog");
+  if (panel && modal && panel.classList.contains("hidden")) {
+    switchEnvTab(modal.id.replace(/-env-modal$/, ""), panel.dataset.envTabPanel);
+  }
+}, true);
+
+// ------------------------------------------------------------------------------
+// Use case branding: logo + primary, secondary and tertiary colors per environment
+// ------------------------------------------------------------------------------
+const BRAND_COLOR_KEYS = ["primary", "secondary", "tertiary"];
+const BRAND_DEFAULT_COLORS = { primary: "#2f5d8a", secondary: "#c2410c", tertiary: "#e8eef5" };
+// The logo travels to the use-cases container as an environment variable (Linux caps each at 128 KiB)
+const MAX_LOGO_DATA_URL = 120000;
+const MAX_LOGO_SIDE = 512;
+
+// prefix -> { logo: undefined (keep stored) | "" (remove) | data URL, preview, customColors, colors }
+const brandingDraft = {};
+
+function resetBrandingDraft(prefix, env) {
+  const b = (env && env.branding) || {};
+  brandingDraft[prefix] = {
+    logo: undefined,
+    preview: b.has_logo ? `/api/environments/${encodeURIComponent(env.id)}/logo?v=${b.logo_rev}` : "",
+    customColors: Boolean(b.colors),
+    colors: { ...BRAND_DEFAULT_COLORS, ...(b.colors || {}) }
+  };
+  renderBrandingFields(prefix);
+}
+
+function renderBrandingFields(prefix) {
+  const box = document.getElementById(`${prefix}-env-branding`);
+  const draft = brandingDraft[prefix];
+  if (!box || !draft) return;
+  const colorField = (key) => `
+    <label class="flex items-center gap-2 bg-slate-900/80 border border-slate-800 rounded-lg px-2.5 py-2 ${draft.customColors ? "" : "opacity-40 pointer-events-none"}">
+      <input type="color" value="${draft.colors[key]}" oninput="handleBrandColor('${prefix}', '${key}', this.value)" ${draft.customColors ? "" : "disabled"}
+        class="w-7 h-7 shrink-0 rounded border border-slate-700 bg-transparent cursor-pointer" aria-label="${escapeHtml(t(`app.branding.${key}`))}">
+      <span class="min-w-0">
+        <span class="block text-xs font-semibold text-white">${escapeHtml(t(`app.branding.${key}`))}</span>
+        <span class="block text-[10px] text-slate-500 leading-snug">${escapeHtml(t(`app.branding.${key}Hint`))}</span>
+        <span id="${prefix}-brand-${key}-hex" class="block text-[10px] font-mono text-slate-400 uppercase">${draft.colors[key]}</span>
+      </span>
+    </label>`;
+  box.innerHTML = `
+    <div class="space-y-3">
+      <p class="text-[11px] text-slate-400 leading-snug">${escapeHtml(t("app.branding.hint"))}</p>
+      <div class="flex items-center gap-3 bg-slate-900/80 border border-slate-800 rounded-xl p-3">
+        <div class="w-24 h-12 shrink-0 rounded-md flex items-center justify-center ${draft.preview ? "bg-white" : "border border-dashed border-slate-700"}">
+          ${draft.preview
+            ? `<img src="${escapeHtml(draft.preview)}" alt="${escapeHtml(t("app.branding.logoPreview"))}" class="max-h-10 max-w-[88px] object-contain">`
+            : `<i data-lucide="image" class="w-5 h-5 text-slate-600"></i>`}
+        </div>
+        <div class="min-w-0 space-y-1.5">
+          <div class="flex flex-wrap gap-2">
+            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border border-slate-700 text-slate-100 hover:bg-slate-800 cursor-pointer transition">
+              <i data-lucide="upload" class="w-3.5 h-3.5"></i>${escapeHtml(t(draft.preview ? "app.branding.replaceLogo" : "app.branding.uploadLogo"))}
+              <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif" class="sr-only" onchange="handleBrandLogoFile('${prefix}', this)">
+            </label>
+            ${draft.preview ? `<button type="button" onclick="removeBrandLogo('${prefix}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-slate-400 hover:text-red-300 hover:bg-slate-800 transition">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>${escapeHtml(t("app.branding.removeLogo"))}</button>` : ""}
+          </div>
+          <p class="text-[10px] text-slate-500 leading-snug">${escapeHtml(t("app.branding.logoHint"))}</p>
+        </div>
+      </div>
+      <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+        <input type="checkbox" ${draft.customColors ? "checked" : ""} onchange="toggleBrandColors('${prefix}', this.checked)"
+          class="w-4 h-4 rounded border-slate-700 text-brand-600 bg-slate-950 focus:ring-brand-500 cursor-pointer">
+        ${escapeHtml(t("app.branding.customColors"))}
+      </label>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">${BRAND_COLOR_KEYS.map(colorField).join("")}</div>
+    </div>`;
+  lucide.createIcons();
+}
+
+function toggleBrandColors(prefix, enabled) {
+  brandingDraft[prefix].customColors = enabled;
+  renderBrandingFields(prefix);
+}
+
+function handleBrandColor(prefix, key, value) {
+  brandingDraft[prefix].colors[key] = value;
+  const hex = document.getElementById(`${prefix}-brand-${key}-hex`);
+  if (hex) hex.textContent = value;
+}
+
+function removeBrandLogo(prefix) {
+  Object.assign(brandingDraft[prefix], { logo: "", preview: "" });
+  renderBrandingFields(prefix);
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("image"));
+    img.src = src;
+  });
+}
+
+// SVGs are kept as they are; bitmaps are scaled down (up to MAX_LOGO_SIDE) until they fit the size limit
+async function normalizeLogo(file) {
+  const dataUrl = await readFileAsDataUrl(file);
+  if (file.type === "image/svg+xml") return dataUrl.length <= MAX_LOGO_DATA_URL ? dataUrl : null;
+  const img = await loadImage(dataUrl);
+  let scale = Math.min(1, MAX_LOGO_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+  for (let i = 0; i < 6; i++, scale *= 0.75) {
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+    for (const [type, quality] of [["image/png"], ["image/webp", 0.9]]) {
+      const out = canvas.toDataURL(type, quality);
+      if (out.startsWith(`data:${type}`) && out.length <= MAX_LOGO_DATA_URL) return out;
+    }
+  }
+  return null;
+}
+
+async function handleBrandLogoFile(prefix, input) {
+  const file = input.files && input.files[0];
+  input.value = "";
+  if (!file) return;
+  if (!/^image\/(png|jpeg|svg\+xml|webp|gif)$/.test(file.type)) {
+    showAlert("error", t("app.branding.invalidLogo"));
+    return;
+  }
+  try {
+    const logo = await normalizeLogo(file);
+    if (!logo) {
+      showAlert("error", t("app.branding.logoTooLarge"));
+      return;
+    }
+    Object.assign(brandingDraft[prefix], { logo, preview: logo });
+    renderBrandingFields(prefix);
+  } catch (err) {
+    showAlert("error", t("app.branding.invalidLogo"));
+  }
+}
+
+// The logo key is left out when unchanged so the stored one is kept
+function brandingPayload(prefix) {
+  const draft = brandingDraft[prefix];
+  if (!draft) return undefined;
+  const payload = { colors: draft.customColors ? { ...draft.colors } : null };
+  if (draft.logo !== undefined) payload.logo = draft.logo;
+  return payload;
 }
 
 // ------------------------------------------------------------------------------
@@ -1056,6 +1386,7 @@ function openEditEnvModal(envId) {
   renderIcmEnvVarsBox(env);
 
   renderUseCaseCheckboxes("edit", env.use_cases || []);
+  resetBrandingDraft("edit", env);
 
   const chkFtp = document.getElementById("edit-env-enable-ftp");
   if (chkFtp) chkFtp.checked = Boolean(env.enable_ftp);
@@ -1065,6 +1396,7 @@ function openEditEnvModal(envId) {
 
   toggleEditScalerGroup();
   toggleEditInteractiveGroup();
+  switchEnvTab("edit", "general");
   document.getElementById("edit-env-modal").showModal();
   lucide.createIcons();
 }
@@ -1124,7 +1456,8 @@ async function handleEditEnvSubmit(e) {
     enable_kafka: enableKafka,
     use_cases: selectedUseCases("edit"),
     enable_ftp: enableFtp,
-    demo_mode: demoMode
+    demo_mode: demoMode,
+    branding: brandingPayload("edit")
   };
 
   // Close the modal window immediately upon clicking save
@@ -1683,7 +2016,7 @@ function renderServicesView() {
 
   // Tier frame: BACK-END, FRONT-END and customer systems are drawn as labelled layers
   const tierFrame = ({ title, icon, subtitle, body, extraAttrs = "" }) => `
-    <section class="tier-frame rounded-2xl border border-slate-700/80 bg-slate-950/40 p-4 sm:p-5 space-y-4 h-full flex flex-col" ${extraAttrs}>
+    <section class="tier-frame rounded-2xl border-2 border-slate-500/70 bg-slate-950/40 p-4 sm:p-5 space-y-4 h-full flex flex-col" ${extraAttrs}>
       <header class="flex flex-wrap items-center justify-between gap-2">
         <div class="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-slate-300">
           <i data-lucide="${icon}" class="w-4 h-4 text-slate-400"></i>
@@ -1786,7 +2119,7 @@ function renderServicesView() {
 
   // ── CLOUD: Digital Services between the Digital Advantage Inbox tile and Scaler ──
   const dsCloudUrl = (lastDasStatus && lastDasStatus.cloud_url) || "";
-  const dsUrl = dsCloudUrl ? `${dsCloudUrl}/digitalservices` : "";
+  const dsUrl = dsCloudUrl ? `${dsCloudUrl}/digitalservices/` : "";
   const dsColStart = ["", "md:col-start-2", "md:col-start-3"][Math.min(dasIndex, 2)] || "";
   const digitalServicesSection = hasDigitalServices ? `
     <div class="grid grid-cols-1 ${useCaseCols} gap-4">

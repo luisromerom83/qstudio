@@ -2,7 +2,60 @@
   --das-bg: #f4f6fa;
   --das-surface: #ffffff;
   --das-border: #e3e7ef;
-  --das-brand: #0d6efd;
+  /* /branding.js sets the environment's colors (Studio Manager › Look & feel):
+     primary = actions, secondary = header and icons, tertiary = soft backgrounds */
+  --das-brand: var(--brand-primary, #0d6efd);
+  --das-on-brand: var(--brand-primary-contrast, #fff);
+  --das-accent: var(--brand-secondary, var(--das-brand));
+  --das-on-accent: var(--brand-secondary-contrast, #fff);
+  --das-tint: var(--brand-tertiary-soft, rgba(13, 110, 253, 0.1));
+}
+
+/* Bootstrap keeps its own blue unless the environment defines colors */
+.has-brand-colors {
+  --das-bg: var(--brand-tertiary-soft);
+  --bs-primary: var(--das-brand);
+  --bs-link-color: var(--das-accent);
+  --bs-link-hover-color: var(--das-accent);
+}
+
+.has-brand-colors .btn-primary {
+  --bs-btn-color: var(--das-on-brand);
+  --bs-btn-bg: var(--das-brand);
+  --bs-btn-border-color: var(--das-brand);
+  --bs-btn-hover-color: var(--das-on-brand);
+  --bs-btn-hover-bg: var(--brand-primary-hover);
+  --bs-btn-hover-border-color: var(--brand-primary-hover);
+  --bs-btn-active-color: var(--das-on-brand);
+  --bs-btn-active-bg: var(--brand-primary-dark);
+  --bs-btn-active-border-color: var(--brand-primary-dark);
+  --bs-btn-disabled-color: var(--das-on-brand);
+  --bs-btn-disabled-bg: var(--das-brand);
+  --bs-btn-disabled-border-color: var(--das-brand);
+}
+
+.has-brand-colors .btn-outline-primary {
+  --bs-btn-color: var(--das-brand);
+  --bs-btn-border-color: var(--das-brand);
+  --bs-btn-hover-color: var(--das-on-brand);
+  --bs-btn-hover-bg: var(--das-brand);
+  --bs-btn-hover-border-color: var(--das-brand);
+  --bs-btn-active-color: var(--das-on-brand);
+  --bs-btn-active-bg: var(--brand-primary-dark);
+  --bs-btn-active-border-color: var(--brand-primary-dark);
+}
+
+.has-brand-colors .text-primary {
+  color: var(--das-brand) !important;
+}
+
+.has-brand-colors .form-control:focus {
+  border-color: var(--brand-tertiary-border);
+  box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--das-brand) 25%, transparent);
+}
+
+.has-brand-colors .navbar-app {
+  border-bottom: 3px solid var(--das-accent);
 }
 
 body {
@@ -23,8 +76,8 @@ body {
   width: 2rem;
   height: 2rem;
   border-radius: 0.6rem;
-  background: var(--das-brand);
-  color: #fff;
+  background: var(--das-accent);
+  color: var(--das-on-accent);
 }
 
 .brand-mark-lg {
@@ -32,6 +85,25 @@ body {
   height: 3rem;
   font-size: 1.4rem;
   border-radius: 0.9rem;
+}
+
+/* Customer logo (set by /branding.js) in place of the icon */
+.brand-mark.brand-logo-slot {
+  width: auto;
+  background: none;
+  border-radius: 0;
+}
+
+.brand-mark .brand-logo {
+  display: block;
+  height: 2rem;
+  max-width: 160px;
+  object-fit: contain;
+}
+
+.brand-mark-lg .brand-logo {
+  height: 3.5rem;
+  max-width: 240px;
 }
 
 .narrow {
@@ -58,8 +130,8 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(13, 110, 253, 0.1);
-  color: var(--das-brand);
+  background: var(--das-tint);
+  color: var(--das-accent);
 }
 
 .doc-item .doc-name {

@@ -471,6 +471,63 @@
           </div>
         </form>
       </div>
+
+      <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="file-text" class="w-5 h-5 text-sky-400"></i>
+            <span data-i18n="html.demos.title">Demos personalizadas</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-1" data-i18n="html.demos.subtitle">Cada demo abre un documento de una aplicación de Quadient Cloud con acceso anónimo, sin login. Aparece como un caso de uso más al crear o editar un ambiente.</p>
+        </div>
+
+        <div>
+          <div id="demos-list" class="rounded-lg border border-slate-700 divide-y divide-slate-800 bg-slate-950 overflow-hidden"></div>
+          <p id="demos-empty" class="hidden rounded-lg border border-dashed border-slate-700 px-3 py-3 text-[11px] text-slate-500" data-i18n="html.demos.empty">Todavía no hay demos personalizadas.</p>
+        </div>
+
+        <form id="demo-form" onsubmit="handleSaveDemo(event)" class="space-y-4 pt-4 border-t border-slate-800">
+          <input type="hidden" id="setting-demo-id">
+          <h3 id="demo-form-title" class="text-sm font-semibold text-white" data-i18n="html.demos.newTitle">Nueva demo</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.demos.name">Nombre</label>
+              <input type="text" id="setting-demo-name" maxlength="80" placeholder="Póliza de auto" data-i18n-attr="placeholder:html.demos.namePh" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.demos.description">Descripción (opcional)</label>
+              <input type="text" id="setting-demo-description" maxlength="200" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-500">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.das.cloudUrl">URL de Quadient Cloud</label>
+            <input type="url" id="setting-demo-url" spellcheck="false" placeholder="https://empresa.quadientcloud.eu" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Application ID</label>
+              <input type="text" id="setting-demo-app-id" inputmode="numeric" spellcheck="false" placeholder="123456789" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Client ID</label>
+              <input type="text" id="setting-demo-client-id" spellcheck="false" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Document ID</label>
+              <input type="text" id="setting-demo-document-id" spellcheck="false" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
+            </div>
+          </div>
+          <span class="block text-[10px] leading-snug text-slate-500 -mt-2" data-i18n-html="html.demos.hint">La aplicación debe tener un proveedor <strong>Anonymous Access</strong> (Application Settings &gt; Authentication). El Client ID es el Authentication Client ID de esa pantalla; no es una contraseña. Al guardar, los ambientes en ejecución con esta demo la reinician con la nueva configuración.</span>
+          <div class="pt-4 flex items-center justify-end gap-2 border-t border-slate-800">
+            <button type="button" id="demo-cancel" onclick="resetDemoForm()" class="hidden px-4 py-2 text-xs font-semibold rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500">
+              <span data-i18n="html.demos.cancel">Cancelar</span>
+            </button>
+            <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-xs font-semibold rounded-lg text-white shadow-lg">
+              <span id="demo-submit-label" data-i18n="html.demos.add">Agregar demo</span>
+            </button>
+          </div>
+        </form>
+      </div>
     </section>
 
   </main>
@@ -523,7 +580,7 @@
   <!-- ========================================================================= -->
   <!-- MODAL: Nueva Demo / Ambiente                                             -->
   <!-- ========================================================================= -->
-  <dialog id="new-env-modal" class="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl shadow-2xl p-0 w-full max-w-lg backdrop:bg-black/70 backdrop:backdrop-blur-sm">
+  <dialog id="new-env-modal" class="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl shadow-2xl p-0 w-full max-w-2xl backdrop:bg-black/70 backdrop:backdrop-blur-sm">
     <div class="p-6 space-y-4">
       <div class="flex items-center justify-between">
         <h2 class="text-base font-bold text-white flex items-center gap-2">
@@ -534,6 +591,26 @@
       </div>
 
       <form id="new-env-form" onsubmit="handleCreateEnvSubmit(event)" class="space-y-4">
+        <div role="tablist" aria-label="Secciones" data-i18n-attr="aria-label:html.envTabs.aria" class="env-tabs" onkeydown="handleEnvTabKey('new', event)">
+          <button type="button" role="tab" id="new-env-tab-general" aria-controls="new-env-panel-general" data-env-tab="general" aria-selected="true" tabindex="0" onclick="switchEnvTab('new', 'general')" class="env-tab">
+            <i data-lucide="file-text" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.general">General</span>
+          </button>
+          <button type="button" role="tab" id="new-env-tab-platform" aria-controls="new-env-panel-platform" data-env-tab="platform" aria-selected="false" tabindex="-1" onclick="switchEnvTab('new', 'platform')" class="env-tab">
+            <i data-lucide="layers" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.platform">Inspire</span>
+          </button>
+          <button type="button" role="tab" id="new-env-tab-integrations" aria-controls="new-env-panel-integrations" data-env-tab="integrations" aria-selected="false" tabindex="-1" onclick="switchEnvTab('new', 'integrations')" class="env-tab">
+            <i data-lucide="plug" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.integrations">Integraciones</span>
+          </button>
+          <button type="button" role="tab" id="new-env-tab-usecases" aria-controls="new-env-panel-usecases" data-env-tab="usecases" aria-selected="false" tabindex="-1" onclick="switchEnvTab('new', 'usecases')" class="env-tab">
+            <i data-lucide="app-window" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.usecases">Casos de uso</span>
+          </button>
+          <button type="button" role="tab" id="new-env-tab-branding" aria-controls="new-env-panel-branding" data-env-tab="branding" aria-selected="false" tabindex="-1" onclick="switchEnvTab('new', 'branding')" class="env-tab">
+            <i data-lucide="palette" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.branding">Look & feel</span>
+          </button>
+        </div>
+
+        <div class="env-tab-panels">
+        <div role="tabpanel" id="new-env-panel-general" aria-labelledby="new-env-tab-general" data-env-tab-panel="general" class="space-y-4">
         <div>
           <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.newEnv.vertical">Vertical de Industria</label>
           <select id="new-env-vertical" onchange="handleVerticalChange()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
@@ -582,12 +659,8 @@
             Linux: <code>/home/usuario/demos</code> | Windows: <code>C:\Inspire\Demos</code> o <code>C:/Inspire/Demos</code>. Si defines una ruta, los datos de Postgres, ICM y Filestore se guardarán en subcarpetas dentro de este folder físico. Si lo dejas vacío, Docker usará su volumen estándar (<code>/var/lib/docker/volumes/</code>).
           </p>
         </div>
-
-        <!-- Componentes & Servicios Opcionales del Stack -->
-        <div class="space-y-3 pt-2 border-t border-slate-800">
-          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider" data-i18n="html.stack.title">
-            Arquitectura de Servicios & Componentes
-          </label>
+        </div>
+        <div role="tabpanel" id="new-env-panel-platform" aria-labelledby="new-env-tab-platform" data-env-tab-panel="platform" class="space-y-3 hidden">
 
           <!-- Core Mandatory Note -->
           <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between text-xs">
@@ -684,7 +757,8 @@
               </div>
             </div>
           </div>
-
+        </div>
+        <div role="tabpanel" id="new-env-panel-integrations" aria-labelledby="new-env-tab-integrations" data-env-tab-panel="integrations" class="space-y-3 hidden">
           <!-- GRUPO: SERVICIOS OPCIONALES DE INTEGRACIÓN -->
           <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
@@ -714,7 +788,8 @@
               </div>
             </div>
           </div>
-
+        </div>
+        <div role="tabpanel" id="new-env-panel-usecases" aria-labelledby="new-env-tab-usecases" data-env-tab-panel="usecases" class="space-y-3 hidden">
           <!-- GRUPO: CASOS DE USO -->
           <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
             <div class="border-b border-slate-800/80 pb-2">
@@ -726,6 +801,11 @@
             </div>
             <div id="new-env-use-cases" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
           </div>
+        </div>
+
+        <div role="tabpanel" id="new-env-panel-branding" aria-labelledby="new-env-tab-branding" data-env-tab-panel="branding" class="hidden">
+          <div id="new-env-branding"></div>
+        </div>
         </div>
 
         <div class="pt-4 flex items-center justify-end gap-2 border-t border-slate-800">
@@ -743,7 +823,7 @@
   <!-- ========================================================================= -->
   <!-- MODAL: Configurar / Editar Componentes del Ambiente                      -->
   <!-- ========================================================================= -->
-  <dialog id="edit-env-modal" class="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl shadow-2xl p-0 w-full max-w-xl backdrop:bg-black/70 backdrop:backdrop-blur-sm">
+  <dialog id="edit-env-modal" class="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl shadow-2xl p-0 w-full max-w-2xl backdrop:bg-black/70 backdrop:backdrop-blur-sm">
     <div class="p-6 space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div>
@@ -761,6 +841,26 @@
       <form onsubmit="handleEditEnvSubmit(event)" class="space-y-4">
         <input type="hidden" id="edit-env-id">
 
+        <div role="tablist" aria-label="Secciones" data-i18n-attr="aria-label:html.envTabs.aria" class="env-tabs" onkeydown="handleEnvTabKey('edit', event)">
+          <button type="button" role="tab" id="edit-env-tab-general" aria-controls="edit-env-panel-general" data-env-tab="general" aria-selected="true" tabindex="0" onclick="switchEnvTab('edit', 'general')" class="env-tab">
+            <i data-lucide="file-text" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.general">General</span>
+          </button>
+          <button type="button" role="tab" id="edit-env-tab-platform" aria-controls="edit-env-panel-platform" data-env-tab="platform" aria-selected="false" tabindex="-1" onclick="switchEnvTab('edit', 'platform')" class="env-tab">
+            <i data-lucide="layers" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.platform">Inspire</span>
+          </button>
+          <button type="button" role="tab" id="edit-env-tab-integrations" aria-controls="edit-env-panel-integrations" data-env-tab="integrations" aria-selected="false" tabindex="-1" onclick="switchEnvTab('edit', 'integrations')" class="env-tab">
+            <i data-lucide="plug" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.integrations">Integraciones</span>
+          </button>
+          <button type="button" role="tab" id="edit-env-tab-usecases" aria-controls="edit-env-panel-usecases" data-env-tab="usecases" aria-selected="false" tabindex="-1" onclick="switchEnvTab('edit', 'usecases')" class="env-tab">
+            <i data-lucide="app-window" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.usecases">Casos de uso</span>
+          </button>
+          <button type="button" role="tab" id="edit-env-tab-branding" aria-controls="edit-env-panel-branding" data-env-tab="branding" aria-selected="false" tabindex="-1" onclick="switchEnvTab('edit', 'branding')" class="env-tab">
+            <i data-lucide="palette" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.branding">Look & feel</span>
+          </button>
+        </div>
+
+        <div class="env-tab-panels">
+        <div role="tabpanel" id="edit-env-panel-general" aria-labelledby="edit-env-tab-general" data-env-tab-panel="general" class="space-y-4">
         <div>
           <label class="block text-xs font-medium text-slate-300 mb-1" data-i18n="html.editEnv.name">Nombre de la Demo</label>
           <input type="text" id="edit-env-name" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
@@ -770,12 +870,8 @@
           <label class="block text-xs font-medium text-slate-300 mb-1" data-i18n="html.editEnv.desc">Notas / Descripción</label>
           <textarea id="edit-env-desc" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500"></textarea>
         </div>
-
-        <!-- Componentes & Servicios Opcionales del Stack -->
-        <div class="space-y-3 pt-2 border-t border-slate-800">
-          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider" data-i18n="html.stack.title">
-            Arquitectura de Servicios & Componentes
-          </label>
+        </div>
+        <div role="tabpanel" id="edit-env-panel-platform" aria-labelledby="edit-env-tab-platform" data-env-tab-panel="platform" class="space-y-3 hidden">
 
           <!-- Core Mandatory Note -->
           <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between text-xs">
@@ -871,7 +967,8 @@
               </div>
             </div>
           </div>
-
+        </div>
+        <div role="tabpanel" id="edit-env-panel-integrations" aria-labelledby="edit-env-tab-integrations" data-env-tab-panel="integrations" class="space-y-3 hidden">
           <!-- GRUPO: SERVICIOS OPCIONALES DE INTEGRACIÓN -->
           <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
@@ -904,7 +1001,8 @@
             <!-- ICM environment variables for this environment's Kafka broker -->
             <div id="edit-icm-env-vars" class="hidden"></div>
           </div>
-
+        </div>
+        <div role="tabpanel" id="edit-env-panel-usecases" aria-labelledby="edit-env-tab-usecases" data-env-tab-panel="usecases" class="space-y-3 hidden">
           <!-- GRUPO: CASOS DE USO -->
           <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
             <div class="border-b border-slate-800/80 pb-2">
@@ -916,6 +1014,11 @@
             </div>
             <div id="edit-env-use-cases" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
           </div>
+        </div>
+
+        <div role="tabpanel" id="edit-env-panel-branding" aria-labelledby="edit-env-tab-branding" data-env-tab-panel="branding" class="hidden">
+          <div id="edit-env-branding"></div>
+        </div>
         </div>
 
         <div class="pt-4 flex items-center justify-end gap-2 border-t border-slate-800">

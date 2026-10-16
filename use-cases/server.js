@@ -4,6 +4,8 @@
  * Cada carpeta de cases/ es un caso de uso: case.json (metadatos) + router.js (rutas y
  * estáticos). Se monta en /<id>/ y el portal en / lista los habilitados.
  * ENABLED_CASES=kafka-csv,push-inbox limita cuáles se cargan (vacío = todos).
+ * Un caso con "virtual": true en case.json no se publica él mismo: su router.js exporta cases() y cada
+ * entrada ({ id, name, description, icon, order, router, status }) se publica como un caso de uso propio.
  */
 const express = require('express');
 const cors = require('cors');
@@ -20,20 +22,24 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-function loadCases() {
+function loadCaseFolders() {
   return fs.readdirSync(CASES_DIR, { withFileTypes: true })
     .filter(d => d.isDirectory() && fs.existsSync(path.join(CASES_DIR, d.name, 'case.json')))
     .map(d => ({ ...JSON.parse(fs.readFileSync(path.join(CASES_DIR, d.name, 'case.json'), 'utf8')), id: d.name }))
     .filter(c => enabledIds.length === 0 || enabledIds.includes(c.id))
-    .sort((a, b) => (a.order ?? 100) - (b.order ?? 100))
     .map(c => ({ ...c, module: require(path.join(CASES_DIR, c.id, 'router.js')) }));
 }
 
-const cases = loadCases();
+const folders = loadCaseFolders();
+const cases = folders
+  .flatMap(c => (c.virtual
+    ? c.module.cases().map(({ router, status, ...meta }) => ({ ...meta, module: { router, status } }))
+    : [c]))
+  .sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
 
 // Server messages in the page's language: each case may ship cases/<id>/i18n/server.js with its CATALOG
 const catalog = {};
-for (const c of cases) {
+for (const c of folders) {
   const file = path.join(CASES_DIR, c.id, 'i18n', 'server.js');
   if (fs.existsSync(file)) Object.assign(catalog, require(file).CATALOG);
 }
@@ -42,6 +48,9 @@ app.use(localizer.middleware);
 
 // Shared front-end helpers (i18n core) for the portal and every case
 app.use('/shared', express.static(path.join(__dirname, 'shared'), { index: false }));
+
+// Environment logo and colors (/branding.js, /branding/logo) from Studio Manager
+app.use(require('./shared/branding-server').router);
 
 for (const c of cases) {
   const base = `/${c.id}`;
@@ -60,7 +69,7 @@ for (const c of cases) {
 
 app.get('/api/cases', (req, res) => {
   // case.json may carry i18n: { "en-US": { name, description }, ... }; Spanish is the base text
-  res.json(cases.map(({ module, i18n, ...meta }) => ({
+  res.json(cases.map(({ module, i18n, virtual, ...meta }) => ({
     ...meta,
     ...((i18n || {})[req.lang] || {}),
     path: `/${meta.id}/`,

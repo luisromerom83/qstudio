@@ -32,6 +32,13 @@ ENV_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 # Docker image tag grammar
 VERSION_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$")
 
+# Per-environment look and feel of the use cases (logo + three colors)
+BRAND_COLOR_KEYS = ("primary", "secondary", "tertiary")
+HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+LOGO_DATA_URL_RE = re.compile(r"^data:image/(png|jpeg|webp|gif|svg\+xml);base64,([A-Za-z0-9+/]+={0,2})$")
+# The logo reaches the use-cases container as an environment variable; Linux caps each one at 128 KiB
+MAX_LOGO_DATA_URL = 120_000
+
 
 FIREBASE_WEB_KEYS = ("apiKey", "authDomain", "projectId", "storageBucket", "messagingSenderId", "appId", "measurementId")
 
@@ -82,6 +89,7 @@ class EnvService:
         self.firebase_key_file = os.path.join(self.data_dir, "firebase-service-account.json")
         self.firebase_web_file = os.path.join(self.data_dir, "firebase-web.json")
         self.das_file = os.path.join(self.data_dir, "das-cloud.json")
+        self.das_demos_file = os.path.join(self.data_dir, "das-demos.json")
         self.use_cases_dir = os.path.join(self.base_dir, "use-cases")
         self.root_env = os.path.join(self.data_dir, ".quadient_credentials.env")
         if not os.path.exists(self.root_env) and os.path.exists(os.path.join(self.base_dir, ".quadient_credentials.env")):
@@ -222,28 +230,82 @@ class EnvService:
         self._apply_use_case_settings("das-inbox")
         return True, f"Quadient Cloud configurado ({cloud_url})"
 
+    def get_das_demos(self) -> List[Dict[str, Any]]:
+        """Custom demos: documents of Quadient Cloud applications with anonymous access, one use case each."""
+        demos = (self._read_json(self.das_demos_file) or {}).get("demos")
+        return [d for d in demos if isinstance(d, dict) and d.get("id")] if isinstance(demos, list) else []
+
+    def save_das_demo(self, data: Dict[str, Any]) -> Tuple[bool, str]:
+        """Creates a demo, or updates the one whose id is given. Saving restarts the running environments that use it."""
+        demos = self.get_das_demos()
+        demo_id = str(data.get("id") or "").strip()
+        if demo_id and not any(d["id"] == demo_id for d in demos):
+            return False, "Demo no encontrada"
+
+        name = str(data.get("name") or "").strip()
+        if not name:
+            return False, "El nombre de la demo es obligatorio"
+        cloud_url = str(data.get("cloud_url") or "").strip().rstrip("/")
+        if not re.match(r"^https://[A-Za-z0-9.-]+(:\d+)?$", cloud_url):
+            return False, "La URL de Quadient Cloud debe tener el formato https://<empresa>.quadientcloud.eu"
+        app_id = str(data.get("app_id") or "").strip()
+        if not app_id.isdigit():
+            return False, "El Application ID debe ser numérico"
+        client_id = str(data.get("client_id") or "").strip()
+        if not client_id:
+            return False, "Falta el Client ID de la aplicación"
+        document_id = str(data.get("document_id") or "").strip()
+        if not document_id:
+            return False, "Falta el Document ID"
+
+        if not demo_id:
+            import unicodedata
+            slug = re.sub(r"[^a-z0-9]+", "-", unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii").lower()).strip("-")[:40].strip("-")
+            base = f"demo-{slug or 'documento'}"
+            demo_id, n = base, 2
+            while any(d["id"] == demo_id for d in demos):
+                demo_id, n = f"{base}-{n}", n + 1
+
+        demo = {
+            "id": demo_id, "name": name, "description": str(data.get("description") or "").strip(),
+            "cloud_url": cloud_url, "app_id": app_id, "client_id": client_id, "document_id": document_id,
+        }
+        demos = [demo if d["id"] == demo_id else d for d in demos] if any(d["id"] == demo_id for d in demos) else demos + [demo]
+        self._write_secret_json(self.das_demos_file, {"demos": demos})
+        self._apply_use_case_settings(demo_id)
+        return True, f"Demo '{name}' guardada"
+
+    def delete_das_demo(self, demo_id: str) -> Tuple[bool, str]:
+        """Removes the demo and takes it out of every environment that used it."""
+        demos = self.get_das_demos()
+        demo = next((d for d in demos if d["id"] == demo_id), None)
+        if not demo:
+            return False, "Demo no encontrada"
+        self._write_secret_json(self.das_demos_file, {"demos": [d for d in demos if d["id"] != demo_id]})
+
+        envs = self.list_environments()
+        affected = [e for e in envs if demo_id in (e.get("use_cases") or [])]
+        for env in affected:
+            env["use_cases"] = [c for c in env["use_cases"] if c != demo_id]
+        if affected:
+            self._save_environments(envs)
+        for env in affected:
+            self._rewrite_compose(env)
+            if env["use_cases"]:
+                self._recreate_use_cases(env)
+            else:
+                # The compose file no longer has the use-cases service
+                DockerService._run_cmd(f"docker rm -f {shlex.quote(env['project_name'] + '-use-cases')}")
+        return True, f"Demo '{demo['name']}' eliminada"
+
     def _apply_use_case_settings(self, case_id: str) -> None:
-        """Rewrites every environment's use-cases.env and recreates the running use-cases containers that host
-        case_id: the container reads its env_file only when it is created, so a restart would keep the old values."""
+        """Rewrites every environment's use-cases.env and recreates the running use-cases containers that host case_id."""
         for env in self.list_environments():
             if not (env.get("use_cases") and env.get("compose_file")):
                 continue
-            target_dir = os.path.dirname(env["compose_file"])
-            self._write_use_cases_env(target_dir, env["use_cases"])
-            if case_id not in env["use_cases"]:
-                continue
-            project_name = env["project_name"]
-            code, out, _ = DockerService._run_cmd(f"docker inspect --format='{{{{.State.Running}}}}' {shlex.quote(project_name + '-use-cases')}")
-            if code != 0 or out.strip() != "true":
-                continue
-            env_file = env.get("env_file", "")
-            env_flag = f"--env-file {shlex.quote(env_file)} " if env_file and os.path.exists(env_file) else ""
-            code, out, err = DockerService._run_cmd(
-                f"docker compose -f {shlex.quote(env['compose_file'])} -p {shlex.quote(project_name)} "
-                f"{env_flag}up -d --no-deps --force-recreate use-cases",
-                timeout=120, cwd=target_dir)
-            if code != 0:
-                print(f"[use-cases] No se pudo recrear {project_name}-use-cases: {err or out}")
+            self._write_use_cases_env(os.path.dirname(env["compose_file"]), env["use_cases"])
+            if case_id in env["use_cases"]:
+                self._recreate_use_cases(env)
 
     def get_use_case_catalog(self) -> List[Dict[str, Any]]:
         """Use cases bundled in use-cases/cases/<id>/case.json, in display order."""
@@ -253,7 +315,8 @@ class EnvService:
             return catalog
         for case_id in os.listdir(cases_dir):
             meta = self._read_json(os.path.join(cases_dir, case_id, "case.json"))
-            if not meta:
+            # Virtual cases (das-demo) publish their entries below instead of themselves
+            if not meta or meta.get("virtual"):
                 continue
             catalog.append({
                 "id": case_id,
@@ -263,7 +326,26 @@ class EnvService:
                 "requires": meta.get("requires", []),
                 "order": meta.get("order", 100),
             })
+        for demo in self.get_das_demos():
+            catalog.append({
+                "id": demo["id"],
+                "name": demo.get("name", demo["id"]),
+                "description": demo.get("description", ""),
+                "icon": "📄",
+                "requires": [],
+                "order": 1000,
+                "custom": True,
+            })
         return sorted(catalog, key=lambda c: (c["order"], c["id"]))
+
+    def _case_folders(self, use_cases: List[str]) -> List[str]:
+        """ENABLED_CASES lists folders of use-cases/cases: custom demos are served by the das-demo folder."""
+        folders = []
+        for case_id in use_cases:
+            folder = "das-demo" if case_id.startswith("demo-") else case_id
+            if folder not in folders:
+                folders.append(folder)
+        return folders
 
     def _clean_use_cases(self, requested: Any) -> List[str]:
         """Keeps only known use case ids, in catalog order."""
@@ -311,12 +393,17 @@ class EnvService:
         return changed
 
     def _write_use_cases_env(self, target_dir: str, use_cases: List[str]) -> None:
-        """Writes use-cases.env; Firebase and Quadient Cloud secrets travel here (never in the compose file), only for the cases that use them."""
+        """Writes use-cases.env; Firebase and Quadient Cloud secrets travel here (never in the compose file), only for the cases
+        that use them, along with the environment's branding."""
         lines = ["# Generated by Studio Manager"]
         if "push-inbox" in use_cases:
             lines.extend(self._firebase_env_lines())
         if "das-inbox" in use_cases:
             lines.extend(self._das_env_lines())
+        demos = [d for d in self.get_das_demos() if d["id"] in use_cases]
+        if demos:
+            lines.append("DAS_DEMOS=" + base64.b64encode(json.dumps(demos).encode("utf-8")).decode("ascii"))
+        lines.extend(self._branding_env_lines(target_dir))
         path = os.path.join(target_dir, "use-cases.env")
         with open(path, "w", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
@@ -350,6 +437,102 @@ class EnvService:
             "DAS_TOKEN_LIFETIME=" + str(das.get("token_lifetime", 1500)),
             "DAS_USERS=" + base64.b64encode(json.dumps(das.get("users", [])).encode("utf-8")).decode("ascii"),
         ]
+
+    def _branding_file(self, target_dir: str) -> str:
+        return os.path.join(target_dir, "branding.json")
+
+    def _read_branding(self, target_dir: str) -> Dict[str, Any]:
+        """{"colors": {primary, secondary, tertiary} | None, "logo": data URL | ""}"""
+        data = self._read_json(self._branding_file(target_dir)) or {}
+        colors = data.get("colors")
+        return {
+            "colors": colors if isinstance(colors, dict) and all(HEX_COLOR_RE.match(str(colors.get(k, ""))) for k in BRAND_COLOR_KEYS) else None,
+            "logo": data.get("logo") if isinstance(data.get("logo"), str) else "",
+        }
+
+    def _save_branding(self, target_dir: str, requested: Any) -> Tuple[bool, str, bool]:
+        """Validates and stores the branding sent by the UI; returns (ok, message, changed).
+
+        colors: {primary, secondary, tertiary} as #rrggbb, or null for the use cases' own colors.
+        logo: data URL to replace it, "" to remove it, absent to keep the stored one."""
+        if not isinstance(requested, dict):
+            return True, "", False
+        current = self._read_branding(target_dir)
+        branding = dict(current)
+        if "colors" in requested:
+            colors = requested["colors"]
+            if colors is None:
+                branding["colors"] = None
+            elif isinstance(colors, dict) and all(HEX_COLOR_RE.match(str(colors.get(k, ""))) for k in BRAND_COLOR_KEYS):
+                branding["colors"] = {k: str(colors[k]).lower() for k in BRAND_COLOR_KEYS}
+            else:
+                return False, "Los colores deben tener el formato #RRGGBB (primario, secundario y terciario)", False
+        if "logo" in requested and requested["logo"] is not None:
+            logo = str(requested["logo"]).strip()
+            if logo:
+                match = LOGO_DATA_URL_RE.match(logo)
+                if not match:
+                    return False, "El logo debe ser una imagen PNG, JPG, SVG, WebP o GIF", False
+                if len(logo) > MAX_LOGO_DATA_URL:
+                    return False, "El logo es demasiado grande; usa una imagen de menos de 85 KB", False
+                try:
+                    base64.b64decode(match.group(2), validate=True)
+                except ValueError:
+                    return False, "El logo no es una imagen válida", False
+            branding["logo"] = logo
+        if branding == current:
+            return True, "", False
+        os.makedirs(target_dir, exist_ok=True)
+        with open(self._branding_file(target_dir), "w", encoding="utf-8") as f:
+            json.dump(branding, f)
+        return True, "", True
+
+    def get_branding_summary(self, env: Dict[str, Any]) -> Dict[str, Any]:
+        """Branding for the UI: the logo itself is served by get_logo(); logo_rev busts the browser cache."""
+        target_dir = os.path.join(self.envs_dir, env["id"])
+        branding = self._read_branding(target_dir)
+        rev = 0
+        if branding["logo"]:
+            try:
+                rev = int(os.path.getmtime(self._branding_file(target_dir)))
+            except OSError:
+                pass
+        return {"colors": branding["colors"], "has_logo": bool(branding["logo"]), "logo_rev": rev}
+
+    def get_logo(self, env_id: str) -> Optional[Tuple[str, bytes]]:
+        """(mime type, bytes) of the environment's logo, or None."""
+        if not ENV_ID_RE.match(env_id or ""):
+            return None
+        match = LOGO_DATA_URL_RE.match(self._read_branding(os.path.join(self.envs_dir, env_id))["logo"])
+        if not match:
+            return None
+        return f"image/{match.group(1)}", base64.b64decode(match.group(2))
+
+    def _branding_env_lines(self, target_dir: str) -> List[str]:
+        branding = self._read_branding(target_dir)
+        lines = []
+        if branding["colors"]:
+            # Without the "#": env files could read it as the start of a comment
+            lines.extend(f"BRAND_{k.upper()}={branding['colors'][k].lstrip('#')}" for k in BRAND_COLOR_KEYS)
+        if branding["logo"]:
+            lines.append("BRAND_LOGO=" + branding["logo"])
+        return lines
+
+    def _recreate_use_cases(self, env: Dict[str, Any]) -> None:
+        """The container reads use-cases.env only when it is created, so a restart would keep the old values."""
+        project_name = env["project_name"]
+        code, out, _ = DockerService._run_cmd(f"docker inspect --format='{{{{.State.Running}}}}' {shlex.quote(project_name + '-use-cases')}")
+        if code != 0 or out.strip() != "true":
+            return
+        target_dir = os.path.dirname(env["compose_file"])
+        env_file = env.get("env_file", "")
+        env_flag = f"--env-file {shlex.quote(env_file)} " if env_file and os.path.exists(env_file) else ""
+        code, out, err = DockerService._run_cmd(
+            f"docker compose -f {shlex.quote(env['compose_file'])} -p {shlex.quote(project_name)} "
+            f"{env_flag}up -d --no-deps --force-recreate use-cases",
+            timeout=120, cwd=target_dir)
+        if code != 0:
+            print(f"[use-cases] No se pudo recrear {project_name}-use-cases: {err or out}")
 
     def get_progress(self, env_id: str) -> Optional[Dict[str, Any]]:
         with self._progress_lock:
@@ -435,6 +618,7 @@ class EnvService:
                     else:
                         env["status"] = "stopped"
                     env["activation"] = self.get_progress(env_id)
+                    env["branding"] = self.get_branding_summary(env)
                     env["active_containers"] = running_count
                     env["total_containers"] = total_count
 
@@ -472,6 +656,7 @@ class EnvService:
             item.pop("active_containers", None)
             item.pop("total_containers", None)
             item.pop("activation", None)
+            item.pop("branding", None)
             clean_envs.append(item)
         tmp_file = self.envs_file + ".tmp"
         with open(tmp_file, "w", encoding="utf-8") as f:
@@ -637,6 +822,10 @@ class EnvService:
         compose_file = os.path.join(target_dir, "docker-compose.yml")
         env_file = os.path.join(target_dir, ".env")
 
+        ok, msg, _ = self._save_branding(target_dir, data.get("branding"))
+        if not ok:
+            return False, msg, None
+
         # Copy credentials from root
         root_creds = ACRService.get_credentials(self.root_env)
         root_creds["INSPIRE_VERSION"] = version
@@ -723,6 +912,10 @@ class EnvService:
         if not target:
             return False, "Ambiente no encontrado"
         original = copy.deepcopy(target)
+
+        ok, msg, branding_changed = self._save_branding(os.path.dirname(target["compose_file"]), data.get("branding"))
+        if not ok:
+            return False, msg
 
         if "name" in data:
             target["name"] = data["name"].strip()
@@ -856,6 +1049,8 @@ class EnvService:
             if target.get("demo_mode"):
                 self._ensure_demo_mode_volume(target)
             DockerService.compose_up(target["compose_file"], target["env_file"], target["project_name"])
+            if branding_changed and target.get("use_cases"):
+                self._recreate_use_cases(target)
 
         self._save_environments(envs)
         return True, "Ambiente y configuración de servicios actualizados correctamente"
@@ -1608,7 +1803,7 @@ class EnvService:
             # Secrets travel in a side env file so they never land in the compose file
             if target_dir:
                 self._write_use_cases_env(target_dir, use_cases)
-            kafka_env = '\n      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"' if enable_kafka else ""
+            kafka_env = f'\n      KAFKA_BOOTSTRAP_SERVERS: "{project_name}-kafka:9092"' if enable_kafka else ""
             depends = "\n    depends_on:\n      - kafka" if enable_kafka else ""
             # Scaler connectors created before the merge still post to http://push-inbox:3000
             aliases = "\n    networks:\n      default:\n        aliases:\n          - push-inbox" if "push-inbox" in use_cases else ""
@@ -1624,7 +1819,7 @@ class EnvService:
       - use-cases.env
     environment:
       PORT: 3000
-      ENABLED_CASES: "{','.join(use_cases)}"{kafka_env}{aliases}
+      ENABLED_CASES: "{','.join(self._case_folders(use_cases))}"{kafka_env}{aliases}
     ports:
       - "{p_use_cases}:3000" """)
 

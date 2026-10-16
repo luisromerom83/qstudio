@@ -61,6 +61,7 @@ def get_config():
         "firebase": env_service.get_firebase_status(),
         "das": env_service.get_das_status(),
         "use_cases": env_service.get_use_case_catalog(),
+        "das_demos": env_service.get_das_demos(),
         "verticals": VERTICAL_CATEGORIES
     })
 
@@ -133,6 +134,18 @@ def update_das_config():
     ok, msg = env_service.save_das_settings(request.json or {})
     return jsonify({"success": ok, "message": msg, "das": env_service.get_das_status()}), (200 if ok else 400)
 
+@app.route("/api/config/das-demos", methods=["POST"])
+def save_das_demo():
+    ok, msg = env_service.save_das_demo(request.json or {})
+    return jsonify({"success": ok, "message": msg, "das_demos": env_service.get_das_demos(),
+                    "use_cases": env_service.get_use_case_catalog()}), (200 if ok else 400)
+
+@app.route("/api/config/das-demos/<demo_id>", methods=["DELETE"])
+def delete_das_demo(demo_id):
+    ok, msg = env_service.delete_das_demo(demo_id)
+    return jsonify({"success": ok, "message": msg, "das_demos": env_service.get_das_demos(),
+                    "use_cases": env_service.get_use_case_catalog()}), (200 if ok else 404)
+
 @app.route("/api/config/test", methods=["POST"])
 def test_config():
     data = request.json or {}
@@ -183,6 +196,19 @@ def download_icm_env_vars(env_id):
         return jsonify({"success": False, "message": msg}), 404
     response = app.response_class(json.dumps(data, ensure_ascii=False, indent=2), mimetype="application/json")
     response.headers["Content-Disposition"] = f'attachment; filename="ICMEnvVars-{env_id}.json"'
+    return response
+
+@app.route("/api/environments/<env_id>/logo", methods=["GET"])
+def environment_logo(env_id):
+    logo = env_service.get_logo(env_id)
+    if not logo:
+        return jsonify({"success": False, "message": "Este ambiente no tiene logo"}), 404
+    mime, content = logo
+    response = app.response_class(content, mimetype=mime)
+    # Uploaded SVGs may carry scripts: never let them run if the URL is opened directly
+    response.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Cache-Control"] = "private, max-age=86400"
     return response
 
 @app.route("/api/environments/<env_id>", methods=["PUT"])

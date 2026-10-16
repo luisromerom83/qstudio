@@ -1,0 +1,9 @@
+{
+  "id": "das-demo",
+  "name": "Demos personalizadas",
+  "description": "Documentos de apps de Quadient Cloud con acceso anónimo. Cada demo definida en Studio Manager › Ajustes es su propio caso de uso.",
+  "icon": "📄",
+  "requires": [],
+  "order": 40,
+  "virtual": true
+}

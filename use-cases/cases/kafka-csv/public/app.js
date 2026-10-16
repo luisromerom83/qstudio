@@ -279,7 +279,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   clearConsole();
   applySampleData('es-MX');
   await loadServerConfig();
-  selectIntegration('3rd Party');
+  selectIntegration('Quadient Inspire DAS');
   switchUseCase(1);
 
   logToConsole(t('kafka.log.initialized'));
@@ -321,6 +321,10 @@ async function loadServerConfig() {
     if (cfg.default_user_ids) defaultUserIds = cfg.default_user_ids;
     document.getElementById('topic').value = cfg.kafka_topic || '';
     kafkaBroker = cfg.kafka_bootstrap_servers || (cfg.kafka_host ? `${cfg.kafka_host}:${cfg.kafka_port}` : '');
+    // Prefill host and port with the environment's broker (the first one when there are several)
+    const [brokerHost, brokerPort] = kafkaBroker.split(',')[0].trim().split(':');
+    document.getElementById('host').value = brokerHost || '';
+    document.getElementById('port').value = brokerPort || cfg.kafka_port || '';
     renderHostHint();
     if (!kafkaBroker) setStatus(false, 'kafka.status.noBroker');
   } catch (err) {

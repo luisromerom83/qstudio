@@ -132,6 +132,28 @@ CATALOG: Dict[str, Dict[str, str]] = {
         "pt-BR": "Quadient Cloud configurado ({url})",
     },
 
+    # ── Custom demos (env_service.py) ──
+    "Demo no encontrada": {
+        "en-US": "Demo not found",
+        "pt-BR": "Demo não encontrada",
+    },
+    "El nombre de la demo es obligatorio": {
+        "en-US": "The demo name is required",
+        "pt-BR": "O nome da demo é obrigatório",
+    },
+    "Falta el Document ID": {
+        "en-US": "The Document ID is missing",
+        "pt-BR": "Falta o Document ID",
+    },
+    "Demo '{name}' guardada": {
+        "en-US": "Demo '{name}' saved",
+        "pt-BR": "Demo '{name}' salva",
+    },
+    "Demo '{name}' eliminada": {
+        "en-US": "Demo '{name}' deleted",
+        "pt-BR": "Demo '{name}' excluída",
+    },
+
     # ── Environments: create / update / delete (env_service.py, app.py) ──
     "Ambiente no encontrado": {
         "en-US": "Environment not found",
@@ -168,6 +190,26 @@ CATALOG: Dict[str, Dict[str, str]] = {
     "Este ambiente no tiene Kafka habilitado": {
         "en-US": "This environment doesn't have Kafka enabled",
         "pt-BR": "Este ambiente não tem o Kafka habilitado",
+    },
+    "Este ambiente no tiene logo": {
+        "en-US": "This environment has no logo",
+        "pt-BR": "Este ambiente não tem logo",
+    },
+    "Los colores deben tener el formato #RRGGBB (primario, secundario y terciario)": {
+        "en-US": "Colors must use the #RRGGBB format (primary, secondary and tertiary)",
+        "pt-BR": "As cores devem usar o formato #RRGGBB (primária, secundária e terciária)",
+    },
+    "El logo debe ser una imagen PNG, JPG, SVG, WebP o GIF": {
+        "en-US": "The logo must be a PNG, JPG, SVG, WebP or GIF image",
+        "pt-BR": "O logo deve ser uma imagem PNG, JPG, SVG, WebP ou GIF",
+    },
+    "El logo es demasiado grande; usa una imagen de menos de 85 KB": {
+        "en-US": "The logo is too large; use an image under 85 KB",
+        "pt-BR": "O logo é muito grande; use uma imagem com menos de 85 KB",
+    },
+    "El logo no es una imagen válida": {
+        "en-US": "The logo isn't a valid image",
+        "pt-BR": "O logo não é uma imagem válida",
     },
     "Puerto de Interactive inválido": {
         "en-US": "Invalid Interactive port",
