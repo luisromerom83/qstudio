@@ -217,6 +217,21 @@
     slot.querySelector("select").value = currentLang;
 
     $("login-form").addEventListener("submit", handleLogin);
+    // Quadient Cloud user store: accounts can be created here and are signed in like a normal login
+    DasSignup.init({
+      loginForm: $("login-form"),
+      onSignedIn: async signedIn => {
+        user = signedIn;
+        try {
+          await signInToCloud();
+          enterApp();
+        } catch (err) {
+          await api("api/logout").catch(() => {});
+          user = null;
+          showLogin(err.message || String(err));
+        }
+      }
+    });
     $("btn-logout").addEventListener("click", handleLogout);
     $("btn-reload").addEventListener("click", loadInbox);
     $("btn-back").addEventListener("click", event => { event.preventDefault(); location.hash = "#/inbox"; });

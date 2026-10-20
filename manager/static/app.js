@@ -8,7 +8,8 @@ let activeContainerForLogs = null;
 let logPollInterval = null;
 let verticals = [];             // from /api/config
 let useCaseCatalog = [];        // from /api/config: bundled use cases (use-cases/cases/*/case.json) plus custom demos
-let dasDemos = [];              // from /api/config: custom demos (anonymous Quadient Cloud documents)
+let dasDemos = [];
+let hostSettings = null;        // from /api/config: {configured, detected} address of this computer on the network              // from /api/config: custom demos (anonymous Quadient Cloud documents)
 const busyEnvs = new Map();     // envId -> {kind: "activate"|"stop", label, step, total}
 let lastEnvSnapshot = "";
 
@@ -57,9 +58,7 @@ window.addEventListener("studio:languagechange", () => {
   renderServicesView();
   renderFirebaseStatus(lastFirebaseStatus);
   renderDasStatus(lastDasStatus);
-  if (document.getElementById("das-users-rows")) renderDasUserRows(readDasUserRows());
   loadVolumes();
-  if (!document.getElementById("view-storage")?.classList.contains("hidden")) loadSnapshots();
   ["new", "edit"].forEach(prefix => {
     if (!document.getElementById(`${prefix}-env-modal`)?.open) return;
     renderUseCaseCheckboxes(prefix, selectedUseCases(prefix));
@@ -108,10 +107,11 @@ function switchTab(tabId) {
     loadAcrVersions();
   } else if (tabId === "storage") {
     loadVolumes();
-    loadSnapshots();
   } else if (tabId === "services") {
     populateServicesSelect();
     renderServicesView();
+  } else if (tabId === "settings") {
+    loadInspireVersions();
   }
 
   lucide.createIcons();
@@ -135,6 +135,9 @@ async function checkConfigAndOnboarding() {
     document.getElementById("setting-lic-server").value = creds.license_server || "";
     renderFirebaseStatus(data.firebase);
     fillDasForm(data.das);
+    fillBankingForm(data.banking);
+    hostSettings = data.host || null;
+    fillHostForm();
     dasDemos = data.das_demos || [];
     renderDemosList();
     resetDemoForm();
@@ -456,67 +459,9 @@ function fillDasForm(das) {
   document.getElementById("setting-das-url").value = das.cloud_url || "";
   document.getElementById("setting-das-app-id").value = das.app_id || "";
   document.getElementById("setting-das-client-id").value = das.client_id || "";
-  document.getElementById("setting-das-lifetime").value = das.token_lifetime || 1500;
-  document.getElementById("setting-das-meta-name").value = das.statements_meta_name || "";
-  document.getElementById("setting-das-meta-value").value = das.statements_meta_value || "";
-  renderDasUserRows(das.users || []);
-  document.getElementById("setting-das-api-key").placeholder = das.api_key ? t("app.das.apiKeyStored") : "";
   renderDasStatus(das);
   // The Digital Services box in the services view links to this cloud URL
   renderServicesView();
-}
-
-const DAS_INPUT_CLASS = "w-full bg-slate-950 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-brand-500";
-
-function dasUserRowHtml(user = {}) {
-  const field = (name, label, placeholder, type = "text") => `
-    <label class="block">
-      <span class="sm:hidden block text-[10px] font-semibold uppercase text-slate-500 mb-0.5">${label}</span>
-      <input type="${type}" data-das-field="${name}" value="${escapeHtml(user[name] || "")}" placeholder="${escapeHtml(placeholder)}"
-        spellcheck="false" autocomplete="off" aria-label="${label}" class="${DAS_INPUT_CLASS}">
-    </label>`;
-  return `
-    <div class="das-user-row grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_2rem] gap-2 px-3 py-2 items-end sm:items-center">
-      ${field("username", t("html.das.colUser"), "demo")}
-      ${field("password", t("html.das.colPassword"), "")}
-      ${field("subject", "Subject", t("app.das.subjectPlaceholder"))}
-      <button type="button" onclick="removeDasUserRow(this)" title="${t("app.das.removeUser")}" aria-label="${t("app.das.removeUser")}"
-        class="justify-self-end w-8 h-8 flex items-center justify-center rounded-md text-slate-500 hover:text-rose-400 hover:bg-slate-900 transition">
-        <i data-lucide="trash-2" class="w-4 h-4"></i>
-      </button>
-    </div>`;
-}
-
-function syncDasUsersEmpty() {
-  const empty = !document.querySelector("#das-users-rows .das-user-row");
-  document.getElementById("das-users-empty").classList.toggle("hidden", !empty);
-}
-
-function renderDasUserRows(users) {
-  document.getElementById("das-users-rows").innerHTML = users.map(dasUserRowHtml).join("");
-  syncDasUsersEmpty();
-  lucide.createIcons();
-}
-
-function addDasUserRow() {
-  const rows = document.getElementById("das-users-rows");
-  rows.insertAdjacentHTML("beforeend", dasUserRowHtml());
-  syncDasUsersEmpty();
-  lucide.createIcons();
-  rows.lastElementChild.querySelector("input").focus();
-}
-
-function removeDasUserRow(button) {
-  button.closest(".das-user-row").remove();
-  syncDasUsersEmpty();
-}
-
-function readDasUserRows() {
-  return Array.from(document.querySelectorAll("#das-users-rows .das-user-row")).map(row => {
-    const user = {};
-    row.querySelectorAll("[data-das-field]").forEach(input => { user[input.dataset.dasField] = input.value.trim(); });
-    return user;
-  });
 }
 
 async function handleSaveDas(e) {
@@ -525,12 +470,7 @@ async function handleSaveDas(e) {
   const payload = {
     cloud_url: value("setting-das-url"),
     app_id: value("setting-das-app-id"),
-    client_id: value("setting-das-client-id"),
-    api_key: value("setting-das-api-key"),
-    token_lifetime: value("setting-das-lifetime"),
-    statements_meta_name: value("setting-das-meta-name"),
-    statements_meta_value: value("setting-das-meta-value"),
-    users: readDasUserRows()
+    client_id: value("setting-das-client-id")
   };
   try {
     const res = await fetch("/api/config/das", {
@@ -540,10 +480,7 @@ async function handleSaveDas(e) {
     });
     const data = await res.json();
     showAlert(data.success ? "success" : "error", data.message);
-    if (data.success) {
-      document.getElementById("setting-das-api-key").value = "";
-      fillDasForm(data.das);
-    }
+    if (data.success) fillDasForm(data.das);
   } catch (err) {
     showAlert("error", t("app.common.networkError", { error: err.message }));
   }
@@ -590,6 +527,7 @@ async function loadEnvironments() {
       lastEnvSnapshot = snapshot;
       renderFilterPills();
       renderEnvironments();
+      renderVersionEnvs();
     }
   } catch (err) {
     console.error("Error al cargar ambientes:", err);
@@ -882,7 +820,6 @@ function renderEnvironments() {
         <div class="flex items-center gap-0.5">
           ${iconButton("settings-2", t("app.actions.configureServices"), `openEditEnvModal('${env.id}')`, { disabled: !!busy })}
           ${iconButton("server", t("app.actions.viewServices"), `viewEnvServices('${env.id}')`)}
-          ${iconButton("camera", t("app.actions.createSnapshot"), `createSnapshotForEnv('${env.id}')`, { disabled: !!busy })}
           <span class="w-px h-4 bg-slate-800 mx-1" aria-hidden="true"></span>
           ${iconButton("trash-2", t("app.actions.deleteEnv"), `deleteEnvironment('${env.id}')`, { danger: true, disabled: !!busy })}
         </div>
@@ -1387,7 +1324,7 @@ function openEditEnvModal(envId) {
 
   const chkKafka = document.getElementById("edit-env-enable-kafka");
   if (chkKafka) chkKafka.checked = Boolean(env.enable_kafka);
-  renderIcmEnvVarsBox(env);
+  renderConfigBackups(env);
 
   renderUseCaseCheckboxes("edit", env.use_cases || []);
   resetBrandingDraft("edit", env);
@@ -1405,36 +1342,47 @@ function openEditEnvModal(envId) {
   lucide.createIcons();
 }
 
-// ICMEnvVars.json with this environment's Kafka server and port, only once Kafka is saved as enabled
-function renderIcmEnvVarsBox(env) {
-  const box = document.getElementById("edit-icm-env-vars");
+// Export / import of Scaler's administration settings and of the ICM environment variables (both through Scaler)
+function renderConfigBackups(env) {
+  const box = document.getElementById("edit-config-backups");
   if (!box) return;
-  if (!env || !env.enable_kafka) {
-    box.classList.add("hidden");
+  if (!env || env.enable_scaler === false) {
     box.innerHTML = "";
     return;
   }
-  const server = `${env.project_name}-kafka`;
-  box.classList.remove("hidden");
-  box.innerHTML = `
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/80 border border-slate-800 rounded-xl p-3">
-      <div class="min-w-0 space-y-1">
-        <span class="flex items-center gap-1.5 text-xs font-semibold text-white">
-          ${productIcon("content-manager", "white", "w-3.5 h-3.5")}
-          ${escapeHtml(t("app.icmEnvVars.title"))}
-        </span>
-        <span class="block text-[11px] text-slate-400 leading-snug">${escapeHtml(t("app.icmEnvVars.hint"))}</span>
-        <span class="flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-mono text-slate-300">
-          <span><span class="text-slate-500">kafkaserver</span> ${escapeHtml(server)}</span>
-          <span><span class="text-slate-500">kafkaport</span> 9092</span>
-        </span>
-      </div>
-      <a href="/api/environments/${encodeURIComponent(env.id)}/icm-env-vars" download="ICMEnvVars-${escapeHtml(env.id)}.json"
-         class="shrink-0 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-slate-700 text-slate-100 hover:bg-slate-800 hover:border-slate-600 transition">
-        <i data-lucide="download" class="w-3.5 h-3.5"></i>
-        ${escapeHtml(t("app.icmEnvVars.download"))}
-      </a>
+  const running = env.status === "running" || env.status === "partial";
+  const id = escapeHtml(env.id);
+  const actions = (exportFn, importFn) => `
+    <div class="flex items-center gap-2 shrink-0">
+      <button type="button" onclick="${exportFn}('${id}')" ${running ? "" : "disabled"}
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-slate-700 text-slate-100 hover:bg-slate-800 hover:border-slate-600 transition disabled:opacity-40 disabled:pointer-events-none">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i>${t("app.scalerConfig.export")}
+      </button>
+      <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-slate-700 text-slate-100 transition ${running ? "hover:bg-slate-800 hover:border-slate-600 cursor-pointer" : "opacity-40 pointer-events-none"}">
+        <i data-lucide="upload" class="w-3.5 h-3.5"></i>${t("app.scalerConfig.import")}
+        <input type="file" accept=".json,application/json" class="sr-only" ${running ? "" : "disabled"} onchange="${importFn}('${id}', this)">
+      </label>
     </div>`;
+  const row = (icon, title, hint, buttons) => `
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-3 py-3">
+      <div class="min-w-0 space-y-0.5">
+        <span class="flex items-center gap-1.5 text-xs font-semibold text-white">${icon}${escapeHtml(title)}</span>
+        <span class="block text-[11px] text-slate-400 leading-snug">${escapeHtml(hint)}</span>
+      </div>
+      ${buttons}
+    </div>`;
+  box.innerHTML = `
+    <div class="bg-slate-900/80 border border-slate-800 rounded-xl overflow-hidden">
+      <div class="flex items-center gap-1.5 px-3 pt-3 text-xs font-bold text-slate-300 uppercase tracking-wider">
+        <i data-lucide="file-json" class="w-3.5 h-3.5 text-slate-400"></i>${t("app.configBackups.title")}
+      </div>
+      ${running ? "" : `<p class="px-3 pt-1 text-[11px] text-amber-300">${t("app.scalerConfig.notRunning")}</p>`}
+      <div class="divide-y divide-slate-800">
+        ${row(productIcon("scaler", "white", "w-3.5 h-3.5"), t("app.scalerConfig.title"), t("app.scalerConfig.exportHint"), actions("exportScalerConfig", "importScalerConfig"))}
+        ${row(productIcon("content-manager", "white", "w-3.5 h-3.5"), t("app.icmVariables.title"), t("app.icmVariables.hint"), actions("exportIcmVariables", "importIcmVariables"))}
+      </div>
+    </div>`;
+  lucide.createIcons();
 }
 
 async function handleEditEnvSubmit(e) {
@@ -1538,6 +1486,7 @@ function getServicePortInfo(c, env) {
   let portText = "";
   let accessUrl = null;
   let urlLabel = "";
+  let address = "";   // host:port other machines connect to (ICM and FTP clients)
 
   if (s.includes("interactive") && !s.includes("ips") && !s.includes("prepare")) {
     const port = extractHostPort(c.ports, 30701) || ports.interactive || 30701;
@@ -1552,6 +1501,7 @@ function getServicePortInfo(c, env) {
   } else if (s.includes("icm")) {
     const port = extractHostPort(c.ports, 30353) || ports.icm || 30353;
     portText = `${port} (Inspire ICM)`;
+    address = `${hostAddress()}:${port}`;
   } else if (s.includes("postgres")) {
     const port = extractHostPort(c.ports, 5432) || ports.postgres || 5432;
     portText = `${port} (PostgreSQL)`;
@@ -1573,12 +1523,13 @@ function getServicePortInfo(c, env) {
   } else if (s.includes("ftp")) {
     const port = extractHostPort(c.ports, 21) || ports.ftp || 2121;
     portText = `${port} (system:Password12345*)`;
+    address = `${hostAddress()}:${port}`;
   } else {
     const genericMatch = c.ports ? c.ports.match(/:(\d+)->/) : null;
     portText = genericMatch ? genericMatch[1] : (c.ports || "N/A");
   }
 
-  return { portText, accessUrl, urlLabel };
+  return { portText, accessUrl, urlLabel, address };
 }
 
 function renderNodeBox({ title, container, defaultPort, internalPort, type, env, compact = false, hint = null }) {
@@ -1588,6 +1539,7 @@ function renderNodeBox({ title, container, defaultPort, internalPort, type, env,
   const portInfo = container ? getServicePortInfo(container, env) : {
     portText: `${defaultPort}${internalPort ? ` -> ${internalPort}` : ''}`,
     accessUrl: type === "interactive" ? `http://${host}:${defaultPort}/interactive` : (type === "scaler" ? `http://${host}:${defaultPort}/` : (type === "use-cases" ? `http://${host}:${defaultPort}/?lang=${currentLang}` : null)),
+    address: type === "icm" || type === "ftp" ? `${hostAddress()}:${defaultPort}` : "",
     urlLabel: type === "interactive" ? t("app.services.openInteractive") : (type === "scaler" ? t("app.services.openScaler") : (type === "use-cases" ? t("app.services.openUseCasesPortal") : ""))
   };
 
@@ -1638,6 +1590,16 @@ function renderNodeBox({ title, container, defaultPort, internalPort, type, env,
               ${escapeHtml(container ? container.name : '--')}
             </span>
           </div>
+          ${portInfo.address ? `
+            <div class="${compact ? "" : "sm:col-span-2"} bg-slate-950/70 p-2 rounded-lg border border-slate-800/80 flex items-center justify-between gap-2" title="${escapeHtml(t("app.host.connectHint"))}">
+              <span class="text-slate-400 font-medium flex-shrink-0">${t("app.host.connectFrom")}</span>
+              <span class="flex items-center gap-1.5 min-w-0">
+                <span class="font-mono font-semibold text-sky-300 truncate select-all">${escapeHtml(portInfo.address)}</span>
+                <button type="button" onclick="copyText('${escapeHtml(portInfo.address)}')" class="p-0.5 rounded text-slate-400 hover:text-white flex-shrink-0" title="${escapeHtml(t("app.host.copy"))}" aria-label="${escapeHtml(t("app.host.copy"))}">
+                  <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                </button>
+              </span>
+            </div>` : ""}
         </div>
 
         <!-- Sharedfolder Volume Info for Scaler -->
@@ -1896,6 +1858,7 @@ function renderServicesView() {
           hint: "production-server"
         })}
       </div>
+
     </div>
   `;
 
@@ -3377,7 +3340,7 @@ async function applyVersionToActiveEnv(tag) {
 }
 
 // ------------------------------------------------------------------------------
-// Volumes & Snapshots
+// Volumes
 // ------------------------------------------------------------------------------
 let currentModalCliCmd = "";
 
@@ -3585,89 +3548,6 @@ function copyVolCliCmd() {
     document.body.removeChild(ta);
     showAlert("success", t("app.volumes.cmdCopied"));
   });
-}
-
-async function loadSnapshots() {
-  const tbody = document.getElementById("snapshots-tbody");
-  if (!tbody) return;
-  try {
-    const res = await fetch("/api/environments/default/snapshots");
-    const data = await res.json();
-    tbody.innerHTML = "";
-    const snaps = data.snapshots || [];
-    if (snaps.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="5" class="py-6 text-center text-slate-500">${t("app.snapshots.none")}</td>
-        </tr>
-      `;
-      return;
-    }
-    snaps.forEach(s => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td class="py-2.5 px-3 font-semibold text-white">${escapeHtml(s.name)}</td>
-        <td class="py-2.5 px-3 text-slate-400 font-mono">${escapeHtml(s.env_id)}</td>
-        <td class="py-2.5 px-3 text-slate-400">${new Date(s.created_at).toLocaleString(currentLang)}</td>
-        <td class="py-2.5 px-3 font-mono text-slate-300">${escapeHtml(s.size_human)}</td>
-        <td class="py-2.5 px-3 text-right">
-          <button onclick="deleteSnapshot('${s.filename}')" class="p-1 hover:text-rose-400 text-slate-500 rounded" title="${t("app.common.delete")}">
-            <i data-lucide="trash" class="w-3.5 h-3.5"></i>
-          </button>
-        </td>
-      `;
-      tbody.appendChild(tr);
-    });
-    lucide.createIcons();
-  } catch (err) {
-    console.error("Error al cargar snapshots:", err);
-  }
-}
-
-function promptCreateSnapshot() {
-  const select = document.getElementById("service-env-select");
-  const envId = select ? select.value : "default";
-  createSnapshotForEnv(envId);
-}
-
-async function createSnapshotForEnv(envId) {
-  const { action, value: name } = await openActionDialog({
-    title: t("app.actions.createSnapshot"),
-    message: `<p>${t("app.snapshots.createIntro", { name: `<strong class="text-white">${escapeHtml(envName(envId))}</strong>` })}</p>`,
-    input: { label: t("app.snapshots.nameLabel"), value: t("app.snapshots.defaultName", { id: envId }) },
-    actions: [{ id: "ok", label: t("app.actions.createSnapshot"), style: "primary", gate: "value", default: true }]
-  });
-  if (!action || !name) return;
-  showAlert("info", t("app.snapshots.creating", { id: envId }));
-  try {
-    const res = await fetch(`/api/environments/${envId}/snapshots`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name })
-    });
-    const data = await res.json();
-    showAlert(data.success ? "success" : "error", data.message);
-    loadSnapshots();
-  } catch (err) {
-    showAlert("error", t("app.common.error", { error: err.message }));
-  }
-}
-
-async function deleteSnapshot(filename) {
-  const { action } = await openActionDialog({
-    title: t("app.snapshots.delete"),
-    message: `<p>${t("app.snapshots.deleteConfirm", { name: `<span class="font-mono text-white break-all">${escapeHtml(filename)}</span>` })}</p>`,
-    actions: [{ id: "ok", label: t("app.snapshots.delete"), style: "danger" }]
-  });
-  if (!action) return;
-  try {
-    const res = await fetch(`/api/snapshots/${filename}`, { method: "DELETE" });
-    const data = await res.json();
-    showAlert(data.success ? "success" : "error", data.message);
-    loadSnapshots();
-  } catch (err) {
-    showAlert("error", t("app.common.error", { error: err.message }));
-  }
 }
 
 // ------------------------------------------------------------------------------

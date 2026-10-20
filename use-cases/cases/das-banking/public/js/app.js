@@ -490,6 +490,20 @@
   // ── Start ──────────────────────────────────────────────────────────────────
   async function start() {
     $("login-form").addEventListener("submit", handleLogin);
+    // Quadient Cloud user store: accounts can be created here and are signed in like a normal login
+    DasSignup.init({
+      loginForm: $("login-form"),
+      onSignedIn: async signedIn => {
+        try {
+          await signInToCloud();
+          enterApp(signedIn);
+        } catch (err) {
+          await api("api/logout").catch(() => {});
+          user = null;
+          showLogin(err.message || String(err));
+        }
+      }
+    });
     $("btn-logout").addEventListener("click", handleLogout);
     $("btn-reload").addEventListener("click", loadStatements);
     $("btn-doc-retry").addEventListener("click", () => openDocumentId && openDocument(openDocumentId));

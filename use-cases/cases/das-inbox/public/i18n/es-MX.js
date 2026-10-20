@@ -6,7 +6,7 @@ window.I18N_MESSAGES["es-MX"] = Object.assign(window.I18N_MESSAGES["es-MX"] || {
   "das.nav.back": "Volver a la bandeja",
   "das.nav.logout": "Cerrar sesión",
   "das.config.title": "Falta configurar Quadient Cloud",
-  "das.config.body": "Captura la URL, el Application ID, el Client ID, el API key y los usuarios en Studio Manager › Ajustes › Quadient Cloud, y reactiva el ambiente.",
+  "das.config.body": "Captura la URL, el Application ID y el Client ID en Studio Manager › Ajustes › Quadient Cloud, y reactiva el ambiente.",
   "das.login.title": "Inicia sesión",
   "das.login.subtitle": "Tus documentos de Quadient Cloud Digital Services.",
   "das.login.username": "Usuario",

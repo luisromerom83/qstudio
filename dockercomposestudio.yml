@@ -1,0 +1,35 @@
+# ==============================================================================
+# Quadient Inspire Flex - Demo & PoC Studio (Docker Desktop for Windows / macOS)
+# ==============================================================================
+# Run (in the folder of this file):
+#   docker compose -f dockercomposestudio.yml pull
+#   docker compose -f dockercomposestudio.yml up -d
+#
+# Open: http://localhost:8090
+#
+# Docker Desktop: WSL 2 based engine and Linux containers.
+# /var/run/docker.sock stays as is on Windows; Docker Desktop maps it.
+# ==============================================================================
+services:
+  studio-manager:
+    image: luisromerom/inspire-flex-demo-studio:latest
+    container_name: inspire-studio-manager
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      # Default interface language: es-MX, en-US or pt-BR (empty = browser language)
+      - STUDIO_LANG=es-MX
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - studio_data:/app/manager/data
+      - studio_environments:/app/manager/environments
+      - studio_docker_config:/root/.docker
+
+volumes:
+  studio_data:
+    name: studio_data
+  studio_environments:
+    name: studio_environments
+  studio_docker_config:
+    name: studio_docker_config

@@ -81,6 +81,16 @@ def _prepare_host_dir(host_path: str, mount: str, subdirs: str) -> Tuple[int, st
 
 # Use cases that sign in to the Quadient Cloud app of Settings › Quadient Cloud (they share its DAS_* settings)
 DAS_CASES = ("das-inbox", "das-banking")
+# Scaler administrator the environments are created with (scaler-prepare); used for its Integration API
+SCALER_API_USER, SCALER_API_PASS = "system", "Password12345*"
+SCALER_API = "http://localhost:30600"
+SCALER_CONFIG_PATH = "/api/integration/v2/configurations"
+# ICM environment variables, served by Scaler; importBehavior values taken from Scaler 17.6 (IcmEnvironmentImportBehavior)
+ICM_VARIABLES_PATH = "/api/content/v1/inspireEnvironments"
+ICM_IMPORT_BEHAVIORS = ("AppendOnly", "AppendOrOverwrite", "Replace")
+
+# Inspire images every environment runs; a version is complete when all of them are published
+CORE_REPOS = ("flex/icm", "flex/ips", "flex/interactive", "flex/scaler")
 # Metadata (name, value) of the documents the online banking case lists as monthly statements
 DEFAULT_STATEMENTS_FILTER = ("DocType", "accstt")
 
@@ -99,6 +109,9 @@ class EnvService:
         self.firebase_web_file = os.path.join(self.data_dir, "firebase-web.json")
         self.das_file = os.path.join(self.data_dir, "das-cloud.json")
         self.das_demos_file = os.path.join(self.data_dir, "das-demos.json")
+        self.banking_file = os.path.join(self.data_dir, "banking.json")
+        self.host_file = os.path.join(self.data_dir, "host.json")
+        self._detected_host: Tuple[float, Optional[str]] = (0.0, None)
         self.use_cases_dir = os.path.join(self.base_dir, "use-cases")
         self.root_env = os.path.join(self.data_dir, ".quadient_credentials.env")
         if not os.path.exists(self.root_env) and os.path.exists(os.path.join(self.base_dir, ".quadient_credentials.env")):
@@ -108,6 +121,10 @@ class EnvService:
         # In-flight activations: env_id -> {"step", "total", "label"}; polled by the UI
         self._progress: Dict[str, Dict[str, Any]] = {}
         self._progress_lock = threading.Lock()
+        # One use-cases recreation at a time per environment: two overlapping `up --force-recreate` runs leave a
+        # renamed container stuck in "Created" and the environment without its use cases
+        self._use_cases_locks: Dict[str, threading.Lock] = {}
+        self._use_cases_locks_guard = threading.Lock()
 
     def _read_json(self, path: str) -> Optional[Dict[str, Any]]:
         try:
@@ -137,7 +154,7 @@ class EnvService:
             "vapid_key": bool(web.get("vapid_key")),
         }
 
-    def save_firebase_settings(self, service_account: str, web_config: str, vapid_key: str) -> Tuple[bool, str]:
+    def save_firebase_settings(self, service_account: str, web_config: str, vapid_key: str, apply: bool = True) -> Tuple[bool, str]:
         """Validates and stores the user's own Firebase project for the push inbox.
 
         Empty fields keep the stored value, so a single piece can be replaced later."""
@@ -172,30 +189,23 @@ class EnvService:
 
         self._write_secret_json(self.firebase_key_file, key)
         self._write_secret_json(self.firebase_web_file, web)
-        self._apply_use_case_settings("push-inbox")
+        if apply:
+            self._apply_use_case_settings("push-inbox")
         return True, f"Firebase configurado con el proyecto {key.get('project_id')}"
 
     def get_das_status(self) -> Dict[str, Any]:
-        """Quadient Cloud settings for the Digital Advantage inbox; the API key is reported only as present or not."""
+        """Quadient Cloud application of the DAS cases (Digital Advantage Inbox, online banking). Its users are
+        Quadient Cloud accounts (user store with Inspire Authentication); they sign in or create one in the case."""
         das = self._read_json(self.das_file) or {}
         return {
-            "configured": bool(das.get("cloud_url") and das.get("app_id") and das.get("client_id") and das.get("api_key") and das.get("users")),
+            "configured": bool(das.get("cloud_url") and das.get("app_id") and das.get("client_id")),
             "cloud_url": das.get("cloud_url", ""),
             "app_id": das.get("app_id", ""),
             "client_id": das.get("client_id", ""),
-            "api_key": bool(das.get("api_key")),
-            "token_lifetime": das.get("token_lifetime", 1500),
-            "users": das.get("users", []),
-            "statements_meta_name": das.get("statements_meta_name", DEFAULT_STATEMENTS_FILTER[0]),
-            "statements_meta_value": das.get("statements_meta_value", DEFAULT_STATEMENTS_FILTER[1]),
         }
 
-    def save_das_settings(self, data: Dict[str, Any]) -> Tuple[bool, str]:
-        """Validates and stores the Quadient Cloud application the DAS inbox signs in to.
-
-        An empty API key keeps the stored one; the other fields are always replaced."""
-        das = self._read_json(self.das_file) or {}
-
+    def save_das_settings(self, data: Dict[str, Any], apply: bool = True) -> Tuple[bool, str]:
+        """Validates and stores the Quadient Cloud application the DAS cases sign in to."""
         cloud_url = str(data.get("cloud_url") or "").strip().rstrip("/")
         if not re.match(r"^https://[A-Za-z0-9.-]+(:\d+)?$", cloud_url):
             return False, "La URL de Quadient Cloud debe tener el formato https://<empresa>.quadientcloud.eu"
@@ -205,48 +215,66 @@ class EnvService:
         client_id = str(data.get("client_id") or "").strip()
         if not client_id:
             return False, "Falta el Client ID de la aplicación"
-        api_key = str(data.get("api_key") or "").strip() or das.get("api_key", "")
-        if not api_key:
-            return False, "Falta el API key de Integrated Server-Side Authentication"
-        try:
-            lifetime = int(data.get("token_lifetime") or 1500)
-        except (TypeError, ValueError):
-            lifetime = 0
-        if not 60 <= lifetime <= 86400:
-            return False, "La vigencia del token debe estar entre 60 y 86400 segundos"
 
-        # [{username, password, subject}]; the subject defaults to the username
-        users = []
-        raw_users = data.get("users") if isinstance(data.get("users"), list) else []
-        for raw in raw_users:
-            if not isinstance(raw, dict):
-                continue
-            username = str(raw.get("username") or "").strip()
-            password = str(raw.get("password") or "").strip()
-            subject = str(raw.get("subject") or "").strip()
-            if not (username or password or subject):
-                continue
-            if not username or not password:
-                return False, "Cada usuario necesita usuario y contraseña"
-            if any(u["username"] == username for u in users):
-                return False, f"El usuario '{username}' está repetido"
-            users.append({"username": username, "password": password, "subject": subject or username})
-        if not users:
-            return False, "Agrega al menos un usuario para la app"
+        self._write_secret_json(self.das_file, {"cloud_url": cloud_url, "app_id": app_id, "client_id": client_id})
+        if apply:
+            self._apply_use_case_settings(*DAS_CASES)
+        return True, f"Quadient Cloud configurado ({cloud_url})"
 
-        # Metadata that marks the monthly statements of the online banking case; an empty name shows every document
+    def _detect_host_address(self) -> Optional[str]:
+        """LAN IP of the machine running Docker, from the source address of its default route (seen from the host
+        network). Docker Desktop runs containers in a VM whose address isn't the computer's, so there it is None."""
+        cached_at, cached = self._detected_host
+        if time.time() - cached_at < 300:
+            return cached
+        address = None
+        code, out, _ = DockerService._run_cmd("docker info --format '{{.OperatingSystem}}'", timeout=15)
+        if code == 0 and "docker desktop" not in out.lower():
+            code, out, _ = DockerService._run_cmd(
+                "docker run --rm --network host alpine sh -c 'ip -4 route get 1.1.1.1'", timeout=60)
+            match = re.search(r"\bsrc\s+(\d+\.\d+\.\d+\.\d+)", out) if code == 0 else None
+            address = match.group(1) if match else None
+        self._detected_host = (time.time(), address)
+        return address
+
+    def get_host_settings(self) -> Dict[str, Any]:
+        """Address other machines (ICM clients, FTP clients) use to reach this computer: the one typed in Settings,
+        otherwise the detected one."""
+        configured = str((self._read_json(self.host_file) or {}).get("host_address") or "")
+        return {"configured": configured, "detected": self._detect_host_address()}
+
+    def save_host_settings(self, data: Dict[str, Any]) -> Tuple[bool, str]:
+        address = str(data.get("host_address") or "").strip()
+        if address and not re.match(r"^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$", address):
+            return False, "Escribe una IP o un nombre de equipo, sin http:// ni puerto"
+        self._write_secret_json(self.host_file, {"host_address": address})
+        return True, "Dirección del host guardada" if address else "Se usará la dirección detectada"
+
+    def get_banking_settings(self) -> Dict[str, str]:
+        """Online banking case: the metadata that marks the monthly statements among the DAS documents.
+        It signs in with the Quadient Cloud app of the Digital Advantage Inbox settings."""
+        banking = self._read_json(self.banking_file)
+        if banking is None:
+            # Stored with the Quadient Cloud settings before they had their own section
+            das = self._read_json(self.das_file) or {}
+            banking = {k: das[k] for k in ("statements_meta_name", "statements_meta_value") if k in das}
+        return {
+            "statements_meta_name": banking.get("statements_meta_name", DEFAULT_STATEMENTS_FILTER[0]),
+            "statements_meta_value": banking.get("statements_meta_value", DEFAULT_STATEMENTS_FILTER[1]),
+        }
+
+    def save_banking_settings(self, data: Dict[str, Any], apply: bool = True) -> Tuple[bool, str]:
+        """An empty metadata name lists every document as a statement."""
         meta_name = str(data.get("statements_meta_name") or "").strip()[:60]
         meta_value = str(data.get("statements_meta_value") or "").strip()[:120]
         if meta_name and not meta_value:
             return False, "Indica el valor del metadato de los estados de cuenta"
-
-        self._write_secret_json(self.das_file, {
-            "cloud_url": cloud_url, "app_id": app_id, "client_id": client_id,
-            "api_key": api_key, "token_lifetime": lifetime, "users": users,
+        self._write_secret_json(self.banking_file, {
             "statements_meta_name": meta_name, "statements_meta_value": meta_value if meta_name else "",
         })
-        self._apply_use_case_settings(*DAS_CASES)
-        return True, f"Quadient Cloud configurado ({cloud_url})"
+        if apply:
+            self._apply_use_case_settings("das-banking")
+        return True, "Banca en línea configurada"
 
     def get_das_demos(self) -> List[Dict[str, Any]]:
         """Custom demos: documents of Quadient Cloud applications with anonymous access, one use case each."""
@@ -260,21 +288,10 @@ class EnvService:
         if demo_id and not any(d["id"] == demo_id for d in demos):
             return False, "Demo no encontrada"
 
-        name = str(data.get("name") or "").strip()
-        if not name:
-            return False, "El nombre de la demo es obligatorio"
-        cloud_url = str(data.get("cloud_url") or "").strip().rstrip("/")
-        if not re.match(r"^https://[A-Za-z0-9.-]+(:\d+)?$", cloud_url):
-            return False, "La URL de Quadient Cloud debe tener el formato https://<empresa>.quadientcloud.eu"
-        app_id = str(data.get("app_id") or "").strip()
-        if not app_id.isdigit():
-            return False, "El Application ID debe ser numérico"
-        client_id = str(data.get("client_id") or "").strip()
-        if not client_id:
-            return False, "Falta el Client ID de la aplicación"
-        document_id = str(data.get("document_id") or "").strip()
-        if not document_id:
-            return False, "Falta el Document ID"
+        ok, msg, fields = self._clean_demo_fields(data)
+        if not ok:
+            return False, msg
+        name = fields["name"]
 
         if not demo_id:
             import unicodedata
@@ -284,14 +301,104 @@ class EnvService:
             while any(d["id"] == demo_id for d in demos):
                 demo_id, n = f"{base}-{n}", n + 1
 
-        demo = {
-            "id": demo_id, "name": name, "description": str(data.get("description") or "").strip(),
-            "cloud_url": cloud_url, "app_id": app_id, "client_id": client_id, "document_id": document_id,
-        }
+        demo = {"id": demo_id, **fields}
         demos = [demo if d["id"] == demo_id else d for d in demos] if any(d["id"] == demo_id for d in demos) else demos + [demo]
         self._write_secret_json(self.das_demos_file, {"demos": demos})
         self._apply_use_case_settings(demo_id)
         return True, f"Demo '{name}' guardada"
+
+    @staticmethod
+    def _clean_demo_fields(data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, str]]:
+        """Validates the fields of a custom demo (everything but its id)."""
+        name = str(data.get("name") or "").strip()
+        if not name:
+            return False, "El nombre de la demo es obligatorio", {}
+        cloud_url = str(data.get("cloud_url") or "").strip().rstrip("/")
+        if not re.match(r"^https://[A-Za-z0-9.-]+(:\d+)?$", cloud_url):
+            return False, "La URL de Quadient Cloud debe tener el formato https://<empresa>.quadientcloud.eu", {}
+        app_id = str(data.get("app_id") or "").strip()
+        if not app_id.isdigit():
+            return False, "El Application ID debe ser numérico", {}
+        client_id = str(data.get("client_id") or "").strip()
+        if not client_id:
+            return False, "Falta el Client ID de la aplicación", {}
+        document_id = str(data.get("document_id") or "").strip()
+        if not document_id:
+            return False, "Falta el Document ID", {}
+        return True, "", {
+            "name": name, "description": str(data.get("description") or "").strip(),
+            "cloud_url": cloud_url, "app_id": app_id, "client_id": client_id, "document_id": document_id,
+        }
+
+    def export_settings(self) -> Dict[str, Any]:
+        """Settings (except Azure, which app.py adds) as one portable document. It carries secrets: the Firebase
+        service account and the Quadient Cloud API key. Environments and their data are not included."""
+        out: Dict[str, Any] = {}
+        key = self._read_json(self.firebase_key_file)
+        web = self._read_json(self.firebase_web_file)
+        if key or web:
+            out["firebase"] = {"service_account": key, "web": web}
+        das = self._read_json(self.das_file)
+        if das:
+            # Only the application; files saved before the users moved to Quadient Cloud may still carry the old ones
+            out["quadient_cloud"] = {k: das[k] for k in ("cloud_url", "app_id", "client_id") if k in das}
+        out["banking"] = self.get_banking_settings()
+        out["custom_demos"] = self.get_das_demos()
+        return out
+
+    def import_settings(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Restores the sections a settings document carries; the others stay as they are. Each section is checked
+        with the same rules as its form and reported on its own ({section, ok, message}); the use cases of the
+        environments are restarted once at the end."""
+        results: List[Dict[str, Any]] = []
+        touched: List[str] = []
+
+        firebase = data.get("firebase")
+        if isinstance(firebase, dict):
+            web = firebase.get("web") if isinstance(firebase.get("web"), dict) else {}
+            ok, msg = self.save_firebase_settings(
+                json.dumps(firebase["service_account"]) if isinstance(firebase.get("service_account"), dict) else "",
+                json.dumps(web["config"]) if isinstance(web.get("config"), dict) else "",
+                str(web.get("vapid_key") or ""), apply=False)
+            results.append({"section": "firebase", "ok": ok, "message": msg})
+            if ok:
+                touched.append("push-inbox")
+
+        das = data.get("quadient_cloud")
+        if isinstance(das, dict):
+            ok, msg = self.save_das_settings(das, apply=False)
+            results.append({"section": "quadient_cloud", "ok": ok, "message": msg})
+            if ok:
+                touched.extend(DAS_CASES)
+
+        banking = data.get("banking")
+        if isinstance(banking, dict):
+            ok, msg = self.save_banking_settings(banking, apply=False)
+            results.append({"section": "banking", "ok": ok, "message": msg})
+            if ok:
+                touched.append("das-banking")
+
+        demos = data.get("custom_demos")
+        if isinstance(demos, list):
+            # Same id replaces, new ids are added, demos that only exist here are kept
+            current = {d["id"]: d for d in self.get_das_demos()}
+            imported, skipped = 0, 0
+            for raw in demos:
+                demo_id = str((raw or {}).get("id") or "") if isinstance(raw, dict) else ""
+                ok, _msg, fields = self._clean_demo_fields(raw) if re.match(r"^demo-[a-z0-9-]{1,60}$", demo_id) else (False, "", {})
+                if not ok:
+                    skipped += 1
+                    continue
+                current[demo_id] = {"id": demo_id, **fields}
+                imported += 1
+                touched.append(demo_id)
+            self._write_secret_json(self.das_demos_file, {"demos": list(current.values())})
+            message = f"{imported} demos importadas" + (f", {skipped} con datos inválidos omitidas" if skipped else "")
+            results.append({"section": "custom_demos", "ok": skipped == 0, "message": message})
+
+        if touched:
+            self._apply_use_case_settings(*dict.fromkeys(touched))
+        return results
 
     def delete_das_demo(self, demo_id: str) -> Tuple[bool, str]:
         """Removes the demo and takes it out of every environment that used it."""
@@ -447,15 +554,13 @@ class EnvService:
         das = self._read_json(self.das_file) or {}
         if not das:
             return []
+        banking = self.get_banking_settings()
         return [
             "DAS_CLOUD_URL=" + das.get("cloud_url", ""),
             "DAS_APP_ID=" + str(das.get("app_id", "")),
             "DAS_CLIENT_ID=" + das.get("client_id", ""),
-            "DAS_API_KEY=" + das.get("api_key", ""),
-            "DAS_TOKEN_LIFETIME=" + str(das.get("token_lifetime", 1500)),
-            "DAS_USERS=" + base64.b64encode(json.dumps(das.get("users", [])).encode("utf-8")).decode("ascii"),
-            "DAS_STATEMENTS_META_NAME=" + das.get("statements_meta_name", DEFAULT_STATEMENTS_FILTER[0]),
-            "DAS_STATEMENTS_META_VALUE=" + das.get("statements_meta_value", DEFAULT_STATEMENTS_FILTER[1]),
+            "DAS_STATEMENTS_META_NAME=" + banking["statements_meta_name"],
+            "DAS_STATEMENTS_META_VALUE=" + banking["statements_meta_value"],
         ]
 
     def _branding_file(self, target_dir: str) -> str:
@@ -539,8 +644,15 @@ class EnvService:
         return lines
 
     def _recreate_use_cases(self, env: Dict[str, Any]) -> None:
-        """The container reads use-cases.env only when it is created, so a restart would keep the old values."""
+        """The container reads use-cases.env only when it is created, so a restart would keep the old values.
+        A call that arrives while another one runs waits for it and then recreates again with the latest file."""
         project_name = env["project_name"]
+        with self._use_cases_locks_guard:
+            lock = self._use_cases_locks.setdefault(project_name, threading.Lock())
+        with lock:
+            self._recreate_use_cases_locked(env, project_name)
+
+    def _recreate_use_cases_locked(self, env: Dict[str, Any], project_name: str) -> None:
         code, out, _ = DockerService._run_cmd(f"docker inspect --format='{{{{.State.Running}}}}' {shlex.quote(project_name + '-use-cases')}")
         if code != 0 or out.strip() != "true":
             return
@@ -1150,31 +1262,6 @@ class EnvService:
         self._save_environments(envs)
         return True, "Ambiente y configuración de servicios actualizados correctamente"
 
-    def build_icm_env_vars(self, env_id: str) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
-        """ICM environment variables (manager/resources/ICMEnvVars.json) pointing at this
-        environment's Kafka broker, ready to import into ICM."""
-        env = self.get_environment(env_id)
-        if not env:
-            return False, "Ambiente no encontrado", None
-        if not env.get("enable_kafka"):
-            return False, "Este ambiente no tiene Kafka habilitado", None
-        template = os.path.join(self.base_dir, "manager", "resources", "ICMEnvVars.json")
-        with open(template, encoding="utf-8") as f:
-            data = json.load(f)
-        # ICM, Scaler and Kafka share the compose network: the container name and the internal
-        # PLAINTEXT listener (9092) resolve there, not the port published on the host
-        values = {"kafkaserver": {"String": f"{env['project_name']}-kafka"}, "kafkaport": {"Number": 9092}}
-
-        def fill(node: Dict[str, Any]) -> None:
-            for child in node.get("Children", []):
-                name = str(child.get("Name", "")).lower()
-                if name in values:
-                    child["Value"] = values[name]
-                fill(child)
-
-        fill(data.get("Root", {}))
-        return True, "", data
-
     def _scaler_volume_targets(self, target: Dict[str, Any]) -> Dict[str, Optional[str]]:
         """Volume name -> host folder it must be bound to (None = Docker-managed)."""
         storage = target.get("storage_path")
@@ -1371,6 +1458,193 @@ class EnvService:
                 "driver": details.get("driver", "local")
             })
         return results
+
+    def _scaler_container(self, env_id: str) -> Tuple[Optional[str], str]:
+        """Name of the running Scaler container of an environment, or the reason there isn't one."""
+        env = self.get_environment(env_id)
+        if not env:
+            return None, "Ambiente no encontrado"
+        if not env.get("enable_scaler", True):
+            return None, "Este ambiente no tiene Scaler"
+        container = f"{env['project_name']}-scaler"
+        code, out, _ = DockerService._run_cmd(f"docker inspect --format='{{{{.State.Running}}}}' {shlex.quote(container)}")
+        if code != 0 or out.strip() != "true":
+            return None, "Scaler no está en ejecución; activa el ambiente primero"
+        return container, ""
+
+    def _scaler_request(self, container: str, method: str, path: str, body: Optional[str] = None) -> Tuple[int, str]:
+        """Calls Scaler's REST API from inside its own container (it ships curl), so no port or network has to be
+        reachable from the Studio. Returns (HTTP status, body); status 0 when curl itself failed."""
+        cmd = (f"docker exec {'-i ' if body is not None else ''}{shlex.quote(container)} curl -s -S "
+               f"-u {shlex.quote(SCALER_API_USER + ':' + SCALER_API_PASS)} -X {method} "
+               f"-H 'Content-Type: application/json' -w '\n%{{http_code}}' "
+               f"{'--data-binary @- ' if body is not None else ''}{shlex.quote(SCALER_API + path)}")
+        code, out, err = DockerService._run_cmd(cmd, timeout=120, input_data=body)
+        text, _, status = out.rpartition("\n")
+        if code != 0 or not status.isdigit():
+            return 0, err or out
+        return int(status), text
+
+    def export_scaler_config(self, env_id: str) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+        """Scaler's administration settings (GET), as Scaler exports them: secrets stay encrypted."""
+        container, reason = self._scaler_container(env_id)
+        if not container:
+            return False, reason, None
+        status, text = self._scaler_request(container, "GET", SCALER_CONFIG_PATH)
+        if status != 200:
+            return False, f"Scaler no devolvió su configuración ({status or 'sin respuesta'}): {text[:200]}", None
+        try:
+            return True, "", json.loads(text)
+        except ValueError:
+            return False, "Scaler devolvió una respuesta que no es JSON", None
+
+    def import_scaler_config(self, env_id: str, config: Any, modules: Any) -> Tuple[bool, str]:
+        """Imports settings into Scaler (POST). Only the chosen modules are sent with importEnabled; each one replaces
+        the whole module in Scaler. Scaler refuses it while any workflow is deployed."""
+        if not isinstance(config, dict) or not isinstance(config.get("internalSettings"), dict):
+            return False, "El archivo no es una configuración exportada de Scaler (falta internalSettings)"
+        chosen = {str(m) for m in modules} if isinstance(modules, list) else None
+        if chosen is not None and not chosen:
+            return False, "Elige al menos un módulo para importar"
+        container, reason = self._scaler_container(env_id)
+        if not container:
+            return False, reason
+        body = copy.deepcopy(config)
+        for name, module in body.items():
+            if isinstance(module, dict) and "importEnabled" in module and chosen is not None:
+                module["importEnabled"] = name in chosen
+        status, text = self._scaler_request(container, "POST", SCALER_CONFIG_PATH, json.dumps(body))
+        if 200 <= status < 300:
+            count = len(chosen) if chosen is not None else sum(1 for m in body.values() if isinstance(m, dict) and m.get("importEnabled"))
+            return True, f"Configuración importada en Scaler ({count} módulos)"
+        try:
+            detail = json.loads(text).get("detail") or text
+        except ValueError:
+            detail = text
+        if "undeployed" in str(detail).lower():
+            return False, "Scaler solo importa configuración con todos los workflows sin desplegar: repliégalos (Undeploy) en Scaler, importa y vuelve a desplegarlos"
+        return False, f"Scaler rechazó la importación ({status or 'sin respuesta'}): {str(detail)[:300]}"
+
+    def export_icm_variables(self, env_id: str) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+        """ICM environment variables (Inspire Environments) through Scaler, in the ICMEnvVars.json format."""
+        container, reason = self._scaler_container(env_id)
+        if not container:
+            return False, reason, None
+        status, text = self._scaler_request(container, "GET", ICM_VARIABLES_PATH)
+        if status != 200:
+            return False, f"Scaler no devolvió las variables de ICM ({status or 'sin respuesta'}): {text[:200]}", None
+        try:
+            return True, "", json.loads(text)
+        except ValueError:
+            return False, "Scaler devolvió una respuesta que no es JSON", None
+
+    def import_icm_variables(self, env_id: str, variables: Any, behavior: str) -> Tuple[bool, str]:
+        """Imports ICM environment variables (PUT). AppendOnly adds the new ones, AppendOrOverwrite also overwrites the
+        existing ones, Replace leaves exactly the file's variables."""
+        if not isinstance(variables, dict) or not isinstance(variables.get("Root"), dict):
+            return False, "El archivo no es un archivo de variables de entorno de ICM (falta Root)"
+        if behavior not in ICM_IMPORT_BEHAVIORS:
+            return False, "Modo de importación inválido"
+        container, reason = self._scaler_container(env_id)
+        if not container:
+            return False, reason
+        status, text = self._scaler_request(container, "PUT", f"{ICM_VARIABLES_PATH}?importBehavior={behavior}", json.dumps(variables))
+        if 200 <= status < 300:
+            return True, "Variables de entorno importadas en ICM"
+        try:
+            detail = json.loads(text).get("title") or text
+        except ValueError:
+            detail = text
+        return False, f"Scaler rechazó las variables ({status or 'sin respuesta'}): {str(detail)[:300]}"
+
+    def get_inspire_versions(self) -> Tuple[bool, str, List[Dict[str, Any]]]:
+        """'-latest' versions in Azure Container Registry and which core components each one is published for."""
+        creds = ACRService.get_credentials(self.root_env)
+        if not (creds.get("ACR_USERNAME") and creds.get("ACR_PASSWORD")):
+            return False, "Credenciales de Azure no configuradas", []
+        registry = creds.get("ACR_REGISTRY", "quadientdistribution.azurecr.io")
+        tags = {repo: set(ACRService.get_tags(registry, creds["ACR_USERNAME"], creds["ACR_PASSWORD"], repo)) for repo in CORE_REPOS}
+        if not any(tags.values()):
+            return False, "No se pudo consultar Azure Container Registry", []
+        latest = {t for repo_tags in tags.values() for t in repo_tags if t.endswith("-latest")}
+
+        def order(tag: str):
+            return [int(p) if p.isdigit() else 0 for p in tag.replace("-latest", "").split(".")]
+        versions = [{
+            "version": tag,
+            "missing": [repo.split("/")[-1] for repo in CORE_REPOS if tag not in tags[repo]],
+        } for tag in sorted(latest, key=order, reverse=True)]
+        return True, "", versions
+
+    def upgrade_version(self, env_id: str, version: str) -> Tuple[bool, str]:
+        """Moves an environment to another Inspire version: checks the images exist, downloads them and, when the
+        environment is running, recreates its containers with them. Reported like an activation (progress)."""
+        with self._progress_lock:
+            if env_id in self._progress:
+                return False, "Este ambiente ya tiene una operación en curso. Espera a que termine."
+            self._progress[env_id] = {"step": 0, "total": 3, "label": "Verificando la versión en Azure"}
+        try:
+            return self._upgrade_version(env_id, version.strip())
+        finally:
+            with self._progress_lock:
+                self._progress.pop(env_id, None)
+
+    def _upgrade_version(self, env_id: str, version: str) -> Tuple[bool, str]:
+        if not VERSION_RE.match(version):
+            return False, f"Versión inválida: {version!r}"
+        envs = self.list_environments()
+        target = next((e for e in envs if e["id"] == env_id), None)
+        if not target:
+            return False, "Ambiente no encontrado"
+        previous = target.get("version", "17.5-latest")
+        if version == previous:
+            return False, f"El ambiente ya usa la versión {version}"
+
+        creds = ACRService.get_credentials(target.get("env_file", self.root_env))
+        if not (creds.get("ACR_USERNAME") and creds.get("ACR_PASSWORD")):
+            creds = ACRService.get_credentials(self.root_env)
+        if not (creds.get("ACR_USERNAME") and creds.get("ACR_PASSWORD")):
+            return False, "Credenciales de Azure no configuradas"
+        registry = creds.get("ACR_REGISTRY", "quadientdistribution.azurecr.io")
+
+        # Every image this environment runs must exist in the new version before anything changes
+        self._set_progress(env_id, 1, 3, "Verificando la versión en Azure")
+        repos = ["flex/icm", "flex/ips"]
+        if target.get("enable_interactive", True):
+            repos.append("flex/interactive")
+        if target.get("enable_scaler", True):
+            repos.append("flex/scaler")
+        missing = [repo.split("/")[-1] for repo in repos
+                   if version not in ACRService.get_tags(registry, creds["ACR_USERNAME"], creds["ACR_PASSWORD"], repo)]
+        if missing:
+            return False, f"La versión {version} no está publicada para: {', '.join(missing)}"
+        ok_login, msg_login = DockerService.login_registry(registry, creds["ACR_USERNAME"], creds["ACR_PASSWORD"])
+        if not ok_login:
+            return False, f"Fallo al autenticar Docker con Azure Container Registry: {msg_login}"
+
+        def set_version(value: str) -> None:
+            target["version"] = value
+            if os.path.exists(target["env_file"]):
+                env_creds = ACRService.get_credentials(target["env_file"])
+                env_creds["INSPIRE_VERSION"] = value
+                ACRService.save_credentials(target["env_file"], env_creds)
+            self._rewrite_compose(target)
+
+        set_version(version)
+        self._set_progress(env_id, 2, 3, f"Descargando las imágenes de Inspire {version} (puede tardar varios minutos)")
+        ok_pull, msg_pull = DockerService.compose_pull(target["compose_file"], target["env_file"], target["project_name"])
+        if not ok_pull:
+            set_version(previous)
+            return False, f"No se pudieron descargar las imágenes de {version}; el ambiente sigue en {previous}: {msg_pull}"
+        self._save_environments(envs)
+
+        if target.get("status") not in ("running", "partial"):
+            return True, f"Ambiente '{target['name']}' actualizado a {version}. Se aplicará al activarlo."
+        self._set_progress(env_id, 3, 3, f"Reiniciando los servicios con {version}")
+        ok_up, msg_up = DockerService.compose_up(target["compose_file"], target["env_file"], target["project_name"], timeout=900)
+        if not ok_up:
+            return False, f"Las imágenes de {version} se descargaron, pero los servicios no arrancaron: {msg_up}"
+        return True, f"Ambiente '{target['name']}' actualizado a {version}"
 
     def activate_demo(self, env_id: str, exclusive: bool = True) -> Tuple[bool, str]:
         with self._progress_lock:

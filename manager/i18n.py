@@ -107,26 +107,6 @@ CATALOG: Dict[str, Dict[str, str]] = {
         "en-US": "The application's Client ID is missing",
         "pt-BR": "Falta o Client ID da aplicação",
     },
-    "Falta el API key de Integrated Server-Side Authentication": {
-        "en-US": "The Integrated Server-Side Authentication API key is missing",
-        "pt-BR": "Falta a API key de Integrated Server-Side Authentication",
-    },
-    "La vigencia del token debe estar entre 60 y 86400 segundos": {
-        "en-US": "The token lifetime must be between 60 and 86400 seconds",
-        "pt-BR": "A validade do token deve estar entre 60 e 86400 segundos",
-    },
-    "Cada usuario necesita usuario y contraseña": {
-        "en-US": "Every user needs a username and a password",
-        "pt-BR": "Cada usuário precisa de usuário e senha",
-    },
-    "El usuario '{user}' está repetido": {
-        "en-US": "User '{user}' is listed more than once",
-        "pt-BR": "O usuário '{user}' está repetido",
-    },
-    "Agrega al menos un usuario para la app": {
-        "en-US": "Add at least one user for the app",
-        "pt-BR": "Adicione pelo menos um usuário para o app",
-    },
     "Quadient Cloud configurado ({url})": {
         "en-US": "Quadient Cloud configured ({url})",
         "pt-BR": "Quadient Cloud configurado ({url})",
@@ -146,6 +126,151 @@ CATALOG: Dict[str, Dict[str, str]] = {
         "pt-BR": "Design inválido",
     },
 
+    # ── Scaler configuration backup (env_service.py) ──
+    "Este ambiente no tiene Scaler": {
+        "en-US": "This environment has no Scaler",
+        "pt-BR": "Este ambiente não tem Scaler",
+    },
+    "Scaler no está en ejecución; activa el ambiente primero": {
+        "en-US": "Scaler is not running; activate the environment first",
+        "pt-BR": "O Scaler não está em execução; ative o ambiente primeiro",
+    },
+    "Scaler no devolvió su configuración ({status}): {detail}": {
+        "en-US": "Scaler didn't return its configuration ({status}): {detail}",
+        "pt-BR": "O Scaler não retornou sua configuração ({status}): {detail}",
+    },
+    "Scaler devolvió una respuesta que no es JSON": {
+        "en-US": "Scaler returned a response that isn't JSON",
+        "pt-BR": "O Scaler retornou uma resposta que não é JSON",
+    },
+    "El archivo no es una configuración exportada de Scaler (falta internalSettings)": {
+        "en-US": "The file is not an exported Scaler configuration (internalSettings is missing)",
+        "pt-BR": "O arquivo não é uma configuração exportada do Scaler (falta internalSettings)",
+    },
+    "Elige al menos un módulo para importar": {
+        "en-US": "Choose at least one module to import",
+        "pt-BR": "Escolha pelo menos um módulo para importar",
+    },
+    "Configuración importada en Scaler ({count} módulos)": {
+        "en-US": "Configuration imported into Scaler ({count} modules)",
+        "pt-BR": "Configuração importada no Scaler ({count} módulos)",
+    },
+    "Scaler solo importa configuración con todos los workflows sin desplegar: repliégalos (Undeploy) en Scaler, importa y vuelve a desplegarlos": {
+        "en-US": "Scaler only imports a configuration while no workflow is deployed: undeploy them in Scaler, import and deploy them again",
+        "pt-BR": "O Scaler só importa a configuração com todos os workflows não implantados: faça Undeploy no Scaler, importe e implante-os novamente",
+    },
+    "Scaler rechazó la importación ({status}): {detail}": {
+        "en-US": "Scaler rejected the import ({status}): {detail}",
+        "pt-BR": "O Scaler recusou a importação ({status}): {detail}",
+    },
+
+    "Scaler no devolvió las variables de ICM ({status}): {detail}": {
+        "en-US": "Scaler didn't return the ICM variables ({status}): {detail}",
+        "pt-BR": "O Scaler não retornou as variáveis do ICM ({status}): {detail}",
+    },
+    "El archivo no es un archivo de variables de entorno de ICM (falta Root)": {
+        "en-US": "The file is not an ICM environment variables file (Root is missing)",
+        "pt-BR": "O arquivo não é um arquivo de variáveis de ambiente do ICM (falta Root)",
+    },
+    "Modo de importación inválido": {
+        "en-US": "Invalid import mode",
+        "pt-BR": "Modo de importação inválido",
+    },
+    "Variables de entorno importadas en ICM": {
+        "en-US": "Environment variables imported into ICM",
+        "pt-BR": "Variáveis de ambiente importadas no ICM",
+    },
+    "Scaler rechazó las variables ({status}): {detail}": {
+        "en-US": "Scaler rejected the variables ({status}): {detail}",
+        "pt-BR": "O Scaler recusou as variáveis ({status}): {detail}",
+    },
+
+    # ── Host address (env_service.py) ──
+    "Escribe una IP o un nombre de equipo, sin http:// ni puerto": {
+        "en-US": "Enter an IP or a computer name, without http:// or a port",
+        "pt-BR": "Digite um IP ou um nome de computador, sem http:// nem porta",
+    },
+    "Dirección del host guardada": {
+        "en-US": "Host address saved",
+        "pt-BR": "Endereço do host salvo",
+    },
+    "Se usará la dirección detectada": {
+        "en-US": "The detected address will be used",
+        "pt-BR": "Será usado o endereço detectado",
+    },
+
+    # ── Settings backup (app.py, env_service.py) ──
+    "El archivo no es un respaldo de ajustes del Studio": {
+        "en-US": "The file is not a Studio settings backup",
+        "pt-BR": "O arquivo não é um backup de configurações do Studio",
+    },
+    "Ajustes importados": {
+        "en-US": "Settings imported",
+        "pt-BR": "Configurações importadas",
+    },
+    "Ajustes importados con errores en algunas secciones": {
+        "en-US": "Settings imported with errors in some sections",
+        "pt-BR": "Configurações importadas com erros em algumas seções",
+    },
+    "{imported} demos importadas, {skipped} con datos inválidos omitidas": {
+        "en-US": "{imported} demos imported, {skipped} with invalid data skipped",
+        "pt-BR": "{imported} demos importadas, {skipped} com dados inválidos ignoradas",
+    },
+    "{imported} demos importadas": {
+        "en-US": "{imported} demos imported",
+        "pt-BR": "{imported} demos importadas",
+    },
+
+    # ── Inspire version upgrade (env_service.py) ──
+    "Este ambiente ya tiene una operación en curso. Espera a que termine.": {
+        "en-US": "This environment already has an operation in progress. Wait for it to finish.",
+        "pt-BR": "Este ambiente já tem uma operação em andamento. Aguarde até terminar.",
+    },
+    "El ambiente ya usa la versión {version}": {
+        "en-US": "The environment already uses version {version}",
+        "pt-BR": "O ambiente já usa a versão {version}",
+    },
+    "La versión {version} no está publicada para: {missing}": {
+        "en-US": "Version {version} is not published for: {missing}",
+        "pt-BR": "A versão {version} não está publicada para: {missing}",
+    },
+    "No se pudieron descargar las imágenes de {version}; el ambiente sigue en {previous}: {detail}": {
+        "en-US": "The {version} images couldn't be downloaded; the environment stays on {previous}: {detail}",
+        "pt-BR": "Não foi possível baixar as imagens da {version}; o ambiente continua na {previous}: {detail}",
+    },
+    "Ambiente '{name}' actualizado a {version}. Se aplicará al activarlo.": {
+        "en-US": "Environment '{name}' updated to {version}. It applies when you activate it.",
+        "pt-BR": "Ambiente '{name}' atualizado para {version}. Será aplicado ao ativá-lo.",
+    },
+    "Las imágenes de {version} se descargaron, pero los servicios no arrancaron: {detail}": {
+        "en-US": "The {version} images were downloaded, but the services didn't start: {detail}",
+        "pt-BR": "As imagens da {version} foram baixadas, mas os serviços não iniciaram: {detail}",
+    },
+    "Ambiente '{name}' actualizado a {version}": {
+        "en-US": "Environment '{name}' updated to {version}",
+        "pt-BR": "Ambiente '{name}' atualizado para {version}",
+    },
+    "No se pudo consultar Azure Container Registry": {
+        "en-US": "Couldn't query Azure Container Registry",
+        "pt-BR": "Não foi possível consultar o Azure Container Registry",
+    },
+    "Verificando la versión en Azure": {
+        "en-US": "Checking the version in Azure",
+        "pt-BR": "Verificando a versão no Azure",
+    },
+    "Descargando las imágenes de Inspire {version} (puede tardar varios minutos)": {
+        "en-US": "Downloading the Inspire {version} images (it can take several minutes)",
+        "pt-BR": "Baixando as imagens do Inspire {version} (pode levar vários minutos)",
+    },
+    "Reiniciando los servicios con {version}": {
+        "en-US": "Restarting the services with {version}",
+        "pt-BR": "Reiniciando os serviços com {version}",
+    },
+
+    "Banca en línea configurada": {
+        "en-US": "Online banking configured",
+        "pt-BR": "Internet banking configurado",
+    },
     "Indica el valor del metadato de los estados de cuenta": {
         "en-US": "Enter the value of the statements metadata",
         "pt-BR": "Informe o valor do metadado dos extratos",
@@ -205,10 +330,6 @@ CATALOG: Dict[str, Dict[str, str]] = {
     "No se pudo recrear el volumen {volume} con la nueva carpeta: {detail}": {
         "en-US": "Couldn't recreate volume {volume} with the new folder: {detail}",
         "pt-BR": "Não foi possível recriar o volume {volume} com a nova pasta: {detail}",
-    },
-    "Este ambiente no tiene Kafka habilitado": {
-        "en-US": "This environment doesn't have Kafka enabled",
-        "pt-BR": "Este ambiente não tem o Kafka habilitado",
     },
     "Este ambiente no tiene logo": {
         "en-US": "This environment has no logo",
@@ -439,24 +560,6 @@ CATALOG: Dict[str, Dict[str, str]] = {
     "Error al eliminar volumen: {detail}": {
         "en-US": "Error deleting volume: {detail}",
         "pt-BR": "Erro ao excluir o volume: {detail}",
-    },
-
-    # ── Snapshots (backup_service.py) ──
-    "Snapshot creado exitosamente": {
-        "en-US": "Snapshot created successfully",
-        "pt-BR": "Snapshot criado com sucesso",
-    },
-    "Error al generar snapshot: {detail}": {
-        "en-US": "Error creating snapshot: {detail}",
-        "pt-BR": "Erro ao gerar o snapshot: {detail}",
-    },
-    "Nombre de snapshot inválido": {
-        "en-US": "Invalid snapshot name",
-        "pt-BR": "Nome de snapshot inválido",
-    },
-    "Snapshot eliminado": {
-        "en-US": "Snapshot deleted",
-        "pt-BR": "Snapshot excluído",
     },
 
     # ── Environment volume components ("component" field, env_service.get_environment_volumes) ──
