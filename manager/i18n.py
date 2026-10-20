@@ -132,6 +132,25 @@ CATALOG: Dict[str, Dict[str, str]] = {
         "pt-BR": "Quadient Cloud configurado ({url})",
     },
 
+    # ── Services view design (env_service.py) ──
+    "Diseño guardado": {
+        "en-US": "Design saved",
+        "pt-BR": "Design salvo",
+    },
+    "Diseño restablecido": {
+        "en-US": "Design reset",
+        "pt-BR": "Design restaurado",
+    },
+    "Diseño inválido": {
+        "en-US": "Invalid design",
+        "pt-BR": "Design inválido",
+    },
+
+    "Indica el valor del metadato de los estados de cuenta": {
+        "en-US": "Enter the value of the statements metadata",
+        "pt-BR": "Informe o valor do metadado dos extratos",
+    },
+
     # ── Custom demos (env_service.py) ──
     "Demo no encontrada": {
         "en-US": "Demo not found",

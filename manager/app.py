@@ -219,6 +219,16 @@ def update_environment(env_id):
         return jsonify({"success": True, "message": msg})
     return jsonify({"success": False, "message": msg}), 400
 
+@app.route("/api/environments/<env_id>/layout", methods=["PUT"])
+def save_environment_layout(env_id):
+    ok, msg = env_service.save_layout(env_id, (request.json or {}).get("layout") or {})
+    return jsonify({"success": ok, "message": msg}), (200 if ok else 400)
+
+@app.route("/api/environments/<env_id>/layout", methods=["DELETE"])
+def reset_environment_layout(env_id):
+    ok, msg = env_service.save_layout(env_id, None)
+    return jsonify({"success": ok, "message": msg}), (200 if ok else 404)
+
 @app.route("/api/environments/<env_id>", methods=["DELETE"])
 def delete_environment(env_id):
     remove_vols = request.args.get("remove_volumes", "false").lower() == "true"

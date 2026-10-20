@@ -12,12 +12,13 @@ const path = require('path');
  * picks the data up with Digital Services Input; this app only signs the user in and shows the documents.
  *
  * Settings come from Studio Manager via use-cases.env: DAS_CLOUD_URL, DAS_APP_ID, DAS_CLIENT_ID, DAS_API_KEY,
- * DAS_TOKEN_LIFETIME and DAS_USERS (Base64 JSON [{ username, password, subject }]).
+ * DAS_TOKEN_LIFETIME and DAS_USERS (Base64 JSON [{ username, password, subject }]); DAS_STATEMENTS_META_NAME and
+ * DAS_STATEMENTS_META_VALUE pick the documents the online banking case lists as statements.
+ *
+ * createDasRouter() also serves other front ends on the same Quadient Cloud app (the online banking case): each
+ * one has its own public folder and session cookie, and shares the SDK in public/vendor.
  */
-const COOKIE = 'das_sid';
-const COOKIE_PATH = '/das-inbox';
-
-const router = express.Router();
+const VENDOR_DIR = path.join(__dirname, 'public', 'vendor');
 
 function settings() {
   let users = [];
@@ -33,7 +34,11 @@ function settings() {
     clientId: (process.env.DAS_CLIENT_ID || '').trim(),
     apiKey: (process.env.DAS_API_KEY || '').trim(),
     lifetime: parseInt(process.env.DAS_TOKEN_LIFETIME, 10) || 1500,
-    users: Array.isArray(users) ? users : []
+    users: Array.isArray(users) ? users : [],
+    statementsMeta: {
+      name: (process.env.DAS_STATEMENTS_META_NAME || '').trim(),
+      value: (process.env.DAS_STATEMENTS_META_VALUE || '').trim()
+    }
   };
 }
 
@@ -45,35 +50,6 @@ function missingSettings(cfg = settings()) {
   if (!cfg.apiKey) missing.push('API key');
   if (!cfg.users.length) missing.push('usuarios');
   return missing;
-}
-
-// The SDK reads CLOUD_URL, CLOUD_APP_ID and CLOUD_CLIENT_ID as globals; must be served before express.static
-router.get('/js/runtime-config.js', (req, res) => {
-  const cfg = settings();
-  const globals = {
-    CLOUD_URL: cfg.cloudUrl,
-    CLOUD_APP_ID: /^\d+$/.test(cfg.appId) ? Number(cfg.appId) : cfg.appId,
-    CLOUD_CLIENT_ID: cfg.clientId
-  };
-  res.type('application/javascript').set('Cache-Control', 'no-store');
-  res.send(Object.entries(globals)
-    .map(([name, value]) => `var ${name} = ${JSON.stringify(value).replace(/</g, '\\u003c')};`)
-    .join('\n') + `\nwindow.__DAS_READY__ = ${missingSettings(cfg).length === 0};\n`);
-});
-
-router.use(express.static(path.join(__dirname, 'public')));
-
-// App sessions live in memory: a container restart signs everybody out, which is fine for a demo
-const sessions = new Map();
-
-function readSession(req) {
-  const match = (req.headers.cookie || '').split(';').map(c => c.trim()).find(c => c.startsWith(`${COOKIE}=`));
-  const sid = match && decodeURIComponent(match.slice(COOKIE.length + 1));
-  return sid && sessions.has(sid) ? { sid, ...sessions.get(sid) } : null;
-}
-
-function setCookie(res, sid, maxAge) {
-  res.append('Set-Cookie', `${COOKIE}=${sid}; Path=${COOKIE_PATH}; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`);
 }
 
 async function callCloud(cfg, endpoint, body) {
@@ -94,67 +70,107 @@ async function callCloud(cfg, endpoint, body) {
   return json;
 }
 
-router.post('/api/login', (req, res) => {
-  const cfg = settings();
-  const missing = missingSettings(cfg);
-  if (missing.length) {
-    return res.status(503).json({ error: `Quadient Cloud sin configurar (falta: ${missing.join(', ')}). Configúralo en Studio Manager.` });
+function createDasRouter({ publicDir, cookieName, cookiePath }) {
+  const router = express.Router();
+
+  // The SDK reads CLOUD_URL, CLOUD_APP_ID and CLOUD_CLIENT_ID as globals; must be served before express.static
+  router.get('/js/runtime-config.js', (req, res) => {
+    const cfg = settings();
+    const globals = {
+      CLOUD_URL: cfg.cloudUrl,
+      CLOUD_APP_ID: /^\d+$/.test(cfg.appId) ? Number(cfg.appId) : cfg.appId,
+      CLOUD_CLIENT_ID: cfg.clientId
+    };
+    res.type('application/javascript').set('Cache-Control', 'no-store');
+    res.send(Object.entries(globals)
+      .map(([name, value]) => `var ${name} = ${JSON.stringify(value).replace(/</g, '\\u003c')};`)
+      .join('\n') + `\nwindow.__DAS_READY__ = ${missingSettings(cfg).length === 0};\n`
+      + `window.__DAS_STATEMENTS_META__ = ${cfg.statementsMeta.name ? JSON.stringify(cfg.statementsMeta).replace(/</g, '\\u003c') : 'null'};\n`);
+  });
+
+  router.use('/vendor', express.static(VENDOR_DIR));
+  router.use(express.static(publicDir));
+
+  // App sessions live in memory: a container restart signs everybody out, which is fine for a demo
+  const sessions = new Map();
+
+  function readSession(req) {
+    const match = (req.headers.cookie || '').split(';').map(c => c.trim()).find(c => c.startsWith(`${cookieName}=`));
+    const sid = match && decodeURIComponent(match.slice(cookieName.length + 1));
+    return sid && sessions.has(sid) ? { sid, ...sessions.get(sid) } : null;
   }
-  const { username, password } = req.body || {};
-  const user = cfg.users.find(u => u.username === username && u.password === password);
-  if (!user) return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
 
-  const sid = crypto.randomBytes(24).toString('hex');
-  sessions.set(sid, { username: user.username, subject: user.subject || user.username, token: null });
-  setCookie(res, sid, 12 * 3600);
-  res.json({ user: { username: user.username, subject: user.subject || user.username } });
-});
-
-// Called by the SDK's refreshToken on sign-in and whenever the Quadient Cloud session is about to expire
-router.post('/api/token', async (req, res) => {
-  const session = readSession(req);
-  if (!session) return res.status(401).json({ error: 'No has iniciado sesión' });
-  const cfg = settings();
-  try {
-    const json = await callCloud(cfg, 'CreateServerAuthenticatedAccessToken', {
-      Subject: session.subject,
-      LifeTimeInSeconds: cfg.lifetime
-    });
-    if (!json.token) throw new Error('Respuesta sin token');
-    sessions.set(session.sid, { username: session.username, subject: session.subject, token: json.token });
-    res.json({ token: json.token });
-  } catch (err) {
-    console.error('❌ CreateServerAuthenticatedAccessToken:', err.message);
-    res.status(502).json({ error: `Quadient Cloud rechazó la solicitud del token: ${err.message}` });
+  function setCookie(res, sid, maxAge) {
+    res.append('Set-Cookie', `${cookieName}=${sid}; Path=${cookiePath}; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`);
   }
-});
 
-router.get('/api/me', (req, res) => {
-  const session = readSession(req);
-  if (!session) return res.status(401).json({ error: 'No has iniciado sesión' });
-  res.json({ user: { username: session.username, subject: session.subject } });
-});
-
-router.post('/api/logout', async (req, res) => {
-  const session = readSession(req);
-  if (session) {
-    sessions.delete(session.sid);
-    if (session.token) {
-      // Best effort: the token expires on its own anyway
-      callCloud(settings(), 'RevokeServerAuthenticatedAccessToken', { Token: session.token })
-        .catch(err => console.warn('⚠️ RevokeServerAuthenticatedAccessToken:', err.message));
+  router.post('/api/login', (req, res) => {
+    const cfg = settings();
+    const missing = missingSettings(cfg);
+    if (missing.length) {
+      return res.status(503).json({ error: `Quadient Cloud sin configurar (falta: ${missing.join(', ')}). Configúralo en Studio Manager.` });
     }
-  }
-  setCookie(res, '', 0);
-  res.json({ success: true });
-});
+    const { username, password } = req.body || {};
+    const user = cfg.users.find(u => u.username === username && u.password === password);
+    if (!user) return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+
+    const sid = crypto.randomBytes(24).toString('hex');
+    sessions.set(sid, { username: user.username, subject: user.subject || user.username, token: null });
+    setCookie(res, sid, 12 * 3600);
+    res.json({ user: { username: user.username, subject: user.subject || user.username } });
+  });
+
+  // Called by the SDK's refreshToken on sign-in and whenever the Quadient Cloud session is about to expire
+  router.post('/api/token', async (req, res) => {
+    const session = readSession(req);
+    if (!session) return res.status(401).json({ error: 'No has iniciado sesión' });
+    const cfg = settings();
+    try {
+      const json = await callCloud(cfg, 'CreateServerAuthenticatedAccessToken', {
+        Subject: session.subject,
+        LifeTimeInSeconds: cfg.lifetime
+      });
+      if (!json.token) throw new Error('Respuesta sin token');
+      sessions.set(session.sid, { username: session.username, subject: session.subject, token: json.token });
+      res.json({ token: json.token });
+    } catch (err) {
+      console.error('❌ CreateServerAuthenticatedAccessToken:', err.message);
+      res.status(502).json({ error: `Quadient Cloud rechazó la solicitud del token: ${err.message}` });
+    }
+  });
+
+  router.get('/api/me', (req, res) => {
+    const session = readSession(req);
+    if (!session) return res.status(401).json({ error: 'No has iniciado sesión' });
+    res.json({ user: { username: session.username, subject: session.subject } });
+  });
+
+  router.post('/api/logout', async (req, res) => {
+    const session = readSession(req);
+    if (session) {
+      sessions.delete(session.sid);
+      if (session.token) {
+        // Best effort: the token expires on its own anyway
+        callCloud(settings(), 'RevokeServerAuthenticatedAccessToken', { Token: session.token })
+          .catch(err => console.warn('⚠️ RevokeServerAuthenticatedAccessToken:', err.message));
+      }
+    }
+    setCookie(res, '', 0);
+    res.json({ success: true });
+  });
+
+  return router;
+}
+
+function status() {
+  const missing = missingSettings();
+  return missing.length
+    ? { ready: false, message: `Quadient Cloud sin configurar (falta: ${missing.join(', ')}). Configúralo en Studio Manager.` }
+    : { ready: true, message: 'Quadient Cloud configurado' };
+}
 
 module.exports = {
-  router,
-  status() {
-    const missing = missingSettings();
-    return missing.length
-      ? { ready: false, message: `Quadient Cloud sin configurar (falta: ${missing.join(', ')}). Configúralo en Studio Manager.` }
-      : { ready: true, message: 'Quadient Cloud configurado' };
-  }
+  router: createDasRouter({ publicDir: path.join(__dirname, 'public'), cookieName: 'das_sid', cookiePath: '/das-inbox' }),
+  status,
+  createDasRouter
 };

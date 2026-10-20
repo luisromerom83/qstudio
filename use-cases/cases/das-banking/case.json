@@ -1,0 +1,18 @@
+{
+  "id": "das-banking",
+  "name": "Banca en línea",
+  "description": "Portal de banca electrónica con datos de ejemplo. Sus estados de cuenta mensuales son los documentos de Quadient Cloud Digital Services (el mismo inbox de DAS, con el mismo login).",
+  "icon": "🏦",
+  "requires": ["das"],
+  "order": 32,
+  "i18n": {
+    "en-US": {
+      "name": "Online banking",
+      "description": "Online banking portal with sample data. Its monthly statements are the Quadient Cloud Digital Services documents (the same DAS inbox, with the same sign-in)."
+    },
+    "pt-BR": {
+      "name": "Internet banking",
+      "description": "Portal de internet banking com dados de exemplo. Os extratos mensais são os documentos do Quadient Cloud Digital Services (o mesmo inbox do DAS, com o mesmo login)."
+    }
+  }
+}

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="bank.page.title">Banca en línea</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="css/bank.css" rel="stylesheet">
+  <!-- Logo and colors of this environment, from Studio Manager -->
+  <script src="/branding.js"></script>
+
+  <!-- CLOUD_URL / CLOUD_APP_ID / CLOUD_CLIENT_ID for the SDK, served from the Studio Manager settings -->
+  <script src="js/runtime-config.js"></script>
+  <script src="vendor/web-runtime.js"></script>
+</head>
+<body>
+
+  <!-- Startup -->
+  <section id="view-loading" class="view d-flex align-items-center justify-content-center min-vh-100">
+    <div class="spinner-border text-primary" role="status"></div>
+  </section>
+
+  <!-- Settings or SDK missing -->
+  <section id="view-config" class="view d-none">
+    <div class="container narrow py-5">
+      <div id="config-missing" class="alert alert-warning">
+        <h2 class="h6 fw-bold mb-1" data-i18n="bank.config.title">Falta configurar Quadient Cloud</h2>
+        <p class="small mb-0" data-i18n="bank.config.body">Captura la URL, el Application ID, el Client ID, el API key y los usuarios en Studio Manager › Ajustes › Quadient Cloud, y reactiva el ambiente.</p>
+      </div>
+      <div id="sdk-missing" class="alert alert-danger d-none">
+        <h2 class="h6 fw-bold mb-1" data-i18n="bank.sdk.title">Falta el SDK de Quadient</h2>
+        <p class="small mb-0" data-i18n-html="bank.sdk.body">Copia <code>web-runtime.js</code> del Advantage Web SDK en <code>use-cases/cases/das-inbox/public/vendor/</code> y reconstruye la imagen de Studio Manager.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sign in -->
+  <section id="view-login" class="view d-none">
+    <div class="login-split">
+      <aside class="login-hero">
+        <div class="login-hero-inner">
+          <span class="brand-mark brand-mark-lg" data-brand-logo><i class="bi bi-bank2"></i></span>
+          <h1 class="display-6 fw-bold mt-4 mb-3" data-i18n="bank.login.heroTitle">Tu banco, donde estés</h1>
+          <p class="lead mb-4" data-i18n="bank.login.heroText">Consulta tus saldos, paga tus tarjetas y recibe tus estados de cuenta digitales.</p>
+          <ul class="list-unstyled hero-points">
+            <li><i class="bi bi-shield-lock"></i><span data-i18n="bank.login.point1">Acceso seguro las 24 horas</span></li>
+            <li><i class="bi bi-file-earmark-text"></i><span data-i18n="bank.login.point2">Estados de cuenta interactivos, sin papel</span></li>
+            <li><i class="bi bi-lightning-charge"></i><span data-i18n="bank.login.point3">Transferencias al instante</span></li>
+          </ul>
+        </div>
+      </aside>
+      <main class="login-panel">
+        <div class="d-flex justify-content-end mb-4" id="login-lang-slot"></div>
+        <div class="login-card">
+          <h2 class="h4 fw-bold mb-1" data-i18n="bank.login.title">Inicia sesión</h2>
+          <p class="text-secondary small mb-4" data-i18n="bank.login.subtitle">Entra a tu banca en línea.</p>
+          <div id="login-error" class="alert alert-danger small d-none"></div>
+          <form id="login-form" novalidate>
+            <div class="mb-3">
+              <label for="login-username" class="form-label small fw-semibold" data-i18n="bank.login.username">Usuario</label>
+              <input id="login-username" class="form-control form-control-lg" autocomplete="username" required>
+            </div>
+            <div class="mb-4">
+              <label for="login-password" class="form-label small fw-semibold" data-i18n="bank.login.password">Contraseña</label>
+              <input id="login-password" type="password" class="form-control form-control-lg" autocomplete="current-password" required>
+            </div>
+            <button id="login-submit" type="submit" class="btn btn-primary btn-lg w-100">
+              <span id="login-spinner" class="spinner-border spinner-border-sm me-1 d-none"></span>
+              <span data-i18n="bank.login.submit">Entrar</span>
+            </button>
+          </form>
+          <p class="demo-note small mt-4 mb-0"><i class="bi bi-info-circle me-1"></i><span data-i18n="bank.login.demoNote">Demo: usa un usuario de la app configurado en Studio Manager. Los saldos y movimientos son de ejemplo.</span></p>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <!-- Banking app -->
+  <section id="view-app" class="view d-none">
+    <nav class="navbar navbar-bank sticky-top">
+      <div class="container-fluid px-3 px-lg-4">
+        <a class="navbar-brand d-flex align-items-center gap-2 fw-bold" href="#/home">
+          <span class="brand-mark" data-brand-logo><i class="bi bi-bank2"></i></span>
+          <span class="text-truncate" data-i18n="bank.brand">Banca en línea</span>
+        </a>
+        <div class="d-flex align-items-center gap-2 ms-auto">
+          <div id="app-lang-slot"></div>
+          <span class="user-chip d-none d-sm-inline-flex"><i class="bi bi-person-circle"></i><span id="user-name"></span></span>
+          <button id="btn-logout" type="button" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-box-arrow-right"></i> <span class="d-none d-md-inline" data-i18n="bank.nav.logout">Salir</span>
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <div class="app-shell">
+      <aside class="side-nav" aria-label="Menú">
+        <a href="#/home" data-section="home"><i class="bi bi-house-door"></i><span data-i18n="bank.nav.home">Inicio</span></a>
+        <a href="#/accounts" data-section="accounts"><i class="bi bi-wallet2"></i><span data-i18n="bank.nav.accounts">Cuentas</span></a>
+        <a href="#/cards" data-section="cards"><i class="bi bi-credit-card"></i><span data-i18n="bank.nav.cards">Tarjetas</span></a>
+        <a href="#/transfers" data-section="transfers"><i class="bi bi-arrow-left-right"></i><span data-i18n="bank.nav.transfers">Transferencias</span></a>
+        <a href="#/statements" data-section="statements"><i class="bi bi-file-earmark-text"></i><span data-i18n="bank.nav.statements">Estados de cuenta</span><span id="statements-badge" class="nav-badge d-none"></span></a>
+      </aside>
+
+      <main class="app-main">
+        <!-- Home -->
+        <section id="section-home" class="bank-section d-none">
+          <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-4">
+            <div>
+              <p class="text-secondary small mb-1" id="today-label"></p>
+              <h1 class="h3 fw-bold mb-0" id="greeting"></h1>
+            </div>
+            <div class="d-flex gap-2">
+              <a href="#/transfers" class="btn btn-primary"><i class="bi bi-send me-1"></i><span data-i18n="bank.home.transfer">Transferir</span></a>
+              <a href="#/statements" class="btn btn-outline-primary"><i class="bi bi-file-earmark-text me-1"></i><span data-i18n="bank.home.statements">Estados de cuenta</span></a>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-4" id="summary-cards"></div>
+
+          <a href="#/statements" class="promo d-flex align-items-center gap-3 mb-4">
+            <span class="promo-icon"><i class="bi bi-envelope-paper-heart"></i></span>
+            <span class="flex-grow-1">
+              <span class="d-block fw-bold" data-i18n="bank.home.promoTitle">Tus estados de cuenta ya son digitales</span>
+              <span class="d-block small" data-i18n="bank.home.promoText">Consúltalos cada mes, interactivos y sin papel, en la sección Estados de cuenta.</span>
+            </span>
+            <i class="bi bi-chevron-right"></i>
+          </a>
+
+          <div class="panel">
+            <div class="panel-header">
+              <h2 class="h6 fw-bold mb-0" data-i18n="bank.home.recent">Movimientos recientes</h2>
+              <a href="#/accounts" class="small" data-i18n="bank.home.seeAll">Ver todos</a>
+            </div>
+            <div id="recent-movements"></div>
+          </div>
+        </section>
+
+        <!-- Accounts -->
+        <section id="section-accounts" class="bank-section d-none">
+          <h1 class="h4 fw-bold mb-4" data-i18n="bank.accounts.title">Mis cuentas</h1>
+          <div class="row g-3 mb-4" id="account-list"></div>
+          <div class="panel">
+            <div class="panel-header">
+              <h2 class="h6 fw-bold mb-0" id="account-movements-title"></h2>
+            </div>
+            <div id="account-movements"></div>
+          </div>
+        </section>
+
+        <!-- Cards -->
+        <section id="section-cards" class="bank-section d-none">
+          <h1 class="h4 fw-bold mb-4" data-i18n="bank.cards.title">Mis tarjetas</h1>
+          <div class="row g-4" id="card-list"></div>
+        </section>
+
+        <!-- Transfers -->
+        <section id="section-transfers" class="bank-section d-none">
+          <h1 class="h4 fw-bold mb-4" data-i18n="bank.transfers.title">Transferir</h1>
+          <div class="row g-4">
+            <div class="col-lg-7">
+              <form id="transfer-form" class="panel p-4" novalidate>
+                <div class="mb-3">
+                  <label for="transfer-from" class="form-label small fw-semibold" data-i18n="bank.transfers.from">Desde</label>
+                  <select id="transfer-from" class="form-select"></select>
+                </div>
+                <div class="mb-3">
+                  <label for="transfer-to" class="form-label small fw-semibold" data-i18n="bank.transfers.to">Para</label>
+                  <select id="transfer-to" class="form-select"></select>
+                </div>
+                <div class="row g-3 mb-3">
+                  <div class="col-sm-6">
+                    <label for="transfer-amount" class="form-label small fw-semibold" data-i18n="bank.transfers.amount">Monto</label>
+                    <input id="transfer-amount" type="number" min="1" step="0.01" class="form-control" required>
+                  </div>
+                  <div class="col-sm-6">
+                    <label for="transfer-concept" class="form-label small fw-semibold" data-i18n="bank.transfers.concept">Concepto</label>
+                    <input id="transfer-concept" class="form-control" maxlength="40">
+                  </div>
+                </div>
+                <div id="transfer-result" class="alert d-none small"></div>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i><span data-i18n="bank.transfers.submit">Transferir</span></button>
+              </form>
+            </div>
+            <div class="col-lg-5">
+              <div class="panel">
+                <div class="panel-header"><h2 class="h6 fw-bold mb-0" data-i18n="bank.transfers.contacts">Contactos frecuentes</h2></div>
+                <div id="contact-list"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Statements: the Digital Advantage Inbox -->
+        <section id="section-statements" class="bank-section d-none">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+            <h1 class="h4 fw-bold mb-0" data-i18n="bank.statements.title">Estados de cuenta</h1>
+            <button id="btn-reload" type="button" class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-arrow-clockwise"></i> <span data-i18n="bank.statements.reload">Actualizar</span>
+            </button>
+          </div>
+          <p class="text-secondary small mb-4" data-i18n="bank.statements.subtitle">Tus estados de cuenta mensuales, interactivos y siempre disponibles.</p>
+          <div id="statements-error" class="alert alert-danger small d-none"></div>
+          <div id="statements-loading" class="text-center py-5 d-none"><div class="spinner-border text-primary" role="status"></div></div>
+          <div id="statements-empty" class="panel text-center text-secondary py-5 d-none">
+            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+            <span data-i18n="bank.statements.empty">Todavía no tienes estados de cuenta.</span>
+          </div>
+          <div id="statements-list" class="statement-grid"></div>
+        </section>
+
+        <!-- Statement opened -->
+        <section id="section-document" class="bank-section d-none">
+          <a href="#/statements" class="btn btn-sm btn-light border mb-3"><i class="bi bi-arrow-left"></i> <span data-i18n="bank.document.back">Estados de cuenta</span></a>
+          <div id="doc-error" class="panel p-4 d-none">
+            <div class="alert alert-danger small" data-i18n="bank.document.error">No se pudo cargar el estado de cuenta.</div>
+            <button id="btn-doc-retry" type="button" class="btn btn-primary" data-i18n="bank.document.retry">Reintentar</button>
+          </div>
+          <div id="doc-loading" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div></div>
+          <div class="doc-frame-wrap">
+            <iframe id="doc-frame" class="d-none" title="Estado de cuenta" data-i18n-attr="title:bank.document.frameTitle"
+              sandbox="allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox"></iframe>
+          </div>
+        </section>
+      </main>
+    </div>
+  </section>
+
+  <div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="toast" class="toast align-items-center text-bg-dark border-0" role="status" aria-live="polite">
+      <div class="d-flex">
+        <div class="toast-body" id="toast-body"></div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="i18n/es-MX.js"></script>
+  <script src="i18n/en-US.js"></script>
+  <script src="i18n/pt-BR.js"></script>
+  <script src="/shared/i18n.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

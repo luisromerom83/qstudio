@@ -134,6 +134,199 @@ dialog::backdrop {
   .hub-flow-line.is-running { animation: none; }
 }
 
+/* Free architecture design: groups and layers placed on a stage, arrows drawn underneath the groups */
+.arch-scroller {
+  overflow-x: auto;
+}
+
+.arch-stage {
+  position: relative;
+  min-width: 100%;
+}
+
+.arch-edges {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.arch-item {
+  position: absolute;
+}
+
+.arch-zone {
+  z-index: 1;
+}
+
+.arch-node {
+  z-index: 10;
+  /* Positions follow the pointer; .group-box would otherwise animate every step */
+  transition: box-shadow 0.15s ease, outline-color 0.15s ease;
+}
+
+/* Editing: the stage shows its 10px snap grid and everything can be grabbed */
+.arch-stage.is-editing {
+  background-image: radial-gradient(rgba(148, 163, 184, 0.28) 1px, transparent 1px);
+  background-size: 10px 10px;
+  border-radius: 1rem;
+  outline: 1px dashed rgba(56, 189, 248, 0.35);
+  outline-offset: 4px;
+}
+
+.arch-stage.is-editing .arch-node {
+  cursor: grab;
+  outline: 2px dashed rgba(56, 189, 248, 0.45);
+  outline-offset: 3px;
+  touch-action: none;
+  user-select: none;
+}
+
+.arch-stage.is-editing .arch-node * {
+  cursor: inherit;
+}
+
+.arch-stage.is-editing .arch-zone {
+  border-style: dashed;
+}
+
+.arch-stage.is-editing .arch-zone-header {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.arch-stage .is-dragging {
+  cursor: grabbing !important;
+  z-index: 20;
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.8), 0 0 0 2px rgba(56, 189, 248, 0.7);
+}
+
+.arch-resize {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 16px;
+  height: 16px;
+  z-index: 2;
+  cursor: nwse-resize !important;
+  border-right: 3px solid rgba(56, 189, 248, 0.85);
+  border-bottom: 3px solid rgba(56, 189, 248, 0.85);
+  border-bottom-right-radius: 6px;
+  touch-action: none;
+}
+
+/* Blue dot at the bottom of each group: drag it onto another group to draw an arrow */
+.arch-connect {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  z-index: 3;
+  border-radius: 9999px;
+  background: #38BDF8;
+  border: 2px solid #0b0f14;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.35);
+  cursor: crosshair !important;
+  touch-action: none;
+}
+
+.arch-connect:hover {
+  transform: scale(1.25);
+}
+
+.arch-stage.is-connecting .arch-node {
+  cursor: crosshair !important;
+}
+
+.arch-stage .is-connect-target {
+  outline: 3px solid rgba(52, 211, 153, 0.9) !important;
+  outline-offset: 3px;
+}
+
+/* Arrows can be clicked while editing: a wide invisible stroke makes them easy to hit */
+.arch-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 16;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.arch-edge-hit:hover + .hub-flow-line {
+  stroke-opacity: 1;
+  stroke-width: 3;
+}
+
+.arch-stage.is-editing .hub-flow-label[data-edge] {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.arch-edge-draft {
+  fill: none;
+  stroke: #38BDF8;
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+}
+
+.arch-custom-edit {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  cursor: pointer !important;
+}
+
+.arch-custom-edit:hover {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+#group-dialog .group-preset.is-selected {
+  border-color: #38BDF8;
+  background: rgba(56, 189, 248, 0.12);
+}
+
+#group-dialog .group-color.is-selected {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px #38BDF8;
+}
+
+/* Use case tile being moved to another place inside its group */
+.arch-stage .is-reordering {
+  opacity: 0.75;
+  cursor: grabbing !important;
+  outline: 2px solid rgba(56, 189, 248, 0.9);
+  outline-offset: 2px;
+}
+
+.arch-stage.is-editing .arch-tile {
+  outline: 1px dashed rgba(56, 189, 248, 0.4);
+  outline-offset: 2px;
+}
+
+/* Groups only change width (their height follows the content) */
+.arch-node > .arch-resize {
+  cursor: ew-resize !important;
+  top: 50%;
+  bottom: auto;
+  height: 28px;
+  margin-top: -14px;
+  border-bottom: none;
+  border-radius: 0 4px 4px 0;
+}
+
 .node-box {
   background-color: rgba(2, 6, 23, 0.85);
   border: 1.5px solid #334155;
