@@ -375,6 +375,84 @@ dialog::backdrop {
   outline-offset: 2px;
 }
 
+/* Settings: a side menu on wide screens, scrolling tabs on narrow ones */
+.settings-layout {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 64rem;
+  margin: 0 auto;
+}
+.settings-tabs {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid #1e293b; /* slate-800 */
+}
+.settings-tabs::-webkit-scrollbar {
+  display: none;
+}
+.settings-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.85rem;
+  margin-bottom: -1px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: #94a3b8; /* slate-400 */
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+.settings-tab:hover {
+  color: #e2e8f0; /* slate-200 */
+}
+.settings-tab[aria-selected="true"] {
+  color: #ffffff;
+  border-bottom-color: #C2410C;
+}
+.settings-tab:focus-visible {
+  outline: 2px solid #C2410C;
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+@media (min-width: 1024px) {
+  .settings-layout {
+    grid-template-columns: 12rem minmax(0, 1fr);
+    align-items: start;
+  }
+  .settings-tabs {
+    flex-direction: column;
+    position: sticky;
+    top: 5rem;
+    border-bottom: none;
+    padding: 0.4rem;
+    border: 1px solid #1e293b;
+    border-radius: 1rem;
+    background: rgba(15, 23, 42, 0.5); /* slate-900/50 */
+  }
+  .settings-tab {
+    margin-bottom: 0;
+    border-bottom: none;
+    border-radius: 0.6rem;
+    padding: 0.6rem 0.75rem;
+  }
+  .settings-tab:hover {
+    background: #1e293b;
+  }
+  .settings-tab[aria-selected="true"] {
+    background: rgba(194, 65, 12, 0.18);
+    box-shadow: inset 3px 0 0 #C2410C;
+  }
+  /* Cards start next to the menu instead of centering in the column */
+  [data-settings-panel] > .max-w-2xl {
+    max-width: 48rem;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
 /* Environment modal tabs */
 .env-tabs {
   display: flex;

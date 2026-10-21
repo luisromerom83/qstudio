@@ -111,6 +111,7 @@ function switchTab(tabId) {
     populateServicesSelect();
     renderServicesView();
   } else if (tabId === "settings") {
+    switchSettingsTab(savedSettingsTab());
     loadInspireVersions();
   }
 
@@ -462,6 +463,464 @@ function fillDasForm(das) {
   renderDasStatus(das);
   // The Digital Services box in the services view links to this cloud URL
   renderServicesView();
+}
+
+// ------------------------------------------------------------------------------
+// Scaler configuration: export its administration settings to a file and import them (into the same or another
+// environment). Scaler imports module by module: each chosen module replaces the whole module in Scaler.
+// ------------------------------------------------------------------------------
+async function exportScalerConfig(envId) {
+  await downloadFromApi(`/api/environments/${encodeURIComponent(envId)}/scaler-config`, `scaler-config-${envId}.json`, "app.scalerConfig.exported");
+}
+
+async function exportIcmVariables(envId) {
+  await downloadFromApi(`/api/environments/${encodeURIComponent(envId)}/icm-variables`, `ICMEnvVars-${envId}.json`, "app.icmVariables.exported");
+}
+
+// Saves a file the API sends as an attachment; API errors come back as JSON and are shown instead
+async function downloadFromApi(url, fallbackName, doneKey) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      showAlert("error", data.message || `HTTP ${res.status}`);
+      return;
+    }
+    const name = (/filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") || "") || [])[1] || fallbackName;
+    const blobUrl = URL.createObjectURL(await res.blob());
+    const link = Object.assign(document.createElement("a"), { href: blobUrl, download: name });
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(blobUrl);
+    showAlert("success", t(doneKey, { file: name }));
+  } catch (err) {
+    showAlert("error", t("app.common.networkError", { error: err.message }));
+  }
+}
+
+// What a module holds: the size of its list, or "settings" for the modules that are a single block
+function scalerModuleSummary(module) {
+  const list = Object.values(module).find(v => Array.isArray(v));
+  if (!list) return { count: null, text: t("app.scalerConfig.settings") };
+  return { count: list.length, text: t(list.length === 1 ? "app.scalerConfig.item" : "app.scalerConfig.items", { count: list.length }) };
+}
+
+function chooseScalerModules(config, fileName, envLabel) {
+  return new Promise(resolve => {
+    let dlg = document.getElementById("scaler-config-dialog");
+    if (!dlg) {
+      dlg = document.createElement("dialog");
+      dlg.id = "scaler-config-dialog";
+      dlg.className = "bg-slate-900 border border-slate-700 text-slate-100 rounded-xl shadow-2xl p-0 w-[calc(100%-2rem)] max-w-xl";
+      document.body.appendChild(dlg);
+    }
+    const modules = Object.entries(config)
+      .filter(([, m]) => m && typeof m === "object" && "importEnabled" in m)
+      .map(([name, m]) => ({ name, ...scalerModuleSummary(m), enabled: m.importEnabled !== false }));
+    // Empty lists start unchecked: importing them would erase what the target Scaler has in that module
+    const checked = m => m.enabled && m.count !== 0;
+    dlg.innerHTML = `
+      <form method="dialog" class="p-6 space-y-4">
+        <h2 class="text-base font-semibold text-white">${t("app.scalerConfig.importTitle")}</h2>
+        <p class="text-sm text-slate-300">${t("app.scalerConfig.importIntro", { file: `<span class="font-mono text-white break-all">${escapeHtml(fileName)}</span>`, env: `<strong class="text-white">${escapeHtml(envLabel)}</strong>` })}</p>
+        <div class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] leading-snug text-amber-200 space-y-1">
+          <p>${t("app.scalerConfig.replaceWarning")}</p>
+          <p>${t("app.scalerConfig.undeployWarning")}</p>
+        </div>
+        <div class="flex items-center justify-between text-[11px] text-slate-400">
+          <span>${t("app.scalerConfig.modules")}</span>
+          <span class="flex gap-3">
+            <button type="button" data-select="all" class="hover:text-white underline">${t("app.scalerConfig.selectAll")}</button>
+            <button type="button" data-select="content" class="hover:text-white underline">${t("app.scalerConfig.selectContent")}</button>
+          </span>
+        </div>
+        <div class="max-h-72 overflow-y-auto rounded-lg border border-slate-700 divide-y divide-slate-800 bg-slate-950">
+          ${modules.map(m => `
+            <label class="flex items-center gap-3 px-3 py-1.5 text-xs cursor-pointer hover:bg-slate-900">
+              <input type="checkbox" value="${escapeHtml(m.name)}" ${checked(m) ? "checked" : ""} class="w-4 h-4 rounded border-slate-700 text-brand-600 bg-slate-950">
+              <span class="font-mono text-slate-200 flex-1">${escapeHtml(m.name)}</span>
+              <span class="${m.count === 0 ? "text-slate-600" : "text-slate-400"}">${escapeHtml(m.text)}</span>
+            </label>`).join("")}
+        </div>
+        <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
+          <button value="" class="whitespace-nowrap px-3.5 py-2 rounded-md text-sm font-medium text-slate-300 border border-slate-700 hover:bg-slate-800">${t("app.common.cancel")}</button>
+          <button value="import" class="whitespace-nowrap px-3.5 py-2 rounded-md text-sm font-medium ${DIALOG_BUTTON_STYLES.primary}">${t("app.scalerConfig.importAction")}</button>
+        </div>
+      </form>`;
+    const boxes = () => Array.from(dlg.querySelectorAll('input[type="checkbox"]'));
+    dlg.querySelector('[data-select="all"]').onclick = () => boxes().forEach(b => { b.checked = true; });
+    dlg.querySelector('[data-select="content"]').onclick = () => boxes().forEach(b => { b.checked = checked(modules.find(m => m.name === b.value)); });
+    dlg.onclick = ev => { if (ev.target === dlg) dlg.close(""); };
+    dlg.addEventListener("close", () => {
+      resolve(dlg.returnValue === "import" ? boxes().filter(b => b.checked).map(b => b.value) : null);
+    }, { once: true });
+    dlg.returnValue = "";
+    dlg.showModal();
+  });
+}
+
+async function importScalerConfig(envId, input) {
+  const file = input.files && input.files[0];
+  input.value = "";
+  if (!file) return;
+  let config = null;
+  try {
+    config = JSON.parse(await file.text());
+  } catch (_) { /* reported below */ }
+  if (!config || typeof config !== "object" || !config.internalSettings) {
+    showAlert("error", t("app.scalerConfig.invalid"));
+    return;
+  }
+  const modules = await chooseScalerModules(config, file.name, envName(envId));
+  if (!modules) return;
+  if (!modules.length) {
+    showAlert("error", t("app.scalerConfig.noneChosen"));
+    return;
+  }
+  showAlert("info", t("app.scalerConfig.importing"));
+  try {
+    const res = await fetch(`/api/environments/${encodeURIComponent(envId)}/scaler-config`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ config, modules })
+    });
+    const data = await res.json();
+    showAlert(data.success ? "success" : "error", data.message);
+  } catch (err) {
+    showAlert("error", t("app.common.networkError", { error: err.message }));
+  }
+}
+
+// ICM environment variables (ICMEnvVars.json format): AppendOnly adds the new ones, AppendOrOverwrite also
+// overwrites the existing ones, Replace leaves exactly the file's variables
+const ICM_IMPORT_BEHAVIORS = ["AppendOnly", "AppendOrOverwrite", "Replace"];
+
+function icmVariableNames(node, prefix = "") {
+  return (node.Children || []).flatMap(child => {
+    const path = prefix ? `${prefix}/${child.Name}` : child.Name;
+    return child.EntryType === "Folder" ? icmVariableNames(child, path) : [path];
+  });
+}
+
+function chooseIcmImportBehavior(variables, fileName, envLabel) {
+  return new Promise(resolve => {
+    let dlg = document.getElementById("icm-variables-dialog");
+    if (!dlg) {
+      dlg = document.createElement("dialog");
+      dlg.id = "icm-variables-dialog";
+      dlg.className = "bg-slate-900 border border-slate-700 text-slate-100 rounded-xl shadow-2xl p-0 w-[calc(100%-2rem)] max-w-lg";
+      document.body.appendChild(dlg);
+    }
+    const names = icmVariableNames(variables.Root);
+    dlg.innerHTML = `
+      <form method="dialog" class="p-6 space-y-4">
+        <h2 class="text-base font-semibold text-white">${t("app.icmVariables.importTitle")}</h2>
+        <p class="text-sm text-slate-300">${t("app.icmVariables.importIntro", { file: `<span class="font-mono text-white break-all">${escapeHtml(fileName)}</span>`, env: `<strong class="text-white">${escapeHtml(envLabel)}</strong>`, count: names.length })}</p>
+        <div class="max-h-32 overflow-y-auto rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-[11px] text-slate-300 leading-relaxed">
+          ${names.map(n => escapeHtml(n)).join("<br>") || `<span class="text-slate-500">${t("app.icmVariables.empty")}</span>`}
+        </div>
+        <fieldset class="space-y-2">
+          <legend class="text-xs text-slate-400 mb-1">${t("app.icmVariables.behavior")}</legend>
+          ${ICM_IMPORT_BEHAVIORS.map((b, i) => `
+            <label class="flex items-start gap-2.5 rounded-lg border border-slate-800 px-3 py-2 cursor-pointer hover:border-slate-600">
+              <input type="radio" name="icm-behavior" value="${b}" ${i === 0 ? "checked" : ""} class="mt-0.5 text-brand-600 bg-slate-950 border-slate-700">
+              <span>
+                <span class="block text-xs font-semibold ${b === "Replace" ? "text-amber-300" : "text-white"}">${t(`app.icmVariables.behavior.${b}`)}</span>
+                <span class="block text-[11px] text-slate-400">${t(`app.icmVariables.behaviorHint.${b}`)}</span>
+              </span>
+            </label>`).join("")}
+        </fieldset>
+        <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
+          <button value="" class="whitespace-nowrap px-3.5 py-2 rounded-md text-sm font-medium text-slate-300 border border-slate-700 hover:bg-slate-800">${t("app.common.cancel")}</button>
+          <button value="import" class="whitespace-nowrap px-3.5 py-2 rounded-md text-sm font-medium ${DIALOG_BUTTON_STYLES.primary}">${t("app.icmVariables.importAction")}</button>
+        </div>
+      </form>`;
+    dlg.onclick = ev => { if (ev.target === dlg) dlg.close(""); };
+    dlg.addEventListener("close", () => {
+      resolve(dlg.returnValue === "import" ? dlg.querySelector('input[name="icm-behavior"]:checked').value : null);
+    }, { once: true });
+    dlg.returnValue = "";
+    dlg.showModal();
+  });
+}
+
+async function importIcmVariables(envId, input) {
+  const file = input.files && input.files[0];
+  input.value = "";
+  if (!file) return;
+  let variables = null;
+  try {
+    variables = JSON.parse(await file.text());
+  } catch (_) { /* reported below */ }
+  if (!variables || typeof variables !== "object" || !variables.Root) {
+    showAlert("error", t("app.icmVariables.invalid"));
+    return;
+  }
+  const behavior = await chooseIcmImportBehavior(variables, file.name, envName(envId));
+  if (!behavior) return;
+  try {
+    const res = await fetch(`/api/environments/${encodeURIComponent(envId)}/icm-variables`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ variables, behavior })
+    });
+    const data = await res.json();
+    showAlert(data.success ? "success" : "error", data.message);
+  } catch (err) {
+    showAlert("error", t("app.common.networkError", { error: err.message }));
+  }
+}
+
+// ------------------------------------------------------------------------------
+// Settings backup: import a file made with "Export settings" (on this or another machine)
+// ------------------------------------------------------------------------------
+const SETTINGS_SECTIONS = ["azure", "firebase", "quadient_cloud", "banking", "custom_demos"];
+
+async function handleImportSettings(input) {
+  const file = input.files && input.files[0];
+  input.value = "";  // the same file can be picked again later
+  if (!file) return;
+  let doc;
+  try {
+    doc = JSON.parse(await file.text());
+  } catch (_) {
+    doc = null;
+  }
+  if (!doc || doc.format !== "inspire-flex-studio-settings") {
+    showAlert("error", t("app.settingsBackup.invalid"));
+    return;
+  }
+  const sections = SETTINGS_SECTIONS.filter(key => key === "azure" ? doc.azure && doc.azure.username : doc[key] != null);
+  const label = key => key === "custom_demos"
+    ? t("app.settingsBackup.section.custom_demos", { count: Array.isArray(doc.custom_demos) ? doc.custom_demos.length : 0 })
+    : t(`app.settingsBackup.section.${key}`);
+  const exported = doc.exported_at ? new Date(doc.exported_at).toLocaleString(currentLang) : "";
+  const { action } = await openActionDialog({
+    title: t("app.settingsBackup.confirmTitle"),
+    message: `<p>${t("app.settingsBackup.confirmFile", { file: `<span class="font-mono text-white break-all">${escapeHtml(file.name)}</span>`, date: escapeHtml(exported) })}</p>
+      <ul class="list-disc pl-5 space-y-0.5">${sections.map(key => `<li>${escapeHtml(label(key))}</li>`).join("")}</ul>
+      <p class="text-amber-300">${t("app.settingsBackup.confirmReplace")}</p>`,
+    actions: [{ id: "ok", label: t("app.settingsBackup.confirmAction"), style: "primary" }]
+  });
+  if (action !== "ok") return;
+
+  showAlert("info", t("app.settingsBackup.importing"));
+  try {
+    const res = await fetch("/api/settings/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(doc)
+    });
+    const data = await res.json();
+    showAlert(data.success ? "success" : "error", data.message);
+    if (data.results && data.results.length) {
+      await openActionDialog({
+        title: data.message,
+        message: `<ul class="space-y-1.5">${data.results.map(r => `
+          <li class="flex items-start gap-2">
+            <span class="${r.ok ? "text-emerald-400" : "text-rose-400"}">${r.ok ? "✓" : "✕"}</span>
+            <span><strong class="text-white">${escapeHtml(label(r.section))}</strong> — ${escapeHtml(r.message)}</span>
+          </li>`).join("")}</ul>`,
+        actions: [{ id: "ok", label: t("app.settingsBackup.done"), style: "primary" }]
+      });
+    }
+    await checkConfigAndOnboarding();
+    inspireVersions = null;
+  } catch (err) {
+    showAlert("error", t("app.common.networkError", { error: err.message }));
+  }
+}
+
+// ------------------------------------------------------------------------------
+// Inspire version: move an environment to another version published in Azure (Settings)
+// ------------------------------------------------------------------------------
+let inspireVersions = null;      // [{version, missing: [component]}] from /api/inspire-versions
+let inspireVersionsError = "";
+
+async function loadInspireVersions(force = false) {
+  if (inspireVersions && !force) return renderVersionEnvs();
+  const status = document.getElementById("versions-status");
+  if (status) status.textContent = t("app.versions.loading");
+  try {
+    const res = await fetch("/api/inspire-versions");
+    const data = await res.json();
+    inspireVersions = data.success ? data.versions : [];
+    inspireVersionsError = data.success ? "" : data.message;
+  } catch (err) {
+    inspireVersions = [];
+    inspireVersionsError = err.message;
+  }
+  renderVersionEnvs();
+}
+
+function renderVersionEnvs() {
+  const list = document.getElementById("versions-envs");
+  const status = document.getElementById("versions-status");
+  if (!list || !status) return;
+  if (inspireVersions === null) return;
+  const complete = inspireVersions.filter(v => !v.missing.length);
+  status.textContent = inspireVersionsError
+    ? t("app.versions.error", { error: inspireVersionsError })
+    : t("app.versions.available", { list: complete.map(v => v.version).join(", ") || "—" });
+  list.classList.toggle("hidden", !allEnvironments.length);
+  list.innerHTML = allEnvironments.map(env => {
+    const busy = busyEnvs.get(env.id);
+    const current = env.version || "17.5-latest";
+    const options = inspireVersions.map(v => {
+      const label = v.missing.length ? `${v.version} — ${t("app.versions.missing", { list: v.missing.join(", ") })}` : v.version;
+      return `<option value="${escapeHtml(v.version)}" ${v.missing.length || v.version === current ? "disabled" : ""}>${escapeHtml(label)}${v.version === current ? ` (${t("app.versions.current")})` : ""}</option>`;
+    }).join("");
+    const firstFree = inspireVersions.find(v => !v.missing.length && v.version !== current);
+    return `
+      <div class="flex flex-col sm:flex-row sm:items-center gap-3 px-3.5 py-3">
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-semibold text-white truncate">${escapeHtml(env.name)}</p>
+          <p class="text-[11px] text-slate-400">${t("app.versions.currentLabel")} <span class="font-mono text-slate-200">${escapeHtml(current)}</span> · ${escapeHtml(statusLabel(env.status))}</p>
+          ${busy ? `<p class="text-[11px] text-sky-300 mt-1 flex items-center gap-1.5"><i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>${escapeHtml(busy.label || "")}</p>` : ""}
+        </div>
+        <div class="flex items-center gap-2">
+          <select id="version-select-${escapeHtml(env.id)}" ${busy || !firstFree ? "disabled" : ""} aria-label="${t("app.versions.newVersion")}"
+            class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-brand-500 disabled:opacity-50">
+            ${options}
+          </select>
+          <button type="button" onclick="upgradeEnvironmentVersion('${escapeHtml(env.id)}')" ${busy || !firstFree ? "disabled" : ""}
+            class="whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-40 disabled:pointer-events-none">
+            ${t("app.versions.update")}
+          </button>
+        </div>
+      </div>`;
+  }).join("");
+  // Preselect the newest complete version that isn't the current one
+  allEnvironments.forEach(env => {
+    const select = document.getElementById(`version-select-${env.id}`);
+    const first = inspireVersions.find(v => !v.missing.length && v.version !== (env.version || "17.5-latest"));
+    if (select && first) select.value = first.version;
+  });
+  lucide.createIcons();
+}
+
+async function upgradeEnvironmentVersion(envId) {
+  const env = allEnvironments.find(e => e.id === envId);
+  const version = document.getElementById(`version-select-${envId}`)?.value;
+  if (!env || !version || busyEnvs.has(envId)) return;
+  const running = env.status === "running" || env.status === "partial";
+  const { action } = await openActionDialog({
+    title: t("app.versions.confirmTitle"),
+    message: `<p>${t("app.versions.confirmBody", { name: `<strong class="text-white">${escapeHtml(env.name)}</strong>`, from: `<span class="font-mono">${escapeHtml(env.version || "17.5-latest")}</span>`, to: `<span class="font-mono text-white">${escapeHtml(version)}</span>` })}</p>
+      <p>${t(running ? "app.versions.confirmRunning" : "app.versions.confirmStopped")}</p>
+      <p class="text-amber-300">${t("app.versions.confirmBackup")}</p>`,
+    actions: [{ id: "ok", label: t("app.versions.confirmAction", { version }), style: "primary" }]
+  });
+  if (action !== "ok") return;
+
+  busyEnvs.set(envId, { kind: "activate", label: t("app.versions.starting"), step: 0, total: 3 });
+  renderVersionEnvs();
+  renderEnvironments();
+  const poller = setInterval(async () => {
+    try {
+      const progress = await fetchProgress(envId);
+      if (progress && busyEnvs.has(envId)) {
+        Object.assign(busyEnvs.get(envId), progress);
+        updateProgressUI(envId);
+        renderVersionEnvs();
+      }
+    } catch (_) { /* transient; next tick retries */ }
+  }, PROGRESS_POLL_MS);
+  try {
+    const res = await fetch(`/api/environments/${encodeURIComponent(envId)}/upgrade`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version })
+    });
+    const data = await res.json();
+    showAlert(data.success ? "success" : "error", data.message);
+  } catch (err) {
+    showAlert("error", t("app.common.networkError", { error: err.message }));
+  } finally {
+    clearInterval(poller);
+    busyEnvs.delete(envId);
+    lastEnvSnapshot = "";
+    await loadEnvironments();
+    renderVersionEnvs();
+  }
+}
+
+// Address other machines use to reach this computer (ICM clients, FTP clients): the one typed in Settings, the
+// detected one, or the address the Studio was opened with
+function hostAddress() {
+  if (hostSettings && (hostSettings.configured || hostSettings.detected)) return hostSettings.configured || hostSettings.detected;
+  const host = window.location.hostname;
+  return host && host !== "127.0.0.1" ? host : "localhost";
+}
+
+function fillHostForm() {
+  const input = document.getElementById("setting-host-address");
+  if (!input) return;
+  input.value = (hostSettings && hostSettings.configured) || "";
+  input.placeholder = (hostSettings && hostSettings.detected) || "192.168.1.20";
+  document.getElementById("host-detected").textContent = hostSettings && hostSettings.detected
+    ? t("app.host.detected", { address: hostSettings.detected })
+    : t("app.host.notDetected");
+}
+
+async function handleSaveHost(e) {
+  e.preventDefault();
+  try {
+    const res = await fetch("/api/config/host", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ host_address: document.getElementById("setting-host-address").value.trim() })
+    });
+    const data = await res.json();
+    showAlert(data.success ? "success" : "error", data.message);
+    if (data.success) {
+      hostSettings = data.host;
+      fillHostForm();
+      renderServicesView();
+    }
+  } catch (err) {
+    showAlert("error", t("app.common.networkError", { error: err.message }));
+  }
+}
+
+function copyText(text) {
+  const done = () => showAlert("success", t("app.host.copied", { text }));
+  navigator.clipboard.writeText(text).then(done).catch(() => {
+    const ta = Object.assign(document.createElement("textarea"), { value: text });
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+    done();
+  });
+}
+
+// Online banking: which DAS documents are its monthly statements (it signs in with the Quadient Cloud settings above)
+function fillBankingForm(banking) {
+  if (!banking) return;
+  document.getElementById("setting-banking-meta-name").value = banking.statements_meta_name || "";
+  document.getElementById("setting-banking-meta-value").value = banking.statements_meta_value || "";
+}
+
+async function handleSaveBanking(e) {
+  e.preventDefault();
+  const value = id => document.getElementById(id).value.trim();
+  try {
+    const res = await fetch("/api/config/banking", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        statements_meta_name: value("setting-banking-meta-name"),
+        statements_meta_value: value("setting-banking-meta-value")
+      })
+    });
+    const data = await res.json();
+    showAlert(data.success ? "success" : "error", data.message);
+    if (data.success) fillBankingForm(data.banking);
+  } catch (err) {
+    showAlert("error", t("app.common.networkError", { error: err.message }));
+  }
 }
 
 async function handleSaveDas(e) {
@@ -1090,6 +1549,45 @@ async function handleCreateEnvSubmit(e) {
 // ------------------------------------------------------------------------------
 // Environment modal tabs (General, Inspire, Integrations, Use cases, Look & feel)
 // ------------------------------------------------------------------------------
+// Settings sections: Inspire, Quadient Cloud, Firebase, Backup; the last one opened is remembered
+const SETTINGS_TAB_KEY = "studio.settingsTab";
+
+function savedSettingsTab() {
+  try {
+    const tab = localStorage.getItem(SETTINGS_TAB_KEY);
+    if (tab && document.querySelector(`[data-settings-tab="${tab}"]`)) return tab;
+  } catch (_) { /* storage unavailable: first tab */ }
+  return "inspire";
+}
+
+function switchSettingsTab(tab, focus = false) {
+  document.querySelectorAll("[data-settings-tab]").forEach(btn => {
+    const active = btn.dataset.settingsTab === tab;
+    btn.setAttribute("aria-selected", String(active));
+    btn.tabIndex = active ? 0 : -1;
+    if (active && focus) btn.focus();
+  });
+  document.querySelectorAll("[data-settings-panel]").forEach(panel => {
+    panel.classList.toggle("hidden", panel.dataset.settingsPanel !== tab);
+  });
+  try { localStorage.setItem(SETTINGS_TAB_KEY, tab); } catch (_) { /* not remembered */ }
+}
+
+function handleSettingsTabKey(e) {
+  const tabs = Array.from(e.currentTarget.querySelectorAll("[data-settings-tab]"));
+  const current = tabs.findIndex(btn => btn.getAttribute("aria-selected") === "true");
+  const next = { ArrowDown: current + 1, ArrowRight: current + 1, ArrowUp: current - 1, ArrowLeft: current - 1, Home: 0, End: tabs.length - 1 }[e.key];
+  if (next === undefined) return;
+  e.preventDefault();
+  switchSettingsTab(tabs[(next + tabs.length) % tabs.length].dataset.settingsTab, true);
+}
+
+// A required settings field on a hidden section would block its form silently: show that section
+document.addEventListener("invalid", (e) => {
+  const panel = e.target.closest && e.target.closest("[data-settings-panel]");
+  if (panel && panel.classList.contains("hidden")) switchSettingsTab(panel.dataset.settingsPanel);
+}, true);
+
 function switchEnvTab(prefix, tab, focus = false) {
   const modal = document.getElementById(`${prefix}-env-modal`);
   if (!modal) return;

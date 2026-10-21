@@ -297,29 +297,23 @@
     <!-- VIEW 5: Ajustes y Administración                                      -->
     <!-- --------------------------------------------------------------------- -->
     <section id="view-settings" class="space-y-6 hidden">
-      <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-5">
-        <div>
-          <h2 class="text-lg font-bold text-white flex items-center gap-2">
-            <i data-lucide="folder-sync" class="w-5 h-5 text-sky-400"></i>
-            <span data-i18n="html.settingsBackup.title">Respaldo de ajustes</span>
-          </h2>
-          <p class="text-xs text-slate-400 mt-1" data-i18n="html.settingsBackup.subtitle">Exporta todos los ajustes a un archivo para restaurarlos en otro equipo: credenciales de Azure, Firebase, Quadient Cloud, Banca en línea y demos personalizadas.</p>
-        </div>
-        <div class="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-[11px] leading-snug text-amber-200">
-          <i data-lucide="shield-alert" class="w-4 h-4 flex-shrink-0 mt-0.5"></i>
-          <span data-i18n-html="html.settingsBackup.note">El archivo incluye contraseñas y llaves (Azure, cuenta de servicio de Firebase, API key de Quadient Cloud): guárdalo en un lugar seguro. <strong>No incluye los ambientes ni sus datos de Flex</strong>; el contenido de Inspire se respalda exportándolo desde ICM.</span>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <a href="/api/settings/export" download class="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-brand-600 hover:bg-brand-500 text-white shadow-lg">
-            <i data-lucide="download" class="w-4 h-4"></i> <span data-i18n="html.settingsBackup.export">Exportar ajustes</span>
-          </a>
-          <label class="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg border border-slate-700 text-slate-200 hover:border-brand-500 hover:text-white cursor-pointer transition">
-            <i data-lucide="upload" class="w-4 h-4"></i> <span data-i18n="html.settingsBackup.import">Importar ajustes</span>
-            <input type="file" id="settings-import-file" accept=".json,application/json" class="sr-only" onchange="handleImportSettings(this)">
-          </label>
-        </div>
-      </div>
-
+      <div class="settings-layout">
+        <nav role="tablist" aria-orientation="vertical" aria-label="Ajustes" data-i18n-attr="aria-label:html.settingsTabs.aria" class="settings-tabs" onkeydown="handleSettingsTabKey(event)">
+          <button type="button" role="tab" id="settings-tab-inspire" aria-controls="settings-panel-inspire" data-settings-tab="inspire" aria-selected="true" tabindex="0" onclick="switchSettingsTab('inspire')" class="settings-tab">
+            <i data-lucide="server" class="w-4 h-4"></i><span data-i18n="html.settingsTabs.inspire">Inspire</span>
+          </button>
+          <button type="button" role="tab" id="settings-tab-cloud" aria-controls="settings-panel-cloud" data-settings-tab="cloud" aria-selected="false" tabindex="-1" onclick="switchSettingsTab('cloud')" class="settings-tab">
+            <i data-lucide="cloud" class="w-4 h-4"></i><span data-i18n="html.settingsTabs.cloud">Quadient Cloud</span>
+          </button>
+          <button type="button" role="tab" id="settings-tab-firebase" aria-controls="settings-panel-firebase" data-settings-tab="firebase" aria-selected="false" tabindex="-1" onclick="switchSettingsTab('firebase')" class="settings-tab">
+            <i data-lucide="bell" class="w-4 h-4"></i><span data-i18n="html.settingsTabs.firebase">Firebase</span>
+          </button>
+          <button type="button" role="tab" id="settings-tab-backup" aria-controls="settings-panel-backup" data-settings-tab="backup" aria-selected="false" tabindex="-1" onclick="switchSettingsTab('backup')" class="settings-tab">
+            <i data-lucide="folder-sync" class="w-4 h-4"></i><span data-i18n="html.settingsTabs.backup">Respaldo</span>
+          </button>
+        </nav>
+        <div class="min-w-0">
+        <div role="tabpanel" id="settings-panel-inspire" aria-labelledby="settings-tab-inspire" data-settings-panel="inspire" class="space-y-6">
       <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
         <div>
           <h2 class="text-lg font-bold text-white flex items-center gap-2">
@@ -362,7 +356,28 @@
           </div>
         </form>
       </div>
+      <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-5">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <i data-lucide="arrow-up-circle" class="w-5 h-5 text-sky-400"></i>
+              <span data-i18n="html.versions.title">Versión de Inspire</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-1" data-i18n="html.versions.subtitle">Actualiza un ambiente a otra versión publicada en Azure Container Registry.</p>
+          </div>
+          <button type="button" onclick="loadInspireVersions(true)" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-700 text-slate-200 hover:border-brand-500 hover:text-white transition">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span data-i18n="html.versions.refresh">Consultar versiones</span>
+          </button>
+        </div>
 
+        <div class="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-[11px] leading-snug text-amber-200">
+          <i data-lucide="triangle-alert" class="w-4 h-4 flex-shrink-0 mt-0.5"></i>
+          <span data-i18n-html="html.versions.warning">Se descargan las imágenes de la nueva versión (varios GB) y, si el ambiente está en ejecución, se reinicia con ellas. Al arrancar, Inspire migra sus bases de datos: <strong>no se puede regresar a la versión anterior con los mismos datos</strong>. Respalda antes el contenido exportándolo desde ICM.</span>
+        </div>
+
+        <div id="versions-status" class="text-xs text-slate-400"></div>
+        <div id="versions-envs" class="rounded-lg border border-slate-700 divide-y divide-slate-800 bg-slate-950 overflow-hidden"></div>
+      </div>
       <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-4">
         <div>
           <h2 class="text-lg font-bold text-white flex items-center gap-2">
@@ -382,65 +397,9 @@
           </button>
         </form>
       </div>
-
-      <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-5">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 class="text-lg font-bold text-white flex items-center gap-2">
-              <i data-lucide="arrow-up-circle" class="w-5 h-5 text-sky-400"></i>
-              <span data-i18n="html.versions.title">Versión de Inspire</span>
-            </h2>
-            <p class="text-xs text-slate-400 mt-1" data-i18n="html.versions.subtitle">Actualiza un ambiente a otra versión publicada en Azure Container Registry.</p>
-          </div>
-          <button type="button" onclick="loadInspireVersions(true)" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-700 text-slate-200 hover:border-brand-500 hover:text-white transition">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span data-i18n="html.versions.refresh">Consultar versiones</span>
-          </button>
         </div>
 
-        <div class="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-[11px] leading-snug text-amber-200">
-          <i data-lucide="triangle-alert" class="w-4 h-4 flex-shrink-0 mt-0.5"></i>
-          <span data-i18n-html="html.versions.warning">Se descargan las imágenes de la nueva versión (varios GB) y, si el ambiente está en ejecución, se reinicia con ellas. Al arrancar, Inspire migra sus bases de datos: <strong>no se puede regresar a la versión anterior con los mismos datos</strong>. Crea un respaldo antes en <em>Almacenamiento</em>.</span>
-        </div>
-
-        <div id="versions-status" class="text-xs text-slate-400"></div>
-        <div id="versions-envs" class="rounded-lg border border-slate-700 divide-y divide-slate-800 bg-slate-950 overflow-hidden"></div>
-      </div>
-
-      <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
-        <div>
-          <h2 class="text-lg font-bold text-white flex items-center gap-2">
-            <i data-lucide="bell-ring" class="w-5 h-5 text-amber-400"></i>
-            <span data-i18n="html.firebase.title">Firebase para Push Notifications Inbox</span>
-          </h2>
-          <p class="text-xs text-slate-400 mt-1" data-i18n="html.firebase.subtitle">Tu propio proyecto de Firebase para el servicio opcional Push Notifications Inbox. Se guarda solo en este equipo. En el proyecto deben estar habilitados Authentication (Email/Password), Firestore y Cloud Messaging.</p>
-        </div>
-
-        <form id="firebase-form" onsubmit="handleSaveFirebase(event)" class="space-y-4">
-          <div id="firebase-status" class="text-xs text-slate-400"></div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.firebase.serviceAccount">Cuenta de servicio (serviceAccountKey.json)</label>
-            <textarea id="setting-firebase-key" rows="4" spellcheck="false" placeholder='{"type": "service_account", "project_id": "...", ...}' class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500"></textarea>
-            <span class="text-[10px] text-slate-500" data-i18n-html="html.firebase.serviceAccountHint">Firebase Console &gt; Configuración del proyecto &gt; Cuentas de servicio &gt; Generar nueva clave privada. Pega el JSON completo.</span>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.firebase.webConfig">Configuración web (firebaseConfig)</label>
-            <textarea id="setting-firebase-web" rows="4" spellcheck="false" placeholder='const firebaseConfig = { apiKey: "...", authDomain: "...", projectId: "...", ... };' class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500"></textarea>
-            <span class="text-[10px] text-slate-500" data-i18n-html="html.firebase.webConfigHint">Configuración del proyecto &gt; General &gt; Tus apps &gt; app web. Puedes pegar el bloque <code>const firebaseConfig = {...}</code> tal cual.</span>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">VAPID key (Web Push)</label>
-            <input type="text" id="setting-firebase-vapid" spellcheck="false" placeholder="BK..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
-            <span class="text-[10px] text-slate-500" data-i18n-html="html.firebase.vapidHint">Configuración del proyecto &gt; Cloud Messaging &gt; Certificados push web &gt; Par de claves.</span>
-          </div>
-          <span class="block text-[10px] text-slate-500" data-i18n="html.firebase.keepHint">Si ya está configurado, deja en blanco lo que no quieras cambiar. Al guardar, los ambientes en ejecución con Push Notifications Inbox lo reinician con la nueva configuración.</span>
-          <div class="pt-4 flex items-center justify-end border-t border-slate-800">
-            <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-xs font-semibold rounded-lg text-white shadow-lg">
-              <span data-i18n="html.firebase.save">Guardar Firebase</span>
-            </button>
-          </div>
-        </form>
-      </div>
-
+        <div role="tabpanel" id="settings-panel-cloud" aria-labelledby="settings-tab-cloud" data-settings-panel="cloud" class="space-y-6 hidden">
       <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
         <div>
           <h2 class="text-lg font-bold text-white flex items-center gap-2">
@@ -475,7 +434,6 @@
           </div>
         </form>
       </div>
-
       <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
         <div>
           <h2 class="text-lg font-bold text-white flex items-center gap-2">
@@ -510,7 +468,6 @@
           </div>
         </form>
       </div>
-
       <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
         <div>
           <h2 class="text-lg font-bold text-white flex items-center gap-2">
@@ -566,6 +523,71 @@
             </button>
           </div>
         </form>
+      </div>
+        </div>
+
+        <div role="tabpanel" id="settings-panel-firebase" aria-labelledby="settings-tab-firebase" data-settings-panel="firebase" class="space-y-6 hidden">
+      <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="bell-ring" class="w-5 h-5 text-amber-400"></i>
+            <span data-i18n="html.firebase.title">Firebase para Push Notifications Inbox</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-1" data-i18n="html.firebase.subtitle">Tu propio proyecto de Firebase para el servicio opcional Push Notifications Inbox. Se guarda solo en este equipo. En el proyecto deben estar habilitados Authentication (Email/Password), Firestore y Cloud Messaging.</p>
+        </div>
+
+        <form id="firebase-form" onsubmit="handleSaveFirebase(event)" class="space-y-4">
+          <div id="firebase-status" class="text-xs text-slate-400"></div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.firebase.serviceAccount">Cuenta de servicio (serviceAccountKey.json)</label>
+            <textarea id="setting-firebase-key" rows="4" spellcheck="false" placeholder='{"type": "service_account", "project_id": "...", ...}' class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500"></textarea>
+            <span class="text-[10px] text-slate-500" data-i18n-html="html.firebase.serviceAccountHint">Firebase Console &gt; Configuración del proyecto &gt; Cuentas de servicio &gt; Generar nueva clave privada. Pega el JSON completo.</span>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.firebase.webConfig">Configuración web (firebaseConfig)</label>
+            <textarea id="setting-firebase-web" rows="4" spellcheck="false" placeholder='const firebaseConfig = { apiKey: "...", authDomain: "...", projectId: "...", ... };' class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500"></textarea>
+            <span class="text-[10px] text-slate-500" data-i18n-html="html.firebase.webConfigHint">Configuración del proyecto &gt; General &gt; Tus apps &gt; app web. Puedes pegar el bloque <code>const firebaseConfig = {...}</code> tal cual.</span>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">VAPID key (Web Push)</label>
+            <input type="text" id="setting-firebase-vapid" spellcheck="false" placeholder="BK..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
+            <span class="text-[10px] text-slate-500" data-i18n-html="html.firebase.vapidHint">Configuración del proyecto &gt; Cloud Messaging &gt; Certificados push web &gt; Par de claves.</span>
+          </div>
+          <span class="block text-[10px] text-slate-500" data-i18n="html.firebase.keepHint">Si ya está configurado, deja en blanco lo que no quieras cambiar. Al guardar, los ambientes en ejecución con Push Notifications Inbox lo reinician con la nueva configuración.</span>
+          <div class="pt-4 flex items-center justify-end border-t border-slate-800">
+            <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-xs font-semibold rounded-lg text-white shadow-lg">
+              <span data-i18n="html.firebase.save">Guardar Firebase</span>
+            </button>
+          </div>
+        </form>
+      </div>
+        </div>
+
+        <div role="tabpanel" id="settings-panel-backup" aria-labelledby="settings-tab-backup" data-settings-panel="backup" class="space-y-6 hidden">
+      <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-5">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="folder-sync" class="w-5 h-5 text-sky-400"></i>
+            <span data-i18n="html.settingsBackup.title">Respaldo de ajustes</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-1" data-i18n="html.settingsBackup.subtitle">Exporta todos los ajustes a un archivo para restaurarlos en otro equipo: credenciales de Azure, Firebase, Quadient Cloud, Banca en línea y demos personalizadas.</p>
+        </div>
+        <div class="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-[11px] leading-snug text-amber-200">
+          <i data-lucide="shield-alert" class="w-4 h-4 flex-shrink-0 mt-0.5"></i>
+          <span data-i18n-html="html.settingsBackup.note">El archivo incluye contraseñas y llaves (Azure, cuenta de servicio de Firebase, API key de Quadient Cloud): guárdalo en un lugar seguro. <strong>No incluye los ambientes ni sus datos de Flex</strong>; el contenido de Inspire se respalda exportándolo desde ICM.</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/api/settings/export" download class="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-brand-600 hover:bg-brand-500 text-white shadow-lg">
+            <i data-lucide="download" class="w-4 h-4"></i> <span data-i18n="html.settingsBackup.export">Exportar ajustes</span>
+          </a>
+          <label class="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg border border-slate-700 text-slate-200 hover:border-brand-500 hover:text-white cursor-pointer transition">
+            <i data-lucide="upload" class="w-4 h-4"></i> <span data-i18n="html.settingsBackup.import">Importar ajustes</span>
+            <input type="file" id="settings-import-file" accept=".json,application/json" class="sr-only" onchange="handleImportSettings(this)">
+          </label>
+        </div>
+      </div>
+        </div>
+        </div>
       </div>
     </section>
 
