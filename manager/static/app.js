@@ -7,7 +7,9 @@ let currentFilter = "all";
 let activeContainerForLogs = null;
 let logPollInterval = null;
 let verticals = [];             // from /api/config
-let useCaseCatalog = [];        // from /api/config: bundled use cases (use-cases/cases/*/case.json)
+let useCaseCatalog = [];        // from /api/config: bundled use cases (use-cases/cases/*/case.json) plus custom demos
+let dasDemos = [];
+let hostSettings = null;        // from /api/config: {configured, detected} address of this computer on the network              // from /api/config: custom demos (anonymous Quadient Cloud documents)
 const busyEnvs = new Map();     // envId -> {kind: "activate"|"stop", label, step, total}
 let lastEnvSnapshot = "";
 
@@ -56,11 +58,11 @@ window.addEventListener("studio:languagechange", () => {
   renderServicesView();
   renderFirebaseStatus(lastFirebaseStatus);
   renderDasStatus(lastDasStatus);
-  if (document.getElementById("das-users-rows")) renderDasUserRows(readDasUserRows());
   loadVolumes();
-  if (!document.getElementById("view-storage")?.classList.contains("hidden")) loadSnapshots();
   ["new", "edit"].forEach(prefix => {
-    if (document.getElementById(`${prefix}-env-modal`)?.open) renderUseCaseCheckboxes(prefix, selectedUseCases(prefix));
+    if (!document.getElementById(`${prefix}-env-modal`)?.open) return;
+    renderUseCaseCheckboxes(prefix, selectedUseCases(prefix));
+    renderBrandingFields(prefix);
   });
   if (document.getElementById("logs-modal")?.open && activeContainerForLogs) renderLogsSubtitle(activeContainerForLogs);
   if (document.getElementById("volume-locations-modal")?.open && volumeModalEnvId) openVolumeLocationModal(volumeModalEnvId);
@@ -105,10 +107,11 @@ function switchTab(tabId) {
     loadAcrVersions();
   } else if (tabId === "storage") {
     loadVolumes();
-    loadSnapshots();
   } else if (tabId === "services") {
     populateServicesSelect();
     renderServicesView();
+  } else if (tabId === "settings") {
+    loadInspireVersions();
   }
 
   lucide.createIcons();
@@ -132,6 +135,12 @@ async function checkConfigAndOnboarding() {
     document.getElementById("setting-lic-server").value = creds.license_server || "";
     renderFirebaseStatus(data.firebase);
     fillDasForm(data.das);
+    fillBankingForm(data.banking);
+    hostSettings = data.host || null;
+    fillHostForm();
+    dasDemos = data.das_demos || [];
+    renderDemosList();
+    resetDemoForm();
 
     if (data.needs_onboarding) {
       const modal = document.getElementById("onboarding-modal");
@@ -241,6 +250,121 @@ function renderFirebaseStatus(fb) {
 }
 
 // ------------------------------------------------------------------------------
+// Custom demos: one anonymous Quadient Cloud document each, published as its own use case
+// ------------------------------------------------------------------------------
+function renderDemosList() {
+  const list = document.getElementById("demos-list");
+  if (!list) return;
+  list.classList.toggle("hidden", !dasDemos.length);
+  document.getElementById("demos-empty").classList.toggle("hidden", dasDemos.length > 0);
+  list.innerHTML = dasDemos.map(d => `
+    <div class="flex items-start justify-between gap-3 px-3 py-2.5">
+      <div class="min-w-0">
+        <p class="text-xs font-semibold text-white truncate">${escapeHtml(d.name)} <code class="text-[10px] text-slate-500 font-normal">/${escapeHtml(d.id)}/</code></p>
+        <p class="text-[10px] font-mono text-slate-500 truncate">App ${escapeHtml(d.app_id)} · Doc ${escapeHtml(d.document_id)}</p>
+        ${d.description ? `<p class="text-[11px] text-slate-400 truncate">${escapeHtml(d.description)}</p>` : ""}
+      </div>
+      <div class="flex items-center gap-1 flex-shrink-0">
+        ${iconButton("pencil", t("app.demos.edit"), `editDemo('${escapeHtml(d.id)}')`)}
+        ${iconButton("trash-2", t("app.demos.delete"), `deleteDemo('${escapeHtml(d.id)}')`, { danger: true })}
+      </div>
+    </div>`).join("");
+  lucide.createIcons();
+}
+
+function fillDemoForm(demo) {
+  const set = (id, value) => { document.getElementById(id).value = value || ""; };
+  set("setting-demo-id", demo.id);
+  set("setting-demo-name", demo.name);
+  set("setting-demo-description", demo.description);
+  // A new demo starts from the Quadient Cloud URL of the Digital Advantage Inbox
+  set("setting-demo-url", demo.cloud_url || (lastDasStatus && lastDasStatus.cloud_url));
+  set("setting-demo-app-id", demo.app_id);
+  set("setting-demo-client-id", demo.client_id);
+  set("setting-demo-document-id", demo.document_id);
+  const editing = Boolean(demo.id);
+  const title = document.getElementById("demo-form-title");
+  title.dataset.i18n = editing ? "html.demos.editTitle" : "html.demos.newTitle";
+  title.textContent = t(title.dataset.i18n);
+  const submit = document.getElementById("demo-submit-label");
+  submit.dataset.i18n = editing ? "html.demos.save" : "html.demos.add";
+  submit.textContent = t(submit.dataset.i18n);
+  document.getElementById("demo-cancel").classList.toggle("hidden", !editing);
+}
+
+function resetDemoForm() {
+  if (document.getElementById("demo-form")) fillDemoForm({});
+}
+
+function editDemo(id) {
+  const demo = dasDemos.find(d => d.id === id);
+  if (!demo) return;
+  fillDemoForm(demo);
+  document.getElementById("demo-form").scrollIntoView({ behavior: "smooth", block: "center" });
+  document.getElementById("setting-demo-name").focus();
+}
+
+function applyDemosResponse(data) {
+  dasDemos = data.das_demos || dasDemos;
+  if (data.use_cases) useCaseCatalog = data.use_cases;
+  renderDemosList();
+}
+
+async function handleSaveDemo(e) {
+  e.preventDefault();
+  const value = id => document.getElementById(id).value.trim();
+  const payload = {
+    id: value("setting-demo-id"),
+    name: value("setting-demo-name"),
+    description: value("setting-demo-description"),
+    cloud_url: value("setting-demo-url"),
+    app_id: value("setting-demo-app-id"),
+    client_id: value("setting-demo-client-id"),
+    document_id: value("setting-demo-document-id")
+  };
+  try {
+    const res = await fetch("/api/config/das-demos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    showAlert(data.success ? "success" : "error", data.message);
+    if (data.success) {
+      applyDemosResponse(data);
+      resetDemoForm();
+    }
+  } catch (err) {
+    showAlert("error", t("app.common.networkError", { error: err.message }));
+  }
+}
+
+async function deleteDemo(id) {
+  const demo = dasDemos.find(d => d.id === id);
+  if (!demo) return;
+  const usedBy = allEnvironments.filter(env => (env.use_cases || []).includes(id)).map(env => env.name);
+  const { action } = await openActionDialog({
+    title: t("app.demos.deleteTitle"),
+    message: `<p>${t("app.demos.deleteBody", { name: escapeHtml(demo.name) })}</p>` +
+      (usedBy.length ? `<p class="text-amber-300">${t("app.demos.deleteUsedBy", { envs: escapeHtml(usedBy.join(", ")) })}</p>` : ""),
+    actions: [{ id: "delete", label: t("app.demos.delete"), style: "danger" }]
+  });
+  if (action !== "delete") return;
+  try {
+    const res = await fetch(`/api/config/das-demos/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const data = await res.json();
+    showAlert(data.success ? "success" : "error", data.message);
+    if (data.success) {
+      applyDemosResponse(data);
+      if (document.getElementById("setting-demo-id").value === id) resetDemoForm();
+      if (usedBy.length) loadEnvironments();
+    }
+  } catch (err) {
+    showAlert("error", t("app.common.networkError", { error: err.message }));
+  }
+}
+
+// ------------------------------------------------------------------------------
 // Use cases (one checkbox per bundled case)
 // ------------------------------------------------------------------------------
 const USE_CASE_REQUIREMENTS = {
@@ -256,7 +380,7 @@ function renderUseCaseCheckboxes(prefix, selected) {
     container.innerHTML = `<p class="text-[11px] text-slate-500">${t("app.useCases.noneAvailable")}</p>`;
     return;
   }
-  container.innerHTML = useCaseCatalog.map(c => {
+  const checkbox = c => {
     const id = `${prefix}-env-uc-${c.id}`;
     const reqs = (c.requires || []).map(r => USE_CASE_REQUIREMENTS[r]).filter(Boolean).map(key => t(key)).join(" ");
     return `
@@ -269,7 +393,15 @@ function renderUseCaseCheckboxes(prefix, selected) {
           <span class="block text-[11px] text-slate-400 mt-0.5 leading-snug">${escapeHtml(useCaseText(c, "description"))}${reqs ? ` <span class="text-slate-500">${escapeHtml(reqs)}</span>` : ""}</span>
         </label>
       </div>`;
-  }).join("");
+  };
+  const bundled = useCaseCatalog.filter(c => !c.custom);
+  const custom = useCaseCatalog.filter(c => c.custom);
+  container.innerHTML = bundled.map(checkbox).join("") + (custom.length ? `
+    <p class="col-span-full pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+      <i data-lucide="file-text" class="w-3.5 h-3.5"></i>${t("html.demos.title")}
+    </p>
+    ${custom.map(checkbox).join("")}` : "");
+  lucide.createIcons();
 }
 
 function handleUseCaseToggle(prefix, checkbox) {
@@ -327,65 +459,9 @@ function fillDasForm(das) {
   document.getElementById("setting-das-url").value = das.cloud_url || "";
   document.getElementById("setting-das-app-id").value = das.app_id || "";
   document.getElementById("setting-das-client-id").value = das.client_id || "";
-  document.getElementById("setting-das-lifetime").value = das.token_lifetime || 1500;
-  renderDasUserRows(das.users || []);
-  document.getElementById("setting-das-api-key").placeholder = das.api_key ? t("app.das.apiKeyStored") : "";
   renderDasStatus(das);
   // The Digital Services box in the services view links to this cloud URL
   renderServicesView();
-}
-
-const DAS_INPUT_CLASS = "w-full bg-slate-950 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-brand-500";
-
-function dasUserRowHtml(user = {}) {
-  const field = (name, label, placeholder, type = "text") => `
-    <label class="block">
-      <span class="sm:hidden block text-[10px] font-semibold uppercase text-slate-500 mb-0.5">${label}</span>
-      <input type="${type}" data-das-field="${name}" value="${escapeHtml(user[name] || "")}" placeholder="${escapeHtml(placeholder)}"
-        spellcheck="false" autocomplete="off" aria-label="${label}" class="${DAS_INPUT_CLASS}">
-    </label>`;
-  return `
-    <div class="das-user-row grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_2rem] gap-2 px-3 py-2 items-end sm:items-center">
-      ${field("username", t("html.das.colUser"), "demo")}
-      ${field("password", t("html.das.colPassword"), "")}
-      ${field("subject", "Subject", t("app.das.subjectPlaceholder"))}
-      <button type="button" onclick="removeDasUserRow(this)" title="${t("app.das.removeUser")}" aria-label="${t("app.das.removeUser")}"
-        class="justify-self-end w-8 h-8 flex items-center justify-center rounded-md text-slate-500 hover:text-rose-400 hover:bg-slate-900 transition">
-        <i data-lucide="trash-2" class="w-4 h-4"></i>
-      </button>
-    </div>`;
-}
-
-function syncDasUsersEmpty() {
-  const empty = !document.querySelector("#das-users-rows .das-user-row");
-  document.getElementById("das-users-empty").classList.toggle("hidden", !empty);
-}
-
-function renderDasUserRows(users) {
-  document.getElementById("das-users-rows").innerHTML = users.map(dasUserRowHtml).join("");
-  syncDasUsersEmpty();
-  lucide.createIcons();
-}
-
-function addDasUserRow() {
-  const rows = document.getElementById("das-users-rows");
-  rows.insertAdjacentHTML("beforeend", dasUserRowHtml());
-  syncDasUsersEmpty();
-  lucide.createIcons();
-  rows.lastElementChild.querySelector("input").focus();
-}
-
-function removeDasUserRow(button) {
-  button.closest(".das-user-row").remove();
-  syncDasUsersEmpty();
-}
-
-function readDasUserRows() {
-  return Array.from(document.querySelectorAll("#das-users-rows .das-user-row")).map(row => {
-    const user = {};
-    row.querySelectorAll("[data-das-field]").forEach(input => { user[input.dataset.dasField] = input.value.trim(); });
-    return user;
-  });
 }
 
 async function handleSaveDas(e) {
@@ -394,10 +470,7 @@ async function handleSaveDas(e) {
   const payload = {
     cloud_url: value("setting-das-url"),
     app_id: value("setting-das-app-id"),
-    client_id: value("setting-das-client-id"),
-    api_key: value("setting-das-api-key"),
-    token_lifetime: value("setting-das-lifetime"),
-    users: readDasUserRows()
+    client_id: value("setting-das-client-id")
   };
   try {
     const res = await fetch("/api/config/das", {
@@ -407,10 +480,7 @@ async function handleSaveDas(e) {
     });
     const data = await res.json();
     showAlert(data.success ? "success" : "error", data.message);
-    if (data.success) {
-      document.getElementById("setting-das-api-key").value = "";
-      fillDasForm(data.das);
-    }
+    if (data.success) fillDasForm(data.das);
   } catch (err) {
     showAlert("error", t("app.common.networkError", { error: err.message }));
   }
@@ -452,11 +522,12 @@ async function loadEnvironments() {
     populateServicesSelect();
 
     // Skip re-rendering when nothing changed (auto-refresh runs every few seconds)
-    const snapshot = JSON.stringify(allEnvironments.map(e => [e.id, e.name, e.status, e.version, e.description, e.vertical_id, e.demo_mode, e.storage_path, e.ports, e.enable_interactive, e.enable_scaler]));
+    const snapshot = JSON.stringify(allEnvironments.map(e => [e.id, e.name, e.status, e.version, e.description, e.vertical_id, e.demo_mode, e.storage_path, e.ports, e.enable_interactive, e.enable_scaler, e.branding]));
     if (snapshot !== lastEnvSnapshot) {
       lastEnvSnapshot = snapshot;
       renderFilterPills();
       renderEnvironments();
+      renderVersionEnvs();
     }
   } catch (err) {
     console.error("Error al cargar ambientes:", err);
@@ -495,6 +566,15 @@ function filterVertical(catId) {
   currentFilter = catId;
   renderFilterPills();
   renderEnvironments();
+}
+
+// Customer logo in the card's corner; white chip so dark logos stay visible on the dark card
+function envLogo(env) {
+  const b = env.branding;
+  if (!b || !b.has_logo) return "";
+  return `<span class="inline-flex items-center justify-center bg-white rounded-md px-1.5 py-1 shadow-sm">
+    <img src="/api/environments/${encodeURIComponent(env.id)}/logo?v=${b.logo_rev}" alt="${escapeHtml(t("app.branding.logoAlt", { name: env.name }))}"
+      class="h-7 w-auto max-w-[96px] object-contain"></span>`;
 }
 
 function statusBadge(env, busy) {
@@ -715,7 +795,10 @@ function renderEnvironments() {
             </div>
             <h3 class="mt-1.5 text-base font-semibold text-white line-clamp-2 break-words" title="${escapeHtml(env.name)}">${escapeHtml(env.name)}</h3>
           </div>
-          ${statusBadge(env, busy)}
+          <div class="flex flex-col items-end gap-2 shrink-0">
+            ${envLogo(env)}
+            ${statusBadge(env, busy)}
+          </div>
         </div>
 
         <p class="text-sm text-slate-400 line-clamp-2">${escapeHtml(env.description || t("app.catalog.noNotes"))}</p>
@@ -737,7 +820,6 @@ function renderEnvironments() {
         <div class="flex items-center gap-0.5">
           ${iconButton("settings-2", t("app.actions.configureServices"), `openEditEnvModal('${env.id}')`, { disabled: !!busy })}
           ${iconButton("server", t("app.actions.viewServices"), `viewEnvServices('${env.id}')`)}
-          ${iconButton("camera", t("app.actions.createSnapshot"), `createSnapshotForEnv('${env.id}')`, { disabled: !!busy })}
           <span class="w-px h-4 bg-slate-800 mx-1" aria-hidden="true"></span>
           ${iconButton("trash-2", t("app.actions.deleteEnv"), `deleteEnvironment('${env.id}')`, { danger: true, disabled: !!busy })}
         </div>
@@ -919,10 +1001,12 @@ function openNewEnvModal() {
   const chkKafka = document.getElementById("new-env-enable-kafka");
   if (chkKafka) chkKafka.checked = false;
   renderUseCaseCheckboxes("new", []);
+  resetBrandingDraft("new", null);
   const chkFtp = document.getElementById("new-env-enable-ftp");
   if (chkFtp) chkFtp.checked = false;
   toggleScalerSharedFolder();
   toggleNewEnvInteractiveGroup();
+  switchEnvTab("new", "general");
   modal.showModal();
   lucide.createIcons();
 }
@@ -974,7 +1058,8 @@ async function handleCreateEnvSubmit(e) {
     scaler_jobs_dir: scalerJobsDir,
     enable_kafka: enableKafka,
     use_cases: selectedUseCases("new"),
-    enable_ftp: enableFtp
+    enable_ftp: enableFtp,
+    branding: brandingPayload("new")
   };
   if (port) {
     payload.interactive_port = parseInt(port);
@@ -1000,6 +1085,192 @@ async function handleCreateEnvSubmit(e) {
   } catch (err) {
     showAlert("error", t("app.common.error", { error: err.message }));
   }
+}
+
+// ------------------------------------------------------------------------------
+// Environment modal tabs (General, Inspire, Integrations, Use cases, Look & feel)
+// ------------------------------------------------------------------------------
+function switchEnvTab(prefix, tab, focus = false) {
+  const modal = document.getElementById(`${prefix}-env-modal`);
+  if (!modal) return;
+  modal.querySelectorAll("[data-env-tab]").forEach(btn => {
+    const active = btn.dataset.envTab === tab;
+    btn.setAttribute("aria-selected", String(active));
+    btn.tabIndex = active ? 0 : -1;
+    if (active && focus) btn.focus();
+  });
+  modal.querySelectorAll("[data-env-tab-panel]").forEach(panel => {
+    panel.classList.toggle("hidden", panel.dataset.envTabPanel !== tab);
+  });
+}
+
+function handleEnvTabKey(prefix, e) {
+  const tabs = Array.from(e.currentTarget.querySelectorAll("[data-env-tab]"));
+  const current = tabs.findIndex(btn => btn.getAttribute("aria-selected") === "true");
+  const next = { ArrowRight: current + 1, ArrowLeft: current - 1, Home: 0, End: tabs.length - 1 }[e.key];
+  if (next === undefined) return;
+  e.preventDefault();
+  switchEnvTab(prefix, tabs[(next + tabs.length) % tabs.length].dataset.envTab, true);
+}
+
+// A required field left empty on a hidden tab would block the submit silently: bring its tab forward
+document.addEventListener("invalid", (e) => {
+  const panel = e.target.closest && e.target.closest("[data-env-tab-panel]");
+  const modal = panel && panel.closest("dialog");
+  if (panel && modal && panel.classList.contains("hidden")) {
+    switchEnvTab(modal.id.replace(/-env-modal$/, ""), panel.dataset.envTabPanel);
+  }
+}, true);
+
+// ------------------------------------------------------------------------------
+// Use case branding: logo + primary, secondary and tertiary colors per environment
+// ------------------------------------------------------------------------------
+const BRAND_COLOR_KEYS = ["primary", "secondary", "tertiary"];
+const BRAND_DEFAULT_COLORS = { primary: "#2f5d8a", secondary: "#c2410c", tertiary: "#e8eef5" };
+// The logo travels to the use-cases container as an environment variable (Linux caps each at 128 KiB)
+const MAX_LOGO_DATA_URL = 120000;
+const MAX_LOGO_SIDE = 512;
+
+// prefix -> { logo: undefined (keep stored) | "" (remove) | data URL, preview, customColors, colors }
+const brandingDraft = {};
+
+function resetBrandingDraft(prefix, env) {
+  const b = (env && env.branding) || {};
+  brandingDraft[prefix] = {
+    logo: undefined,
+    preview: b.has_logo ? `/api/environments/${encodeURIComponent(env.id)}/logo?v=${b.logo_rev}` : "",
+    customColors: Boolean(b.colors),
+    colors: { ...BRAND_DEFAULT_COLORS, ...(b.colors || {}) }
+  };
+  renderBrandingFields(prefix);
+}
+
+function renderBrandingFields(prefix) {
+  const box = document.getElementById(`${prefix}-env-branding`);
+  const draft = brandingDraft[prefix];
+  if (!box || !draft) return;
+  const colorField = (key) => `
+    <label class="flex items-center gap-2 bg-slate-900/80 border border-slate-800 rounded-lg px-2.5 py-2 ${draft.customColors ? "" : "opacity-40 pointer-events-none"}">
+      <input type="color" value="${draft.colors[key]}" oninput="handleBrandColor('${prefix}', '${key}', this.value)" ${draft.customColors ? "" : "disabled"}
+        class="w-7 h-7 shrink-0 rounded border border-slate-700 bg-transparent cursor-pointer" aria-label="${escapeHtml(t(`app.branding.${key}`))}">
+      <span class="min-w-0">
+        <span class="block text-xs font-semibold text-white">${escapeHtml(t(`app.branding.${key}`))}</span>
+        <span class="block text-[10px] text-slate-500 leading-snug">${escapeHtml(t(`app.branding.${key}Hint`))}</span>
+        <span id="${prefix}-brand-${key}-hex" class="block text-[10px] font-mono text-slate-400 uppercase">${draft.colors[key]}</span>
+      </span>
+    </label>`;
+  box.innerHTML = `
+    <div class="space-y-3">
+      <p class="text-[11px] text-slate-400 leading-snug">${escapeHtml(t("app.branding.hint"))}</p>
+      <div class="flex items-center gap-3 bg-slate-900/80 border border-slate-800 rounded-xl p-3">
+        <div class="w-24 h-12 shrink-0 rounded-md flex items-center justify-center ${draft.preview ? "bg-white" : "border border-dashed border-slate-700"}">
+          ${draft.preview
+            ? `<img src="${escapeHtml(draft.preview)}" alt="${escapeHtml(t("app.branding.logoPreview"))}" class="max-h-10 max-w-[88px] object-contain">`
+            : `<i data-lucide="image" class="w-5 h-5 text-slate-600"></i>`}
+        </div>
+        <div class="min-w-0 space-y-1.5">
+          <div class="flex flex-wrap gap-2">
+            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border border-slate-700 text-slate-100 hover:bg-slate-800 cursor-pointer transition">
+              <i data-lucide="upload" class="w-3.5 h-3.5"></i>${escapeHtml(t(draft.preview ? "app.branding.replaceLogo" : "app.branding.uploadLogo"))}
+              <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif" class="sr-only" onchange="handleBrandLogoFile('${prefix}', this)">
+            </label>
+            ${draft.preview ? `<button type="button" onclick="removeBrandLogo('${prefix}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-slate-400 hover:text-red-300 hover:bg-slate-800 transition">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>${escapeHtml(t("app.branding.removeLogo"))}</button>` : ""}
+          </div>
+          <p class="text-[10px] text-slate-500 leading-snug">${escapeHtml(t("app.branding.logoHint"))}</p>
+        </div>
+      </div>
+      <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+        <input type="checkbox" ${draft.customColors ? "checked" : ""} onchange="toggleBrandColors('${prefix}', this.checked)"
+          class="w-4 h-4 rounded border-slate-700 text-brand-600 bg-slate-950 focus:ring-brand-500 cursor-pointer">
+        ${escapeHtml(t("app.branding.customColors"))}
+      </label>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">${BRAND_COLOR_KEYS.map(colorField).join("")}</div>
+    </div>`;
+  lucide.createIcons();
+}
+
+function toggleBrandColors(prefix, enabled) {
+  brandingDraft[prefix].customColors = enabled;
+  renderBrandingFields(prefix);
+}
+
+function handleBrandColor(prefix, key, value) {
+  brandingDraft[prefix].colors[key] = value;
+  const hex = document.getElementById(`${prefix}-brand-${key}-hex`);
+  if (hex) hex.textContent = value;
+}
+
+function removeBrandLogo(prefix) {
+  Object.assign(brandingDraft[prefix], { logo: "", preview: "" });
+  renderBrandingFields(prefix);
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("image"));
+    img.src = src;
+  });
+}
+
+// SVGs are kept as they are; bitmaps are scaled down (up to MAX_LOGO_SIDE) until they fit the size limit
+async function normalizeLogo(file) {
+  const dataUrl = await readFileAsDataUrl(file);
+  if (file.type === "image/svg+xml") return dataUrl.length <= MAX_LOGO_DATA_URL ? dataUrl : null;
+  const img = await loadImage(dataUrl);
+  let scale = Math.min(1, MAX_LOGO_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+  for (let i = 0; i < 6; i++, scale *= 0.75) {
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+    for (const [type, quality] of [["image/png"], ["image/webp", 0.9]]) {
+      const out = canvas.toDataURL(type, quality);
+      if (out.startsWith(`data:${type}`) && out.length <= MAX_LOGO_DATA_URL) return out;
+    }
+  }
+  return null;
+}
+
+async function handleBrandLogoFile(prefix, input) {
+  const file = input.files && input.files[0];
+  input.value = "";
+  if (!file) return;
+  if (!/^image\/(png|jpeg|svg\+xml|webp|gif)$/.test(file.type)) {
+    showAlert("error", t("app.branding.invalidLogo"));
+    return;
+  }
+  try {
+    const logo = await normalizeLogo(file);
+    if (!logo) {
+      showAlert("error", t("app.branding.logoTooLarge"));
+      return;
+    }
+    Object.assign(brandingDraft[prefix], { logo, preview: logo });
+    renderBrandingFields(prefix);
+  } catch (err) {
+    showAlert("error", t("app.branding.invalidLogo"));
+  }
+}
+
+// The logo key is left out when unchanged so the stored one is kept
+function brandingPayload(prefix) {
+  const draft = brandingDraft[prefix];
+  if (!draft) return undefined;
+  const payload = { colors: draft.customColors ? { ...draft.colors } : null };
+  if (draft.logo !== undefined) payload.logo = draft.logo;
+  return payload;
 }
 
 // ------------------------------------------------------------------------------
@@ -1053,9 +1324,10 @@ function openEditEnvModal(envId) {
 
   const chkKafka = document.getElementById("edit-env-enable-kafka");
   if (chkKafka) chkKafka.checked = Boolean(env.enable_kafka);
-  renderIcmEnvVarsBox(env);
+  renderConfigBackups(env);
 
   renderUseCaseCheckboxes("edit", env.use_cases || []);
+  resetBrandingDraft("edit", env);
 
   const chkFtp = document.getElementById("edit-env-enable-ftp");
   if (chkFtp) chkFtp.checked = Boolean(env.enable_ftp);
@@ -1065,40 +1337,52 @@ function openEditEnvModal(envId) {
 
   toggleEditScalerGroup();
   toggleEditInteractiveGroup();
+  switchEnvTab("edit", "general");
   document.getElementById("edit-env-modal").showModal();
   lucide.createIcons();
 }
 
-// ICMEnvVars.json with this environment's Kafka server and port, only once Kafka is saved as enabled
-function renderIcmEnvVarsBox(env) {
-  const box = document.getElementById("edit-icm-env-vars");
+// Export / import of Scaler's administration settings and of the ICM environment variables (both through Scaler)
+function renderConfigBackups(env) {
+  const box = document.getElementById("edit-config-backups");
   if (!box) return;
-  if (!env || !env.enable_kafka) {
-    box.classList.add("hidden");
+  if (!env || env.enable_scaler === false) {
     box.innerHTML = "";
     return;
   }
-  const server = `${env.project_name}-kafka`;
-  box.classList.remove("hidden");
-  box.innerHTML = `
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/80 border border-slate-800 rounded-xl p-3">
-      <div class="min-w-0 space-y-1">
-        <span class="flex items-center gap-1.5 text-xs font-semibold text-white">
-          ${productIcon("content-manager", "white", "w-3.5 h-3.5")}
-          ${escapeHtml(t("app.icmEnvVars.title"))}
-        </span>
-        <span class="block text-[11px] text-slate-400 leading-snug">${escapeHtml(t("app.icmEnvVars.hint"))}</span>
-        <span class="flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-mono text-slate-300">
-          <span><span class="text-slate-500">kafkaserver</span> ${escapeHtml(server)}</span>
-          <span><span class="text-slate-500">kafkaport</span> 9092</span>
-        </span>
-      </div>
-      <a href="/api/environments/${encodeURIComponent(env.id)}/icm-env-vars" download="ICMEnvVars-${escapeHtml(env.id)}.json"
-         class="shrink-0 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-slate-700 text-slate-100 hover:bg-slate-800 hover:border-slate-600 transition">
-        <i data-lucide="download" class="w-3.5 h-3.5"></i>
-        ${escapeHtml(t("app.icmEnvVars.download"))}
-      </a>
+  const running = env.status === "running" || env.status === "partial";
+  const id = escapeHtml(env.id);
+  const actions = (exportFn, importFn) => `
+    <div class="flex items-center gap-2 shrink-0">
+      <button type="button" onclick="${exportFn}('${id}')" ${running ? "" : "disabled"}
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-slate-700 text-slate-100 hover:bg-slate-800 hover:border-slate-600 transition disabled:opacity-40 disabled:pointer-events-none">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i>${t("app.scalerConfig.export")}
+      </button>
+      <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-slate-700 text-slate-100 transition ${running ? "hover:bg-slate-800 hover:border-slate-600 cursor-pointer" : "opacity-40 pointer-events-none"}">
+        <i data-lucide="upload" class="w-3.5 h-3.5"></i>${t("app.scalerConfig.import")}
+        <input type="file" accept=".json,application/json" class="sr-only" ${running ? "" : "disabled"} onchange="${importFn}('${id}', this)">
+      </label>
     </div>`;
+  const row = (icon, title, hint, buttons) => `
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-3 py-3">
+      <div class="min-w-0 space-y-0.5">
+        <span class="flex items-center gap-1.5 text-xs font-semibold text-white">${icon}${escapeHtml(title)}</span>
+        <span class="block text-[11px] text-slate-400 leading-snug">${escapeHtml(hint)}</span>
+      </div>
+      ${buttons}
+    </div>`;
+  box.innerHTML = `
+    <div class="bg-slate-900/80 border border-slate-800 rounded-xl overflow-hidden">
+      <div class="flex items-center gap-1.5 px-3 pt-3 text-xs font-bold text-slate-300 uppercase tracking-wider">
+        <i data-lucide="file-json" class="w-3.5 h-3.5 text-slate-400"></i>${t("app.configBackups.title")}
+      </div>
+      ${running ? "" : `<p class="px-3 pt-1 text-[11px] text-amber-300">${t("app.scalerConfig.notRunning")}</p>`}
+      <div class="divide-y divide-slate-800">
+        ${row(productIcon("scaler", "white", "w-3.5 h-3.5"), t("app.scalerConfig.title"), t("app.scalerConfig.exportHint"), actions("exportScalerConfig", "importScalerConfig"))}
+        ${row(productIcon("content-manager", "white", "w-3.5 h-3.5"), t("app.icmVariables.title"), t("app.icmVariables.hint"), actions("exportIcmVariables", "importIcmVariables"))}
+      </div>
+    </div>`;
+  lucide.createIcons();
 }
 
 async function handleEditEnvSubmit(e) {
@@ -1124,7 +1408,8 @@ async function handleEditEnvSubmit(e) {
     enable_kafka: enableKafka,
     use_cases: selectedUseCases("edit"),
     enable_ftp: enableFtp,
-    demo_mode: demoMode
+    demo_mode: demoMode,
+    branding: brandingPayload("edit")
   };
 
   // Close the modal window immediately upon clicking save
@@ -1201,6 +1486,7 @@ function getServicePortInfo(c, env) {
   let portText = "";
   let accessUrl = null;
   let urlLabel = "";
+  let address = "";   // host:port other machines connect to (ICM and FTP clients)
 
   if (s.includes("interactive") && !s.includes("ips") && !s.includes("prepare")) {
     const port = extractHostPort(c.ports, 30701) || ports.interactive || 30701;
@@ -1215,6 +1501,7 @@ function getServicePortInfo(c, env) {
   } else if (s.includes("icm")) {
     const port = extractHostPort(c.ports, 30353) || ports.icm || 30353;
     portText = `${port} (Inspire ICM)`;
+    address = `${hostAddress()}:${port}`;
   } else if (s.includes("postgres")) {
     const port = extractHostPort(c.ports, 5432) || ports.postgres || 5432;
     portText = `${port} (PostgreSQL)`;
@@ -1236,12 +1523,13 @@ function getServicePortInfo(c, env) {
   } else if (s.includes("ftp")) {
     const port = extractHostPort(c.ports, 21) || ports.ftp || 2121;
     portText = `${port} (system:Password12345*)`;
+    address = `${hostAddress()}:${port}`;
   } else {
     const genericMatch = c.ports ? c.ports.match(/:(\d+)->/) : null;
     portText = genericMatch ? genericMatch[1] : (c.ports || "N/A");
   }
 
-  return { portText, accessUrl, urlLabel };
+  return { portText, accessUrl, urlLabel, address };
 }
 
 function renderNodeBox({ title, container, defaultPort, internalPort, type, env, compact = false, hint = null }) {
@@ -1251,6 +1539,7 @@ function renderNodeBox({ title, container, defaultPort, internalPort, type, env,
   const portInfo = container ? getServicePortInfo(container, env) : {
     portText: `${defaultPort}${internalPort ? ` -> ${internalPort}` : ''}`,
     accessUrl: type === "interactive" ? `http://${host}:${defaultPort}/interactive` : (type === "scaler" ? `http://${host}:${defaultPort}/` : (type === "use-cases" ? `http://${host}:${defaultPort}/?lang=${currentLang}` : null)),
+    address: type === "icm" || type === "ftp" ? `${hostAddress()}:${defaultPort}` : "",
     urlLabel: type === "interactive" ? t("app.services.openInteractive") : (type === "scaler" ? t("app.services.openScaler") : (type === "use-cases" ? t("app.services.openUseCasesPortal") : ""))
   };
 
@@ -1301,6 +1590,16 @@ function renderNodeBox({ title, container, defaultPort, internalPort, type, env,
               ${escapeHtml(container ? container.name : '--')}
             </span>
           </div>
+          ${portInfo.address ? `
+            <div class="${compact ? "" : "sm:col-span-2"} bg-slate-950/70 p-2 rounded-lg border border-slate-800/80 flex items-center justify-between gap-2" title="${escapeHtml(t("app.host.connectHint"))}">
+              <span class="text-slate-400 font-medium flex-shrink-0">${t("app.host.connectFrom")}</span>
+              <span class="flex items-center gap-1.5 min-w-0">
+                <span class="font-mono font-semibold text-sky-300 truncate select-all">${escapeHtml(portInfo.address)}</span>
+                <button type="button" onclick="copyText('${escapeHtml(portInfo.address)}')" class="p-0.5 rounded text-slate-400 hover:text-white flex-shrink-0" title="${escapeHtml(t("app.host.copy"))}" aria-label="${escapeHtml(t("app.host.copy"))}">
+                  <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                </button>
+              </span>
+            </div>` : ""}
         </div>
 
         <!-- Sharedfolder Volume Info for Scaler -->
@@ -1466,7 +1765,7 @@ function renderServicesView() {
 
   // Helper to render Interactive Group
   const renderInteractiveGroup = () => `
-    <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
+    <div data-node="interactive" class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
       <!-- Header Banner (Mint Green as in groups.png) -->
       <div class="bg-[#8FB8A0] text-slate-950 font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
         ${productIcon("interactive", "black", "w-5 h-5")}
@@ -1507,7 +1806,7 @@ function renderServicesView() {
 
   // Helper to render Scaler Group
   const renderScalerGroup = () => `
-    <div class="group-box hub-box flex flex-col rounded-2xl border-2 border-[#C99A62] overflow-hidden bg-slate-900/90" data-flow-target>
+    <div data-node="scaler" class="group-box hub-box flex flex-col rounded-2xl border-2 border-[#C99A62] overflow-hidden bg-slate-900/90" data-flow-target>
       <!-- Header Banner: Scaler is the communications hub every integration feeds -->
       <div class="bg-[#C99A62] text-slate-950 font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2 flex-wrap">
         ${productIcon("scaler", "black", "w-5 h-5")}
@@ -1559,6 +1858,7 @@ function renderServicesView() {
           hint: "production-server"
         })}
       </div>
+
     </div>
   `;
 
@@ -1619,6 +1919,7 @@ function renderServicesView() {
           ` : ''}
         </div>
       </div>
+      ${layoutToolbarHtml(env)}
   `;
 
   // Check prepare containers real execution status
@@ -1682,8 +1983,8 @@ function renderServicesView() {
   }
 
   // Tier frame: BACK-END, FRONT-END and customer systems are drawn as labelled layers
-  const tierFrame = ({ title, icon, subtitle, body, extraAttrs = "" }) => `
-    <section class="tier-frame rounded-2xl border border-slate-700/80 bg-slate-950/40 p-4 sm:p-5 space-y-4 h-full flex flex-col" ${extraAttrs}>
+  const tierFrame = ({ zone, title, icon, subtitle, body, extraAttrs = "" }) => `
+    <section data-zone="${zone}" class="tier-frame rounded-2xl border-2 border-slate-500/70 bg-slate-950/40 p-4 sm:p-5 space-y-4 h-full flex flex-col" ${extraAttrs}>
       <header class="flex flex-wrap items-center justify-between gap-2">
         <div class="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-slate-300">
           <i data-lucide="${icon}" class="w-4 h-4 text-slate-400"></i>
@@ -1705,7 +2006,7 @@ function renderServicesView() {
   ` : "";
 
   const serviceGroup = ({ key, color, icon, title, body, flow, arrow, bidir, protocol }) => `
-    <div class="group-box flex flex-col h-full rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl" data-flow-source="${key}" ${bidir ? "data-flow-bidir" : ""} data-flow-protocol="${protocol}">
+    <div data-node="${key}" class="group-box flex flex-col h-full rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl" data-flow-source="${key}" ${bidir ? "data-flow-bidir" : ""} data-flow-protocol="${protocol}">
       <div class="bg-[${color}] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
         ${productIcon(icon, "white", "w-5 h-5")}
         <span>${title}</span>
@@ -1719,7 +2020,8 @@ function renderServicesView() {
 
   // Same column count for the use case tiles and the row below them, so Digital Services sits under its tile
   const useCaseCols = envUseCases.length >= 3 ? "md:grid-cols-3" : envUseCases.length === 2 ? "md:grid-cols-2" : "";
-  const dasIndex = envUseCases.findIndex(c => c.id === "das-inbox");
+  // Digital Services sits under the first case that shows Quadient Cloud documents (inbox or online banking)
+  const dasIndex = envUseCases.findIndex(c => c.id === "das-inbox" || c.id === "das-banking");
   const hasDigitalServices = dasIndex >= 0;
   const useCaseColCount = Math.min(envUseCases.length, 3) || 1;
   // The direct use cases → Scaler line leaves from the middle of the other tiles, clear of the Digital Services box
@@ -1733,7 +2035,7 @@ function renderServicesView() {
   const useCasesUp = useCasesContainer && useCasesContainer.state === "running";
   const useCasesBaseUrl = `http://${window.location.hostname || "localhost"}:${env.ports?.use_cases || 3000}`;
   const useCasesSection = hasUseCases ? `
-    <div class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl" ${useCasesDirectFlow ? `data-flow-source="use-cases" data-flow-bidir data-flow-x="${useCasesFlowX}"` : ""}>
+    <div data-node="use-cases" class="group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl" ${useCasesDirectFlow ? `data-flow-source="use-cases" data-flow-bidir data-flow-x="${useCasesFlowX}"` : ""}>
       <div class="bg-[#A35F78] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
         ${productIcon("use-cases", "white", "w-5 h-5")}
         <span>${t("app.services.useCasesBanner")}</span>
@@ -1762,9 +2064,9 @@ function renderServicesView() {
           ` : ""}
         </div>
 
-        <div class="grid grid-cols-1 ${useCaseCols} gap-4">
+        <div data-tiles class="grid grid-cols-1 ${useCaseCols} gap-4">
           ${envUseCases.length ? envUseCases.map(c => `
-            <a href="${escapeHtml(`${useCasesBaseUrl}/${c.id}/?lang=${currentLang}`)}" target="_blank" rel="noopener noreferrer"
+            <a data-node="uc-${escapeHtml(c.id)}" href="${escapeHtml(`${useCasesBaseUrl}/${c.id}/?lang=${currentLang}`)}" target="_blank" rel="noopener noreferrer"
                class="use-case-tile group rounded-xl border-2 p-4 sm:p-5 flex items-start gap-4 transition ${useCasesUp ? "border-[#A35F78]/60 bg-slate-950/80 hover:border-[#A35F78] hover:bg-slate-950" : "border-slate-800 bg-slate-900/40 pointer-events-none opacity-60"}">
               <span class="text-3xl sm:text-4xl leading-none" aria-hidden="true">${escapeHtml(c.icon || "📄")}</span>
               <span class="min-w-0 flex-1 space-y-1.5">
@@ -1786,7 +2088,7 @@ function renderServicesView() {
 
   // ── CLOUD: Digital Services between the Digital Advantage Inbox tile and Scaler ──
   const dsCloudUrl = (lastDasStatus && lastDasStatus.cloud_url) || "";
-  const dsUrl = dsCloudUrl ? `${dsCloudUrl}/digitalservices` : "";
+  const dsUrl = dsCloudUrl ? `${dsCloudUrl}/digitalservices/` : "";
   const dsColStart = ["", "md:col-start-2", "md:col-start-3"][Math.min(dasIndex, 2)] || "";
   const digitalServicesSection = hasDigitalServices ? `
     <div class="grid grid-cols-1 ${useCaseCols} gap-4">
@@ -1795,7 +2097,7 @@ function renderServicesView() {
           <i data-lucide="arrow-up-down" class="w-4 h-4"></i>
           <span class="mt-1 text-[10px] font-mono px-2 py-0.5 rounded-full border border-sky-500/40 bg-slate-950">HTTPS · SDK</span>
         </div>
-        <div class="group-box w-full flex flex-col rounded-2xl border-2 border-sky-500/40 overflow-hidden bg-slate-900/90 shadow-xl"
+        <div data-node="digital-services" class="group-box w-full flex flex-col rounded-2xl border-2 border-sky-500/40 overflow-hidden bg-slate-900/90 shadow-xl"
           data-flow-source="digital-services" data-flow-bidir data-flow-protocol="HTTPS · long polling">
           <div class="bg-[#2F6E9E] text-white font-black tracking-widest text-center py-2.5 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
             ${productIcon("digital-services", "white", "w-5 h-5")}
@@ -1831,7 +2133,7 @@ function renderServicesView() {
 
   // ── MIDDLE: BACK-END — Scaler hub + ICM + Postgres ──
   const renderIcmGroup = () => `
-    <div class="group-box rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
+    <div data-node="icm" class="group-box rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
       <div class="bg-[#8b929d] text-slate-950 font-black tracking-widest text-center py-2 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
         ${productIcon("content-manager", "black", "w-5 h-5")}
         <span>ICM</span>
@@ -1851,7 +2153,7 @@ function renderServicesView() {
   `;
 
   const renderPostgresGroup = () => `
-    <div class="group-box rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
+    <div data-node="postgres" class="group-box rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl">
       <div class="bg-[#8b929d] text-slate-950 font-black tracking-widest text-center py-2 px-4 uppercase text-sm sm:text-base border-b-2 border-slate-700 select-none shadow-sm flex items-center justify-center gap-2">
         ${productIcon("postgres", "black", "w-5 h-5")}
         <span>POSTGRES DATABASE</span>
@@ -1883,6 +2185,7 @@ function renderServicesView() {
   `;
 
   const backendSection = tierFrame({
+    zone: "backend",
     title: "Back-end",
     icon: "server",
     subtitle: hasScaler ? t("app.services.backendSubtitleScaler") : t("app.services.backendSubtitle"),
@@ -1904,6 +2207,7 @@ function renderServicesView() {
 
   // ── BOTTOM: FRONT-END (Interactive) + customer systems (FTP, Kafka) ──
   const frontendSection = hasInteractive ? tierFrame({
+    zone: "frontend",
     title: "Front-end",
     icon: "monitor",
     subtitle: t("app.services.frontendSubtitle"),
@@ -1984,6 +2288,7 @@ function renderServicesView() {
   }
 
   const integrationsSection = integrationGroups.length ? tierFrame({
+    zone: "integrations",
     title: t("app.services.integrations"),
     icon: "network",
     subtitle: hasScaler ? "" : `<span class="text-amber-300">${t("app.services.enableScalerHint")}</span>`,
@@ -2021,7 +2326,7 @@ function renderServicesView() {
   // If there are extra containers not part of the standard architecture
   if (extraContainers.length > 0) {
     html += `
-      <div class="pt-6 border-t border-slate-800 space-y-3">
+      <div data-node="extra" class="pt-6 border-t border-slate-800 space-y-3">
         <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
           <i data-lucide="layers" class="w-4 h-4 text-slate-500"></i>
           ${t("app.services.extra")}
@@ -2059,11 +2364,15 @@ function renderServicesView() {
 
   container.innerHTML = html;
   lucide.createIcons();
-  requestAnimationFrame(drawHubFlow);
+  requestAnimationFrame(() => {
+    // A saved design (or one being edited) turns the tiers into a free canvas; otherwise the automatic layout
+    if (!applyArchitectureCanvas(env)) drawHubFlow();
+  });
 }
 
 // Connectors from every source (use cases above, front-end and integrations below) into the Scaler hub
 function drawHubFlow() {
+  if (document.getElementById("arch-stage")) return drawCanvasEdges();
   const wrap = document.getElementById("hub-flow");
   const svg = document.getElementById("hub-flow-svg");
   if (!wrap || !svg) return;
@@ -2133,8 +2442,740 @@ function drawHubFlow() {
 let hubFlowResizeTimer = null;
 window.addEventListener("resize", () => {
   clearTimeout(hubFlowResizeTimer);
-  hubFlowResizeTimer = setTimeout(drawHubFlow, 120);
+  hubFlowResizeTimer = setTimeout(() => {
+    // Crossing the canvas width limit switches between the free design and the automatic layout
+    const env = selectedServicesEnv();
+    const wantsCanvas = Boolean(env && window.innerWidth >= CANVAS_MIN_VIEWPORT && (layoutEditing || savedLayout(env)));
+    if (wantsCanvas !== Boolean(document.getElementById("arch-stage"))) return renderServicesView();
+    fitCanvasStage();
+    drawHubFlow();
+  }, 120);
 });
+
+// ------------------------------------------------------------------------------
+// Architecture canvas: the services view as a free layout, designed per environment and locked when done.
+// The automatic layout is rendered first; applyArchitectureCanvas() measures it (the defaults for anything the
+// design doesn't have yet) and moves the groups ([data-node]) and the layers ([data-zone]) onto a stage. The use
+// case tiles stay inside their group: they are only reordered there, and arrows can start or end on them.
+// A design is { nodes: {key: {x,y,w,h}}, zones: {key: {x,y,w,h}}, tiles: [tile key, ...], edges: [{from, to, label,
+// bidir, style, animate}], custom: {key: {title, subtitle, icon, color}} }; the arrows start as the automatic ones
+// and then belong to the design, and custom groups stand for systems around Inspire (AWS, SAP, a CRM...).
+// ------------------------------------------------------------------------------
+const CANVAS_GRID = 10;
+const CANVAS_MIN_VIEWPORT = 1024;   // narrower screens keep the automatic, stacked layout
+const ZONE_META = {
+  backend: { icon: "server", title: () => "Back-end" },
+  frontend: { icon: "monitor", title: () => "Front-end" },
+  integrations: { icon: "network", title: () => t("app.services.integrations") }
+};
+const CUSTOM_GROUP_PRESETS = [
+  { id: "aws", title: "AWS Cloud Services", icon: "cloud", color: "#B45309" },
+  { id: "azure", title: "Microsoft Azure", icon: "cloud", color: "#1D6FB8" },
+  { id: "gcp", title: "Google Cloud", icon: "cloud", color: "#2F7D4F" },
+  { id: "sap", title: "SAP", icon: "building-2", color: "#1F5FA6" },
+  { id: "crm", title: "CRM", icon: "users", color: "#7C3AED" },
+  { id: "database", titleKey: "app.layout.preset.database", icon: "database", color: "#475569" },
+  { id: "messaging", titleKey: "app.layout.preset.messaging", icon: "mail", color: "#BE185D" },
+  { id: "customer", titleKey: "app.layout.preset.customer", icon: "building", color: "#0F766E" },
+  { id: "other", titleKey: "app.layout.preset.other", icon: "box", color: "#57534E" }
+];
+const CUSTOM_GROUP_COLORS = ["#B45309", "#1D6FB8", "#2F7D4F", "#7C3AED", "#BE185D", "#0F766E", "#475569", "#A35F78", "#C99A62", "#57534E"];
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+const ICON_NAME = /^[a-z0-9-]{1,40}$/;
+
+let layoutEditing = null;           // { envId, draft } while a design is being edited
+let canvasLayout = null;            // design shown on the stage (the draft while editing)
+let canvasConnect = null;           // arrow being drawn: { from, x, y }
+let canvasEdgesFrame = 0;
+
+const snapToGrid = v => Math.round(v / CANVAS_GRID) * CANVAS_GRID;
+const presetTitle = p => (p.titleKey ? t(p.titleKey) : p.title);
+const cloneLayout = value => JSON.parse(JSON.stringify(value));
+
+function savedLayout(env) {
+  const layout = env && env.layout;
+  return layout && typeof layout === "object" && layout.nodes ? layout : null;
+}
+
+function layoutToolbarHtml(env) {
+  const editing = Boolean(layoutEditing && layoutEditing.envId === env.id);
+  const locked = Boolean(savedLayout(env));
+  const button = (icon, label, onclick, style) => `
+    <button type="button" onclick="${onclick}" class="whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${style}">
+      <i data-lucide="${icon}" class="w-3.5 h-3.5"></i>${label}
+    </button>`;
+  const neutral = "bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700";
+  const hint = editing ? t("app.layout.editingHint") : locked ? t("app.layout.lockedHint") : t("app.layout.autoHint");
+  return `
+    <div class="hidden lg:flex flex-wrap items-center justify-between gap-2 ${editing ? "bg-sky-500/10 border border-sky-500/30 rounded-xl px-3 py-2" : ""}">
+      <p class="text-[11px] ${editing ? "text-sky-200" : "text-slate-500"} flex items-center gap-1.5 max-w-3xl">
+        <i data-lucide="${editing ? "move" : locked ? "lock" : "layout-grid"}" class="w-3.5 h-3.5 flex-shrink-0"></i>${hint}
+      </p>
+      <div class="flex flex-wrap items-center gap-2">
+        ${editing ? `
+          ${button("plus", t("app.layout.addGroup"), "openCustomGroupDialog()", "bg-slate-800 text-sky-200 border border-sky-500/40 hover:bg-slate-700")}
+          ${locked ? button("rotate-ccw", t("app.layout.reset"), "resetArchitectureLayout()", neutral) : ""}
+          ${button("x", t("app.layout.cancel"), "cancelArchitectureLayout()", neutral)}
+          ${button("lock", t("app.layout.lock"), "lockArchitectureLayout()", "bg-sky-600 hover:bg-sky-500 text-white border border-sky-500")}
+        ` : button("pencil-ruler", t(locked ? "app.layout.editAgain" : "app.layout.edit"), "editArchitectureLayout()", neutral)}
+      </div>
+    </div>`;
+}
+
+function customGroupElement(key, group, editing) {
+  const color = HEX_COLOR.test(group.color || "") ? group.color : "#57534E";
+  const icon = ICON_NAME.test(group.icon || "") ? group.icon : "box";
+  const el = document.createElement("div");
+  el.dataset.node = key;
+  el.dataset.custom = "";
+  el.className = "group-box flex flex-col rounded-2xl border-2 border-slate-700 overflow-hidden bg-slate-900/90 shadow-xl";
+  el.innerHTML = `
+    <div class="relative text-white font-black tracking-widest text-center py-2.5 ${editing ? "px-10" : "px-4"} uppercase text-sm sm:text-base leading-tight border-b-2 border-slate-700 select-none flex items-center justify-center gap-2" style="background:${color}">
+      <i data-lucide="${icon}" class="w-5 h-5 flex-shrink-0"></i><span class="min-w-0 break-words">${escapeHtml(group.title)}</span>
+      ${editing ? `<button type="button" data-custom-edit class="arch-custom-edit" title="${t("app.layout.groupEditTitle")}" aria-label="${t("app.layout.groupEditTitle")}"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>` : ""}
+    </div>
+    ${group.subtitle ? `<div class="p-4 text-xs text-slate-300 leading-relaxed bg-slate-900/60 whitespace-pre-line">${escapeHtml(group.subtitle)}</div>` : ""}`;
+  return el;
+}
+
+// The arrows the automatic layout draws; a new design starts with them
+function defaultCanvasEdges(stage) {
+  const has = key => Boolean(stage.querySelector(`[data-node="${key}"]`));
+  const edges = [];
+  if (has("scaler")) {
+    stage.querySelectorAll("[data-node][data-flow-source]").forEach(el => {
+      const key = el.dataset.node;
+      if (key === "scaler") return;
+      edges.push({ from: key, to: "scaler", label: el.dataset.flowProtocol || "", bidir: el.hasAttribute("data-flow-bidir"),
+        style: el.dataset.flowStyle === "platform" ? "platform" : "hub", animate: key === "use-cases" || key === "digital-services" });
+    });
+  }
+  const link = (from, to, label) => {
+    if (has(from) && has(to)) edges.push({ from, to, label, bidir: true, style: "hub", animate: false });
+  };
+  link("scaler", "icm", t("app.services.icmResources").replace(/<br\s*\/?>/gi, " "));
+  link("icm", "postgres", t("app.services.icmPostgresLink"));
+  const dasTiles = ["uc-das-inbox", "uc-das-banking"].filter(has);
+  (dasTiles.length ? dasTiles : ["use-cases"]).forEach(key => link(key, "digital-services", "HTTPS · SDK"));
+  return edges;
+}
+
+function applyArchitectureCanvas(env) {
+  if (layoutEditing && layoutEditing.envId !== env.id) layoutEditing = null;
+  const editing = Boolean(layoutEditing);
+  const source = editing ? layoutEditing.draft : savedLayout(env);
+  const wrap = document.getElementById("hub-flow");
+  // Two renders in the same frame: the first callback already built the stage for the latest markup
+  if (!wrap) return Boolean(document.getElementById("arch-stage"));
+  canvasLayout = null;
+  if (!source || window.innerWidth < CANVAS_MIN_VIEWPORT) return false;
+  const origin = wrap.getBoundingClientRect();
+  if (origin.width === 0) return false;   // hidden tab: it is rendered again when shown
+  const card = wrap.closest(".architecture-canvas");
+  // The extra containers block sits after the architecture card, so look in the whole services view
+  const view = document.getElementById("services-grid");
+
+  // The interactive group carries its flow attributes on a wrapper; the stage only keeps the group itself
+  card.querySelectorAll("[data-flow-source]").forEach(el => {
+    const node = el.matches("[data-node]") ? null : el.querySelector("[data-node]");
+    if (!node) return;
+    ["data-flow-source", "data-flow-bidir", "data-flow-protocol", "data-flow-style"].forEach(attr => {
+      if (el.hasAttribute(attr)) node.setAttribute(attr, el.getAttribute(attr));
+    });
+  });
+
+  // Measured before anything moves (taking the tiles out shrinks the use cases group), rounded down to the
+  // grid so the automatic layout never ends up wider than the view
+  const down = v => Math.floor(v / CANVAS_GRID) * CANVAS_GRID;
+  const nodes = Array.from(view.querySelectorAll("[data-node]:not(.use-case-tile)"));
+  const tiles = Array.from(view.querySelectorAll(".use-case-tile[data-node]"));
+  const zones = Array.from(wrap.querySelectorAll("[data-zone]"));
+  const auto = new Map([...nodes, ...zones].map(el => {
+    const r = el.getBoundingClientRect();
+    return [el, { x: down(r.left - origin.left), y: down(r.top - origin.top), w: down(r.width), h: down(r.height) }];
+  }));
+
+  // Saved positions win; anything that appeared after the design was made starts below it
+  const layout = {
+    nodes: {}, zones: {},
+    custom: cloneLayout(source.custom || {}),
+    tiles: Array.isArray(source.tiles) ? [...source.tiles] : [],
+    edges: Array.isArray(source.edges) ? cloneLayout(source.edges) : null
+  };
+  const known = [...Object.values(source.nodes || {}), ...Object.values(source.zones || {})];
+  let freeY = known.length ? Math.max(...known.map(r => r.y + (r.h || 200))) + 40 : 0;
+  const fresh = new Set();
+  const place = (saved, rect, key) => {
+    if (saved) return { ...saved };
+    if (key) fresh.add(key);
+    if (!known.length) return rect;
+    const placed = { ...rect, y: freeY };
+    freeY += rect.h + 20;
+    return placed;
+  };
+
+  const stage = document.createElement("div");
+  stage.id = "arch-stage";
+  stage.className = `arch-stage${editing ? " is-editing" : ""}`;
+  stage.dataset.running = wrap.dataset.running;
+  stage.innerHTML = `<svg id="arch-edges" class="arch-edges" aria-hidden="true"></svg>`;
+  const handles = `<span class="arch-resize" data-resize title="${t("app.layout.resize")}"></span>`;
+
+  zones.forEach(el => {
+    const key = el.dataset.zone;
+    const meta = ZONE_META[key] || { icon: "square", title: () => key };
+    const zone = document.createElement("section");
+    zone.className = "arch-item arch-zone tier-frame rounded-2xl border-2 border-slate-500/70 bg-slate-950/40";
+    zone.dataset.kind = "zone";
+    zone.dataset.key = key;
+    zone.innerHTML = `
+      <header class="arch-zone-header flex items-center gap-2 px-4 pt-3 pb-2 text-xs font-black uppercase tracking-[0.2em] text-slate-300">
+        <i data-lucide="${meta.icon}" class="w-4 h-4 text-slate-400"></i>${escapeHtml(meta.title())}
+      </header>
+      ${editing ? handles : ""}`;
+    layout.zones[key] = place(source.zones && source.zones[key], auto.get(el));
+    stage.appendChild(zone);
+    placeCanvasItem(zone, layout.zones[key]);
+  });
+
+  const addNode = (el, rect) => {
+    el.classList.remove("h-full");
+    el.classList.add("arch-item", "arch-node");
+    el.dataset.kind = "node";
+    el.dataset.key = el.dataset.node;
+    if (editing) {
+      // Stopped environments dim their tiles and make them unclickable; while designing they must be grabbable
+      el.classList.remove("pointer-events-none");
+      el.setAttribute("draggable", "false");
+      el.insertAdjacentHTML("beforeend", `${handles}<span class="arch-connect" data-connect title="${t("app.layout.connect")}"></span>`);
+    }
+    layout.nodes[el.dataset.node] = rect;
+    stage.appendChild(el);
+    placeCanvasItem(el, rect);
+  };
+  nodes.forEach(el => addNode(el, place(source.nodes && source.nodes[el.dataset.node], auto.get(el), el.dataset.node)));
+
+  // Tiles keep the saved order inside their group (new use cases go last) and can be arrow ends
+  // (the use cases group is already on the detached stage, so the grid is reached through its tiles)
+  const tileGrid = tiles.length ? tiles[0].parentElement : null;
+  if (tileGrid) {
+    const rank = key => { const i = layout.tiles.indexOf(key); return i < 0 ? Infinity : i; };
+    tiles.sort((a, b) => rank(a.dataset.node) - rank(b.dataset.node)).forEach(tile => tileGrid.appendChild(tile));
+  }
+  tiles.forEach(tile => {
+    tile.dataset.key = tile.dataset.node;
+    if (!editing) return;
+    tile.classList.remove("pointer-events-none");
+    tile.classList.add("relative", "arch-tile");
+    tile.setAttribute("draggable", "false");
+    tile.insertAdjacentHTML("beforeend", `<span class="arch-connect" data-connect title="${t("app.layout.connect")}"></span>`);
+  });
+  layout.tiles = tiles.map(tile => tile.dataset.node);
+  Object.entries(layout.custom).forEach(([key, group]) => {
+    addNode(customGroupElement(key, group, editing), place(source.nodes && source.nodes[key], { x: 20, y: 0, w: 300, h: 120 }, key));
+  });
+
+  // New designs start with the automatic arrows; groups added to the environment later bring theirs along
+  const defaults = defaultCanvasEdges(stage);
+  if (!layout.edges) layout.edges = defaults;
+  else layout.edges.push(...defaults.filter(e => (fresh.has(e.from) || fresh.has(e.to))
+    && !layout.edges.some(x => x.from === e.from && x.to === e.to)));
+
+  const scroller = document.createElement("div");
+  scroller.className = "arch-scroller";
+  scroller.appendChild(stage);
+  wrap.replaceWith(scroller);
+
+  canvasLayout = layout;
+  if (editing) {
+    layoutEditing.draft = layout;
+    stage.addEventListener("pointerdown", onCanvasPointerDown);
+    // Designing, not operating: links and buttons inside the groups stay quiet
+    stage.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); }, true);
+  }
+  fitCanvasStage();
+  drawCanvasEdges();
+  lucide.createIcons();
+  return true;
+}
+
+function placeCanvasItem(el, rect) {
+  el.style.left = `${rect.x}px`;
+  el.style.top = `${rect.y}px`;
+  el.style.width = `${rect.w}px`;
+  if (el.dataset.kind === "zone") el.style.height = `${rect.h}px`;
+}
+
+// Grows the stage to its content; while editing it keeps room below to drag groups into
+function fitCanvasStage() {
+  const stage = document.getElementById("arch-stage");
+  if (!stage) return;
+  let right = 0;
+  let bottom = 0;
+  stage.querySelectorAll(".arch-item").forEach(el => {
+    right = Math.max(right, el.offsetLeft + el.offsetWidth);
+    bottom = Math.max(bottom, el.offsetTop + el.offsetHeight);
+  });
+  // Wider than the view only when a group was dragged past its right edge
+  const width = stage.parentElement.clientWidth;
+  stage.style.width = `${right > width ? right + 20 : width}px`;
+  stage.style.height = `${bottom + (layoutEditing ? 240 : 20)}px`;
+}
+
+function onCanvasPointerDown(e) {
+  if (!layoutEditing || e.button !== 0) return;
+  const edge = e.target.closest("[data-edge]");
+  if (edge) {
+    e.preventDefault();
+    openEdgeDialog(Number(edge.dataset.edge));
+    return;
+  }
+  const tile = e.target.closest(".arch-tile");
+  if (tile) return e.target.closest("[data-connect]") ? startCanvasConnect(e, tile) : startTileReorder(e, tile);
+  const item = e.target.closest(".arch-item");
+  if (!item) return;
+  if (e.target.closest("[data-custom-edit]")) {
+    e.preventDefault();
+    openCustomGroupDialog(item.dataset.key);
+    return;
+  }
+  if (e.target.closest("[data-connect]")) return startCanvasConnect(e, item);
+
+  const resizing = Boolean(e.target.closest("[data-resize]"));
+  const isZone = item.dataset.kind === "zone";
+  // Layers move by their title so the groups on top of them stay easy to grab
+  if (isZone && !resizing && !e.target.closest(".arch-zone-header")) return;
+  e.preventDefault();
+
+  const rect = layoutEditing.draft[isZone ? "zones" : "nodes"][item.dataset.key];
+  const start = { px: e.clientX, py: e.clientY, x: rect.x, y: rect.y, w: rect.w, h: rect.h };
+  item.setPointerCapture(e.pointerId);
+  item.classList.add("is-dragging");
+
+  const move = ev => {
+    const dx = ev.clientX - start.px;
+    const dy = ev.clientY - start.py;
+    if (resizing) {
+      rect.w = Math.max(isZone ? 200 : 160, snapToGrid(start.w + dx));
+      if (isZone) rect.h = Math.max(80, snapToGrid(start.h + dy));
+    } else {
+      rect.x = Math.max(0, snapToGrid(start.x + dx));
+      rect.y = Math.max(0, snapToGrid(start.y + dy));
+    }
+    placeCanvasItem(item, rect);
+    scheduleCanvasEdges();
+  };
+  const end = () => {
+    item.removeEventListener("pointermove", move);
+    item.removeEventListener("pointerup", end);
+    item.removeEventListener("pointercancel", end);
+    item.classList.remove("is-dragging");
+    if (!isZone) rect.h = snapToGrid(item.offsetHeight);
+    fitCanvasStage();
+    drawCanvasEdges();
+  };
+  item.addEventListener("pointermove", move);
+  item.addEventListener("pointerup", end);
+  item.addEventListener("pointercancel", end);
+}
+
+// Use case tiles are reordered inside their group: dragging one over another puts it in that place
+function startTileReorder(e, tile) {
+  e.preventDefault();
+  const grid = tile.parentElement;
+  tile.classList.add("is-reordering");
+
+  // Moving the tile in the DOM drops pointer capture, so the pointer is followed on the window
+  const move = ev => {
+    const el = document.elementFromPoint(ev.clientX, ev.clientY);
+    const over = el && el.closest(".use-case-tile");
+    if (!over || over === tile || over.parentElement !== grid) return;
+    const tiles = Array.from(grid.children);
+    // Moving forward lands after the tile below the pointer, moving back lands before it
+    grid.insertBefore(tile, tiles.indexOf(over) > tiles.indexOf(tile) ? over.nextSibling : over);
+    scheduleCanvasEdges();
+  };
+  const end = () => {
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", end);
+    window.removeEventListener("pointercancel", end);
+    tile.classList.remove("is-reordering");
+    if (layoutEditing) layoutEditing.draft.tiles = Array.from(grid.querySelectorAll(".use-case-tile")).map(t => t.dataset.node);
+    fitCanvasStage();
+    drawCanvasEdges();
+  };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", end);
+  window.addEventListener("pointercancel", end);
+}
+
+// Drag from a group's blue dot to another group to draw an arrow between them
+function startCanvasConnect(e, item) {
+  e.preventDefault();
+  const stage = document.getElementById("arch-stage");
+  const handle = e.target.closest("[data-connect]");
+  const at = ev => {
+    const box = stage.getBoundingClientRect();
+    return { x: ev.clientX - box.left, y: ev.clientY - box.top };
+  };
+  const targetAt = ev => {
+    const el = document.elementFromPoint(ev.clientX, ev.clientY);
+    const node = el && el.closest("#arch-stage .use-case-tile, #arch-stage .arch-node");
+    return node && node !== item ? node : null;
+  };
+  canvasConnect = { from: item.dataset.key, ...at(e) };
+  handle.setPointerCapture(e.pointerId);
+  stage.classList.add("is-connecting");
+  let hovered = null;
+
+  const move = ev => {
+    Object.assign(canvasConnect, at(ev));
+    const target = targetAt(ev);
+    if (target !== hovered) {
+      if (hovered) hovered.classList.remove("is-connect-target");
+      hovered = target;
+      if (hovered) hovered.classList.add("is-connect-target");
+    }
+    scheduleCanvasEdges();
+  };
+  const end = ev => {
+    handle.removeEventListener("pointermove", move);
+    handle.removeEventListener("pointerup", end);
+    handle.removeEventListener("pointercancel", end);
+    stage.classList.remove("is-connecting");
+    if (hovered) hovered.classList.remove("is-connect-target");
+    const target = ev.type === "pointerup" ? targetAt(ev) : null;
+    const from = canvasConnect.from;
+    canvasConnect = null;
+    if (!target) return drawCanvasEdges();
+    const edges = layoutEditing.draft.edges;
+    edges.push({ from, to: target.dataset.key, label: "", bidir: false, style: "hub", animate: false });
+    drawCanvasEdges();
+    openEdgeDialog(edges.length - 1, true);
+  };
+  handle.addEventListener("pointermove", move);
+  handle.addEventListener("pointerup", end);
+  handle.addEventListener("pointercancel", end);
+}
+
+function scheduleCanvasEdges() {
+  if (canvasEdgesFrame) return;
+  canvasEdgesFrame = requestAnimationFrame(() => {
+    canvasEdgesFrame = 0;
+    drawCanvasEdges();
+  });
+}
+
+// Each arrow leaves from the side of a group that faces the other one; arrivals sharing a side are spread out
+function drawCanvasEdges() {
+  const stage = document.getElementById("arch-stage");
+  const svg = document.getElementById("arch-edges");
+  if (!stage || !svg || !canvasLayout) return;
+  const box = stage.getBoundingClientRect();
+  const rectOf = el => {
+    const r = el.getBoundingClientRect();
+    const left = r.left - box.left;
+    const top = r.top - box.top;
+    return { left, top, right: left + r.width, bottom: top + r.height, cx: left + r.width / 2, cy: top + r.height / 2 };
+  };
+  const node = key => stage.querySelector(`.arch-node[data-key="${CSS.escape(key)}"], .use-case-tile[data-key="${CSS.escape(key)}"]`);
+  const running = stage.dataset.running === "true";
+  const editing = stage.classList.contains("is-editing");
+
+  const sides = (a, b) => {
+    if (b.top >= a.bottom) return ["bottom", "top"];
+    if (b.bottom <= a.top) return ["top", "bottom"];
+    return b.cx >= a.cx ? ["right", "left"] : ["left", "right"];
+  };
+  const point = (r, side) => ({
+    top: { x: r.cx, y: r.top - 3 }, bottom: { x: r.cx, y: r.bottom + 3 },
+    left: { x: r.left - 3, y: r.cy }, right: { x: r.right + 3, y: r.cy }
+  })[side];
+
+  const lines = [];
+  canvasLayout.edges.forEach((edge, index) => {
+    const from = node(edge.from);
+    const to = node(edge.to);
+    if (!from || !to || from === to) return;
+    const a = rectOf(from);
+    const b = rectOf(to);
+    const [sa, sb] = sides(a, b);
+    lines.push({ edge, index, a, sa, sb, toKey: edge.to, start: point(a, sa), end: point(b, sb) });
+  });
+  const bySide = new Map();
+  lines.forEach(l => {
+    const k = `${l.toKey}:${l.sb}`;
+    if (!bySide.has(k)) bySide.set(k, []);
+    bySide.get(k).push(l);
+  });
+  bySide.forEach(list => {
+    const vertical = list[0].sb === "top" || list[0].sb === "bottom";
+    list.sort((p, q) => (vertical ? p.a.cx - q.a.cx : p.a.cy - q.a.cy));
+    list.forEach((l, i) => {
+      const offset = (i - (list.length - 1) / 2) * 40;
+      if (vertical) l.end.x += offset; else l.end.y += offset;
+    });
+  });
+
+  const curve = (sx, sy, ax, ay, verticalStart) => {
+    const mx = (sx + ax) / 2;
+    const my = (sy + ay) / 2;
+    return verticalStart ? `M ${sx} ${sy} C ${sx} ${my}, ${ax} ${my}, ${ax} ${ay}` : `M ${sx} ${sy} C ${mx} ${sy}, ${mx} ${ay}, ${ax} ${ay}`;
+  };
+  let paths = lines.map(l => {
+    const { edge, index } = l;
+    const { x: sx, y: sy } = l.start;
+    const { x: ax, y: ay } = l.end;
+    const d = curve(sx, sy, ax, ay, l.sa === "top" || l.sa === "bottom");
+    const style = edge.style === "platform" ? " is-platform" : "";
+    const marker = style ? "hub-arrow-platform" : "hub-arrow";
+    const hit = editing ? `<path d="${d}" class="arch-edge-hit" data-edge="${index}"><title>${escapeHtml(t("app.layout.edgeHint"))}</title></path>` : "";
+    const path = `${hit}<path d="${d}" class="hub-flow-line${style}${edge.animate && running ? " is-running" : ""}" marker-end="url(#${marker})"${edge.bidir ? ` marker-start="url(#${marker})"` : ""} />`;
+    if (!edge.label) return path;
+    // Both curves are symmetric, so t = 0.5 is the midpoint of the two ends
+    const mx = (sx + ax) / 2;
+    const my = (sy + ay) / 2;
+    const w = edge.label.length * 6.6 + 18;
+    return `${path}
+      <g class="hub-flow-label${style}"${editing ? ` data-edge="${index}"` : ""}>
+        <rect x="${mx - w / 2}" y="${my - 10}" width="${w}" height="20" rx="10" />
+        <text x="${mx}" y="${my + 3.5}" text-anchor="middle">${escapeHtml(edge.label)}</text>
+      </g>`;
+  }).join("");
+
+  // Arrow being drawn: from the source group to the pointer
+  if (canvasConnect) {
+    const from = node(canvasConnect.from);
+    if (from) {
+      const r = rectOf(from);
+      paths += `<path d="M ${r.cx} ${r.cy} L ${canvasConnect.x} ${canvasConnect.y}" class="arch-edge-draft" marker-end="url(#hub-arrow-draft)" />`;
+    }
+  }
+
+  svg.setAttribute("width", stage.offsetWidth);
+  svg.setAttribute("height", stage.offsetHeight);
+  svg.setAttribute("viewBox", `0 0 ${stage.offsetWidth} ${stage.offsetHeight}`);
+  svg.innerHTML = `
+    <defs>
+      <marker id="hub-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#C99A62" />
+      </marker>
+      <marker id="hub-arrow-platform" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#8FB8A0" />
+      </marker>
+      <marker id="hub-arrow-draft" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#38BDF8" />
+      </marker>
+    </defs>
+    ${paths}`;
+}
+
+// Name of a group or tile for the arrow dialog
+function canvasNodeName(key) {
+  const names = {
+    "use-cases": t("app.services.useCasesBanner"), "digital-services": "Digital Services", scaler: "Scaler", icm: "ICM",
+    postgres: "PostgreSQL", interactive: "Interactive", ftp: "FTP", kafka: "Kafka", extra: t("app.services.extra")
+  };
+  if (names[key]) return names[key];
+  if (canvasLayout && canvasLayout.custom[key]) return canvasLayout.custom[key].title;
+  if (key.startsWith("uc-")) {
+    const useCase = useCaseCatalog.find(c => c.id === key.slice(3));
+    return useCase ? useCaseText(useCase, "name") : key.slice(3);
+  }
+  return key;
+}
+
+async function openEdgeDialog(index, isNew = false) {
+  if (!layoutEditing) return;
+  const edges = layoutEditing.draft.edges;
+  const edge = edges[index];
+  if (!edge) return;
+  const { action, value } = await openActionDialog({
+    title: t(isNew ? "app.layout.edgeNewTitle" : "app.layout.edgeTitle"),
+    message: `<p class="font-mono text-xs text-slate-400">${escapeHtml(canvasNodeName(edge.from))} → ${escapeHtml(canvasNodeName(edge.to))}</p>`,
+    input: { label: t("app.layout.edgeLabel"), value: edge.label },
+    actions: [
+      { id: "delete", label: t("app.layout.edgeDelete"), style: "dangerOutline" },
+      { id: "both", label: t("app.layout.edgeTwoWay"), style: edge.bidir ? "primary" : "secondary", default: edge.bidir },
+      { id: "one", label: t("app.layout.edgeOneWay"), style: edge.bidir ? "secondary" : "primary", default: !edge.bidir }
+    ]
+  });
+  if (!layoutEditing || layoutEditing.draft.edges !== edges) return;
+  if (action === "delete" || (!action && isNew)) {
+    edges.splice(index, 1);
+  } else if (action) {
+    edge.label = value.slice(0, 60);
+    edge.bidir = action === "both";
+  }
+  drawCanvasEdges();
+}
+
+// Add or edit a custom group: a preset (AWS, SAP, a CRM...) or a free name, a description and a color
+function openCustomGroupDialog(key) {
+  if (!layoutEditing) return;
+  const draft = layoutEditing.draft;
+  const existing = key ? draft.custom[key] : null;
+  const first = CUSTOM_GROUP_PRESETS[0];
+  const state = existing ? { ...existing } : { title: presetTitle(first), subtitle: "", icon: first.icon, color: first.color };
+
+  let dlg = document.getElementById("group-dialog");
+  if (!dlg) {
+    dlg = document.createElement("dialog");
+    dlg.id = "group-dialog";
+    dlg.className = "bg-slate-900 border border-slate-700 text-slate-100 rounded-xl shadow-2xl p-0 w-[calc(100%-2rem)] max-w-lg";
+    document.body.appendChild(dlg);
+  }
+  const field = "w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500";
+  dlg.innerHTML = `
+    <form method="dialog" class="p-6 space-y-4">
+      <h2 class="text-base font-semibold text-white">${t(existing ? "app.layout.groupEditTitle" : "app.layout.groupNewTitle")}</h2>
+      ${existing ? "" : `
+        <div>
+          <span class="block text-xs text-slate-400 mb-1.5">${t("app.layout.groupPreset")}</span>
+          <div class="flex flex-wrap gap-1.5">
+            ${CUSTOM_GROUP_PRESETS.map(p => `
+              <button type="button" data-preset="${p.id}" class="group-preset flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-700 text-xs text-slate-200 hover:border-slate-500">
+                <span class="w-2.5 h-2.5 rounded-full" style="background:${p.color}"></span>
+                <i data-lucide="${p.icon}" class="w-3.5 h-3.5"></i>${escapeHtml(presetTitle(p))}
+              </button>`).join("")}
+          </div>
+        </div>`}
+      <div>
+        <label for="group-dialog-title" class="block text-xs text-slate-400 mb-1.5">${t("app.layout.groupName")}</label>
+        <input id="group-dialog-title" type="text" maxlength="60" autocomplete="off" value="${escapeHtml(state.title)}" class="${field}">
+      </div>
+      <div>
+        <label for="group-dialog-subtitle" class="block text-xs text-slate-400 mb-1.5">${t("app.layout.groupDescription")}</label>
+        <textarea id="group-dialog-subtitle" rows="3" maxlength="200" class="${field}">${escapeHtml(state.subtitle || "")}</textarea>
+      </div>
+      <div>
+        <span class="block text-xs text-slate-400 mb-1.5">${t("app.layout.groupColor")}</span>
+        <div class="flex flex-wrap gap-2">
+          ${CUSTOM_GROUP_COLORS.map(c => `<button type="button" data-color="${c}" class="group-color w-7 h-7 rounded-full border-2 border-transparent" style="background:${c}" aria-label="${c}"></button>`).join("")}
+        </div>
+      </div>
+      <div class="flex flex-col-reverse sm:flex-row sm:items-center gap-2 pt-2">
+        ${existing ? `<button value="delete" class="sm:mr-auto whitespace-nowrap px-3.5 py-2 rounded-md text-sm font-medium ${DIALOG_BUTTON_STYLES.dangerOutline}">${t("app.layout.groupDelete")}</button>` : `<span class="sm:mr-auto"></span>`}
+        <button value="" class="whitespace-nowrap px-3.5 py-2 rounded-md text-sm font-medium text-slate-300 border border-slate-700 hover:bg-slate-800">${t("app.common.cancel")}</button>
+        <button value="save" class="whitespace-nowrap px-3.5 py-2 rounded-md text-sm font-medium ${DIALOG_BUTTON_STYLES.primary}">${t(existing ? "app.layout.groupSave" : "app.layout.groupAdd")}</button>
+      </div>
+    </form>`;
+
+  const titleInput = dlg.querySelector("#group-dialog-title");
+  const markSelected = () => {
+    dlg.querySelectorAll(".group-color").forEach(b => b.classList.toggle("is-selected", b.dataset.color.toLowerCase() === state.color.toLowerCase()));
+    dlg.querySelectorAll(".group-preset").forEach(b => {
+      const p = CUSTOM_GROUP_PRESETS.find(x => x.id === b.dataset.preset);
+      b.classList.toggle("is-selected", p.icon === state.icon && presetTitle(p) === titleInput.value.trim());
+    });
+  };
+  dlg.querySelectorAll(".group-preset").forEach(b => b.addEventListener("click", () => {
+    const p = CUSTOM_GROUP_PRESETS.find(x => x.id === b.dataset.preset);
+    Object.assign(state, { title: presetTitle(p), icon: p.icon, color: p.color });
+    titleInput.value = state.title;
+    markSelected();
+  }));
+  dlg.querySelectorAll(".group-color").forEach(b => b.addEventListener("click", () => {
+    state.color = b.dataset.color;
+    markSelected();
+  }));
+  titleInput.addEventListener("input", markSelected);
+  markSelected();
+  lucide.createIcons();
+
+  dlg.onclick = ev => { if (ev.target === dlg) dlg.close(""); };
+  dlg.addEventListener("close", () => {
+    if (!layoutEditing || layoutEditing.draft !== draft) return;
+    const action = dlg.returnValue;
+    if (action === "delete" && key) {
+      delete draft.custom[key];
+      delete draft.nodes[key];
+      draft.edges = draft.edges.filter(e => e.from !== key && e.to !== key);
+    } else if (action === "save") {
+      const group = {
+        title: titleInput.value.trim().slice(0, 60) || state.title,
+        subtitle: dlg.querySelector("#group-dialog-subtitle").value.trim().slice(0, 200),
+        icon: state.icon,
+        color: state.color
+      };
+      if (key) {
+        draft.custom[key] = group;
+      } else {
+        // New groups appear near the top of what is on screen
+        const newKey = `custom-${Date.now().toString(36)}`;
+        const stageTop = document.getElementById("arch-stage")?.getBoundingClientRect().top || 0;
+        draft.custom[newKey] = group;
+        draft.nodes[newKey] = { x: 20, y: Math.max(0, snapToGrid(160 - stageTop)), w: 300, h: 120 };
+      }
+    } else {
+      return;
+    }
+    renderServicesView();
+  }, { once: true });
+  dlg.returnValue = "";
+  dlg.showModal();
+  titleInput.focus();
+}
+
+function selectedServicesEnv() {
+  const envId = document.getElementById("service-env-select")?.value;
+  return allEnvironments.find(e => e.id === envId) || null;
+}
+
+function editArchitectureLayout() {
+  const env = selectedServicesEnv();
+  if (!env) return;
+  const saved = savedLayout(env);
+  layoutEditing = { envId: env.id, draft: saved ? cloneLayout(saved) : { nodes: {}, zones: {} } };
+  renderServicesView();
+}
+
+function cancelArchitectureLayout() {
+  layoutEditing = null;
+  renderServicesView();
+}
+
+async function saveArchitectureLayout(env, layout) {
+  try {
+    const res = await fetch(`/api/environments/${encodeURIComponent(env.id)}/layout`, {
+      method: layout ? "PUT" : "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: layout ? JSON.stringify({ layout }) : undefined
+    });
+    const data = await res.json();
+    showAlert(data.success ? "success" : "error", data.message);
+    if (!data.success) return false;
+    env.layout = layout;
+    return true;
+  } catch (err) {
+    showAlert("error", t("app.common.networkError", { error: err.message }));
+    return false;
+  }
+}
+
+async function lockArchitectureLayout() {
+  const env = selectedServicesEnv();
+  if (!env || !layoutEditing) return;
+  if (await saveArchitectureLayout(env, layoutEditing.draft)) {
+    layoutEditing = null;
+    renderServicesView();
+  }
+}
+
+async function resetArchitectureLayout() {
+  const env = selectedServicesEnv();
+  if (!env) return;
+  const { action } = await openActionDialog({
+    title: t("app.layout.resetTitle"),
+    message: `<p>${t("app.layout.resetBody", { name: escapeHtml(env.name) })}</p>`,
+    actions: [{ id: "reset", label: t("app.layout.reset"), style: "danger" }]
+  });
+  if (action !== "reset") return;
+  if (await saveArchitectureLayout(env, null)) {
+    layoutEditing = null;
+    renderServicesView();
+  }
+}
 
 async function containerAction(containerName, action) {
   showAlert("info", t("app.services.runningAction", { action, name: containerName }));
@@ -2299,7 +3340,7 @@ async function applyVersionToActiveEnv(tag) {
 }
 
 // ------------------------------------------------------------------------------
-// Volumes & Snapshots
+// Volumes
 // ------------------------------------------------------------------------------
 let currentModalCliCmd = "";
 
@@ -2509,96 +3550,14 @@ function copyVolCliCmd() {
   });
 }
 
-async function loadSnapshots() {
-  const tbody = document.getElementById("snapshots-tbody");
-  if (!tbody) return;
-  try {
-    const res = await fetch("/api/environments/default/snapshots");
-    const data = await res.json();
-    tbody.innerHTML = "";
-    const snaps = data.snapshots || [];
-    if (snaps.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="5" class="py-6 text-center text-slate-500">${t("app.snapshots.none")}</td>
-        </tr>
-      `;
-      return;
-    }
-    snaps.forEach(s => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td class="py-2.5 px-3 font-semibold text-white">${escapeHtml(s.name)}</td>
-        <td class="py-2.5 px-3 text-slate-400 font-mono">${escapeHtml(s.env_id)}</td>
-        <td class="py-2.5 px-3 text-slate-400">${new Date(s.created_at).toLocaleString(currentLang)}</td>
-        <td class="py-2.5 px-3 font-mono text-slate-300">${escapeHtml(s.size_human)}</td>
-        <td class="py-2.5 px-3 text-right">
-          <button onclick="deleteSnapshot('${s.filename}')" class="p-1 hover:text-rose-400 text-slate-500 rounded" title="${t("app.common.delete")}">
-            <i data-lucide="trash" class="w-3.5 h-3.5"></i>
-          </button>
-        </td>
-      `;
-      tbody.appendChild(tr);
-    });
-    lucide.createIcons();
-  } catch (err) {
-    console.error("Error al cargar snapshots:", err);
-  }
-}
-
-function promptCreateSnapshot() {
-  const select = document.getElementById("service-env-select");
-  const envId = select ? select.value : "default";
-  createSnapshotForEnv(envId);
-}
-
-async function createSnapshotForEnv(envId) {
-  const { action, value: name } = await openActionDialog({
-    title: t("app.actions.createSnapshot"),
-    message: `<p>${t("app.snapshots.createIntro", { name: `<strong class="text-white">${escapeHtml(envName(envId))}</strong>` })}</p>`,
-    input: { label: t("app.snapshots.nameLabel"), value: t("app.snapshots.defaultName", { id: envId }) },
-    actions: [{ id: "ok", label: t("app.actions.createSnapshot"), style: "primary", gate: "value", default: true }]
-  });
-  if (!action || !name) return;
-  showAlert("info", t("app.snapshots.creating", { id: envId }));
-  try {
-    const res = await fetch(`/api/environments/${envId}/snapshots`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name })
-    });
-    const data = await res.json();
-    showAlert(data.success ? "success" : "error", data.message);
-    loadSnapshots();
-  } catch (err) {
-    showAlert("error", t("app.common.error", { error: err.message }));
-  }
-}
-
-async function deleteSnapshot(filename) {
-  const { action } = await openActionDialog({
-    title: t("app.snapshots.delete"),
-    message: `<p>${t("app.snapshots.deleteConfirm", { name: `<span class="font-mono text-white break-all">${escapeHtml(filename)}</span>` })}</p>`,
-    actions: [{ id: "ok", label: t("app.snapshots.delete"), style: "danger" }]
-  });
-  if (!action) return;
-  try {
-    const res = await fetch(`/api/snapshots/${filename}`, { method: "DELETE" });
-    const data = await res.json();
-    showAlert(data.success ? "success" : "error", data.message);
-    loadSnapshots();
-  } catch (err) {
-    showAlert("error", t("app.common.error", { error: err.message }));
-  }
-}
-
 // ------------------------------------------------------------------------------
 // Helpers & Utilities
 // ------------------------------------------------------------------------------
 const DIALOG_BUTTON_STYLES = {
   primary: "bg-[#C2410C] hover:bg-[#9A3412] text-white",
   danger: "bg-rose-600 hover:bg-rose-500 text-white",
-  dangerOutline: "border border-rose-500/40 text-rose-300 hover:bg-rose-500/10"
+  dangerOutline: "border border-rose-500/40 text-rose-300 hover:bg-rose-500/10",
+  secondary: "border border-slate-600 text-slate-200 hover:bg-slate-800"
 };
 
 /**

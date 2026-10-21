@@ -5,7 +5,8 @@ Web Server & Management API
 import json
 import os
 import sys
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from datetime import datetime
+from flask import Flask, Response, render_template, request, jsonify, send_from_directory
 
 # Add parent directory to path
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -14,7 +15,6 @@ sys.path.insert(0, BASE_DIR)
 from manager.services.acr_service import ACRService
 from manager.services.docker_service import DockerService
 from manager.services.env_service import EnvService, VERTICAL_CATEGORIES
-from manager.services.backup_service import BackupService
 from manager.i18n import resolve_lang, localize_payload
 
 app = Flask(
@@ -29,12 +29,12 @@ if not os.path.exists(ENV_FILE) and os.path.exists(os.path.join(BASE_DIR, ".quad
     ENV_FILE = os.path.join(BASE_DIR, ".quadient_credentials.env")
 
 env_service = EnvService(BASE_DIR)
-backup_service = BackupService(BASE_DIR)
 
 @app.after_request
 def localize_response(response):
     lang = resolve_lang(request.headers.get("X-Studio-Lang"), request.headers.get("Accept-Language"))
-    if response.is_json and lang != "es-MX":
+    # Downloaded files (the settings backup) go out exactly as written
+    if response.is_json and lang != "es-MX" and "attachment" not in response.headers.get("Content-Disposition", ""):
         response.set_data(json.dumps(localize_payload(response.get_json(), lang), ensure_ascii=False))
     return response
 
@@ -60,13 +60,21 @@ def get_config():
         "needs_onboarding": is_onboarding_needed,
         "firebase": env_service.get_firebase_status(),
         "das": env_service.get_das_status(),
+        "banking": env_service.get_banking_settings(),
+        "host": env_service.get_host_settings(),
         "use_cases": env_service.get_use_case_catalog(),
+        "das_demos": env_service.get_das_demos(),
         "verticals": VERTICAL_CATEGORIES
     })
 
 @app.route("/api/config", methods=["POST"])
 def update_config():
-    data = request.json or {}
+    ok, msg = apply_azure_settings(request.json or {})
+    return jsonify({"success": ok, "message": msg}), (200 if ok else 400)
+
+def apply_azure_settings(data):
+    """Saves the Azure Container Registry credentials, license server and default version, copies them to every
+    environment and signs Docker in to the registry. Missing keys (or an empty password) keep the stored value."""
     creds = ACRService.get_credentials(ENV_FILE)
     
     if "registry" in data:
@@ -95,7 +103,8 @@ def update_config():
             env_file = env.get("env_file")
             if env_file and os.path.exists(env_file):
                 env_creds = ACRService.get_credentials(env_file)
-                env_creds.update(creds)
+                # Each environment keeps its own Inspire version; the stored one is only the default for new ones
+                env_creds.update({k: v for k, v in creds.items() if k != "INSPIRE_VERSION"})
                 ACRService.save_credentials(env_file, env_creds)
     except Exception as e:
         app.logger.warning(f"Error propagando credenciales a ambientes existentes: {e}")
@@ -111,12 +120,8 @@ def update_config():
         )
 
     if not login_ok:
-        return jsonify({
-            "success": False,
-            "message": f"Configuración guardada, pero falló la autenticación con Azure Container Registry: {login_msg}"
-        }), 400
-
-    return jsonify({"success": True, "message": "Configuración guardada y sesión iniciada exitosamente en Azure Container Registry"})
+        return False, f"Configuración guardada, pero falló la autenticación con Azure Container Registry: {login_msg}"
+    return True, "Configuración guardada y sesión iniciada exitosamente en Azure Container Registry"
 
 @app.route("/api/config/firebase", methods=["POST"])
 def update_firebase_config():
@@ -132,6 +137,28 @@ def update_firebase_config():
 def update_das_config():
     ok, msg = env_service.save_das_settings(request.json or {})
     return jsonify({"success": ok, "message": msg, "das": env_service.get_das_status()}), (200 if ok else 400)
+
+@app.route("/api/config/host", methods=["POST"])
+def update_host_config():
+    ok, msg = env_service.save_host_settings(request.json or {})
+    return jsonify({"success": ok, "message": msg, "host": env_service.get_host_settings()}), (200 if ok else 400)
+
+@app.route("/api/config/banking", methods=["POST"])
+def update_banking_config():
+    ok, msg = env_service.save_banking_settings(request.json or {})
+    return jsonify({"success": ok, "message": msg, "banking": env_service.get_banking_settings()}), (200 if ok else 400)
+
+@app.route("/api/config/das-demos", methods=["POST"])
+def save_das_demo():
+    ok, msg = env_service.save_das_demo(request.json or {})
+    return jsonify({"success": ok, "message": msg, "das_demos": env_service.get_das_demos(),
+                    "use_cases": env_service.get_use_case_catalog()}), (200 if ok else 400)
+
+@app.route("/api/config/das-demos/<demo_id>", methods=["DELETE"])
+def delete_das_demo(demo_id):
+    ok, msg = env_service.delete_das_demo(demo_id)
+    return jsonify({"success": ok, "message": msg, "das_demos": env_service.get_das_demos(),
+                    "use_cases": env_service.get_use_case_catalog()}), (200 if ok else 404)
 
 @app.route("/api/config/test", methods=["POST"])
 def test_config():
@@ -176,13 +203,17 @@ def get_environment(env_id):
         return jsonify({"success": False, "message": "Ambiente no encontrado"}), 404
     return jsonify({"success": True, "environment": env})
 
-@app.route("/api/environments/<env_id>/icm-env-vars", methods=["GET"])
-def download_icm_env_vars(env_id):
-    ok, msg, data = env_service.build_icm_env_vars(env_id)
-    if not ok:
-        return jsonify({"success": False, "message": msg}), 404
-    response = app.response_class(json.dumps(data, ensure_ascii=False, indent=2), mimetype="application/json")
-    response.headers["Content-Disposition"] = f'attachment; filename="ICMEnvVars-{env_id}.json"'
+@app.route("/api/environments/<env_id>/logo", methods=["GET"])
+def environment_logo(env_id):
+    logo = env_service.get_logo(env_id)
+    if not logo:
+        return jsonify({"success": False, "message": "Este ambiente no tiene logo"}), 404
+    mime, content = logo
+    response = app.response_class(content, mimetype=mime)
+    # Uploaded SVGs may carry scripts: never let them run if the URL is opened directly
+    response.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Cache-Control"] = "private, max-age=86400"
     return response
 
 @app.route("/api/environments/<env_id>", methods=["PUT"])
@@ -192,6 +223,16 @@ def update_environment(env_id):
     if ok:
         return jsonify({"success": True, "message": msg})
     return jsonify({"success": False, "message": msg}), 400
+
+@app.route("/api/environments/<env_id>/layout", methods=["PUT"])
+def save_environment_layout(env_id):
+    ok, msg = env_service.save_layout(env_id, (request.json or {}).get("layout") or {})
+    return jsonify({"success": ok, "message": msg}), (200 if ok else 400)
+
+@app.route("/api/environments/<env_id>/layout", methods=["DELETE"])
+def reset_environment_layout(env_id):
+    ok, msg = env_service.save_layout(env_id, None)
+    return jsonify({"success": ok, "message": msg}), (200 if ok else 404)
 
 @app.route("/api/environments/<env_id>", methods=["DELETE"])
 def delete_environment(env_id):
@@ -207,6 +248,46 @@ def activate_demo(env_id):
     exclusive = data.get("exclusive", True) # Default to true for RAM saving
     ok, msg = env_service.activate_demo(env_id, exclusive=exclusive)
     return jsonify({"success": ok, "message": msg})
+
+@app.route("/api/environments/<env_id>/scaler-config", methods=["GET"])
+def export_scaler_config(env_id):
+    ok, msg, config = env_service.export_scaler_config(env_id)
+    if not ok:
+        return jsonify({"success": False, "message": msg}), 400
+    name = f"scaler-config-{env_id}-{datetime.now().strftime('%Y%m%d-%H%M')}.json"
+    return Response(json.dumps(config, indent=2, ensure_ascii=False), mimetype="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
+
+@app.route("/api/environments/<env_id>/scaler-config", methods=["POST"])
+def import_scaler_config(env_id):
+    data = request.get_json(silent=True) or {}
+    ok, msg = env_service.import_scaler_config(env_id, data.get("config"), data.get("modules"))
+    return jsonify({"success": ok, "message": msg}), (200 if ok else 400)
+
+@app.route("/api/environments/<env_id>/icm-variables", methods=["GET"])
+def export_icm_variables(env_id):
+    ok, msg, variables = env_service.export_icm_variables(env_id)
+    if not ok:
+        return jsonify({"success": False, "message": msg}), 400
+    name = f"ICMEnvVars-{env_id}-{datetime.now().strftime('%Y%m%d-%H%M')}.json"
+    return Response(json.dumps(variables, indent=2, ensure_ascii=False), mimetype="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
+
+@app.route("/api/environments/<env_id>/icm-variables", methods=["POST"])
+def import_icm_variables(env_id):
+    data = request.get_json(silent=True) or {}
+    ok, msg = env_service.import_icm_variables(env_id, data.get("variables"), str(data.get("behavior") or ""))
+    return jsonify({"success": ok, "message": msg}), (200 if ok else 400)
+
+@app.route("/api/environments/<env_id>/upgrade", methods=["POST"])
+def upgrade_environment_version(env_id):
+    ok, msg = env_service.upgrade_version(env_id, str((request.json or {}).get("version") or ""))
+    return jsonify({"success": ok, "message": msg}), (200 if ok else 400)
+
+@app.route("/api/inspire-versions", methods=["GET"])
+def list_inspire_versions():
+    ok, msg, versions = env_service.get_inspire_versions()
+    return jsonify({"success": ok, "message": msg, "versions": versions}), (200 if ok else 400)
 
 @app.route("/api/environments/<env_id>/progress", methods=["GET"])
 def activation_progress(env_id):
@@ -258,29 +339,48 @@ def get_acr_versions():
     return jsonify({"success": True, "data": info})
 
 # ------------------------------------------------------------------------------
-# 5. Snapshots & Backups
+# 5. Settings backup: export everything under Settings to one file and restore it on another machine
+#    (environments and their Flex data are not included; Inspire content is exported from ICM)
 # ------------------------------------------------------------------------------
-@app.route("/api/environments/<env_id>/snapshots", methods=["GET"])
-def list_snapshots(env_id):
-    snaps = backup_service.list_snapshots(env_id)
-    return jsonify({"success": True, "snapshots": snaps})
+SETTINGS_FORMAT = "inspire-flex-studio-settings"
 
-@app.route("/api/environments/<env_id>/snapshots", methods=["POST"])
-def create_snapshot(env_id):
-    env = env_service.get_environment(env_id)
-    if not env:
-        return jsonify({"success": False, "message": "Ambiente no encontrado"}), 404
-    data = request.json or {}
-    name = data.get("name")
-    ok, msg, snap = backup_service.create_snapshot(env_id, env["project_name"], name=name)
-    if ok:
-        return jsonify({"success": True, "message": msg, "snapshot": snap})
-    return jsonify({"success": False, "message": msg}), 500
+@app.route("/api/settings/export", methods=["GET"])
+def export_settings():
+    creds = ACRService.get_credentials(ENV_FILE)
+    doc = {
+        "format": SETTINGS_FORMAT,
+        "format_version": 1,
+        "exported_at": datetime.now().isoformat(timespec="seconds"),
+        "azure": {
+            "registry": creds.get("ACR_REGISTRY", ""),
+            "username": creds.get("ACR_USERNAME", ""),
+            "password": creds.get("ACR_PASSWORD", ""),
+            "license_server": creds.get("CX_LIC_SERVER", ""),
+            "version": creds.get("INSPIRE_VERSION", ""),
+        },
+        **env_service.export_settings(),
+    }
+    name = f"studio-ajustes-{datetime.now().strftime('%Y%m%d-%H%M')}.json"
+    return Response(json.dumps(doc, indent=2, ensure_ascii=False), mimetype="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
 
-@app.route("/api/snapshots/<filename>", methods=["DELETE"])
-def delete_snapshot(filename):
-    ok, msg = backup_service.delete_snapshot(filename)
-    return jsonify({"success": ok, "message": msg})
+@app.route("/api/settings/import", methods=["POST"])
+def import_settings():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or data.get("format") != SETTINGS_FORMAT:
+        return jsonify({"success": False, "message": "El archivo no es un respaldo de ajustes del Studio"}), 400
+    results = []
+    azure = data.get("azure")
+    if isinstance(azure, dict) and azure.get("username"):
+        ok, msg = apply_azure_settings({k: str(azure.get(k) or "") for k in ("registry", "username", "password", "license_server", "version") if k in azure})
+        results.append({"section": "azure", "ok": ok, "message": msg})
+    results.extend(env_service.import_settings(data))
+    all_ok = all(r["ok"] for r in results)
+    return jsonify({
+        "success": all_ok,
+        "message": "Ajustes importados" if all_ok else "Ajustes importados con errores en algunas secciones",
+        "results": results,
+    }), 200
 
 # ------------------------------------------------------------------------------
 # 6. Volumes

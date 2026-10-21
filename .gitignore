@@ -23,6 +23,8 @@ manager/data/firebase-service-account.json
 manager/data/firebase-web.json
 # Quadient Cloud settings for the DAS inbox (API key)
 manager/data/das-cloud.json
+# Custom demos (anonymous Quadient Cloud documents)
+manager/data/das-demos.json
 inbox.env
 use-cases.env
 

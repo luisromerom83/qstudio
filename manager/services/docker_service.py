@@ -145,13 +145,25 @@ class DockerService:
         return logs or "No hay registros disponibles."
 
     @classmethod
-    def compose_up(cls, compose_file: str, env_file: str, project_name: str, services: Optional[List[str]] = None) -> Tuple[bool, str]:
+    def compose_up(cls, compose_file: str, env_file: str, project_name: str, services: Optional[List[str]] = None,
+                   timeout: int = 180) -> Tuple[bool, str]:
         cwd = os.path.dirname(os.path.abspath(compose_file))
         svc_str = " ".join(shlex.quote(s) for s in services) if services else ""
         cmd = f"docker compose -f {shlex.quote(compose_file)} -p {shlex.quote(project_name)} --env-file {shlex.quote(env_file)} up -d --remove-orphans {svc_str}"
-        code, out, err = cls._run_cmd(cmd, timeout=180, cwd=cwd)
+        code, out, err = cls._run_cmd(cmd, timeout=timeout, cwd=cwd)
         if code == 0:
             return True, out or "Servicios iniciados correctamente"
+        return False, err or out
+
+    @classmethod
+    def compose_pull(cls, compose_file: str, env_file: str, project_name: str, timeout: int = 3600) -> Tuple[bool, str]:
+        """Downloads the images of every service that pulls from a registry (the use-cases image is built locally)."""
+        cwd = os.path.dirname(os.path.abspath(compose_file))
+        cmd = (f"docker compose -f {shlex.quote(compose_file)} -p {shlex.quote(project_name)} --env-file {shlex.quote(env_file)} "
+               f"pull --ignore-buildable --quiet")
+        code, out, err = cls._run_cmd(cmd, timeout=timeout, cwd=cwd)
+        if code == 0:
+            return True, out or "Imágenes descargadas"
         return False, err or out
 
     @classmethod

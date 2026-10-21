@@ -1,3 +1,5 @@
+[hidden] { display: none !important; }
+
 /* ==========================================================================
    FORMULARIOS A KAFKA - HOJA DE ESTILOS
    Estilo corporativo neutro:
@@ -6,13 +8,17 @@
    ========================================================================== */
 
 :root {
-  /* Acento neutro */
-  --brand: #2f5d8a;
-  --brand-dark: #234766;
-  --brand-hover: #284f75;
+  /* Acento neutro; /branding.js lo sustituye por los colores del ambiente (Studio Manager › Look & feel):
+     primario = acciones, secundario = acentos y encabezados, terciario = fondos suaves */
+  --brand: var(--brand-primary, #2f5d8a);
+  --brand-dark: var(--brand-primary-dark, #234766);
+  --brand-hover: var(--brand-primary-hover, #284f75);
   --brand-light: #3d73a8;
-  --brand-soft: #f3f7fb;
-  --brand-border: #cddcea;
+  --on-brand: var(--brand-primary-contrast, #ffffff);
+  --brand-accent: var(--brand-secondary, var(--brand));
+  --on-brand-accent: var(--brand-secondary-contrast, var(--on-brand));
+  --brand-soft: var(--brand-tertiary-soft, #f3f7fb);
+  --brand-border: var(--brand-tertiary-border, #cddcea);
 
   /* Superficies Blancas Predominantes */
   --bg-primary: #ffffff;
@@ -21,7 +27,7 @@
   --bg-subtle: #f9fafb;
   --border-color: #e5e7eb;
   --border-hover: #d1d5db;
-  --border-focus: #2f5d8a;
+  --border-focus: var(--brand);
 
   /* Tipografía y Textos Corporativos */
   --text-primary: #111827;
@@ -31,8 +37,8 @@
   --text-inverse: #ffffff;
 
   /* Acentos y Botones */
-  --accent-primary: #2f5d8a;
-  --accent-hover: #284f75;
+  --accent-primary: var(--brand);
+  --accent-hover: var(--brand-hover);
 
   /* Colores Funcionales (Sobrios, estándar empresarial, SIN neón) */
   --success: #16a34a;
@@ -111,6 +117,26 @@ body {
   background: var(--brand-soft);
   border: 1px solid var(--brand-border);
   font-size: 1.25rem;
+}
+
+/* Environment branding (set by /branding.js): secondary-color band and the customer logo in place of the icon */
+.has-brand-colors .app-header {
+  border-top: 3px solid var(--brand-accent);
+}
+
+.brand-mark.brand-logo-slot {
+  width: auto;
+  max-width: 180px;
+  padding: 0;
+  background: none;
+  border: none;
+}
+
+.brand-mark .brand-logo {
+  display: block;
+  height: 42px;
+  max-width: 180px;
+  object-fit: contain;
 }
 
 .header-badges {
@@ -220,7 +246,7 @@ body {
   left: 0;
   right: 0;
   height: 3px;
-  background: var(--brand);
+  background: var(--brand-accent);
 }
 
 .screen-tab-icon {
@@ -338,7 +364,7 @@ body {
 .push-form-card {
   background: #ffffff;
   border: 1px solid var(--border-color);
-  border-left: 4px solid var(--brand);
+  border-left: 4px solid var(--brand-accent);
   border-radius: var(--radius-md);
   padding: 1.4rem 1.6rem;
   margin-bottom: 1.75rem;
@@ -360,7 +386,7 @@ body {
   padding: 0.15rem 0.5rem;
   border-radius: 4px;
   background: var(--brand-soft);
-  color: var(--brand);
+  color: var(--brand-accent);
   border: 1px solid var(--brand-border);
   margin-left: 0.4rem;
   vertical-align: middle;
@@ -447,7 +473,7 @@ textarea:focus,
 select:focus {
   outline: none;
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(47, 93, 138, 0.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 12%, transparent);
 }
 
 input::placeholder,
@@ -488,7 +514,7 @@ textarea {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--brand);
+  color: var(--brand-accent);
   margin-bottom: 0.4rem;
 }
 
@@ -536,7 +562,7 @@ textarea {
 .usecase-tab-card.active {
   border-color: var(--brand);
   background: #ffffff;
-  box-shadow: 0 4px 12px rgba(47, 93, 138, 0.08);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--brand) 8%, transparent);
 }
 
 .usecase-tab-card.active::before {
@@ -546,7 +572,7 @@ textarea {
   left: 0;
   right: 0;
   height: 3px;
-  background: var(--brand);
+  background: var(--brand-accent);
 }
 
 .usecase-tab-icon {
@@ -565,7 +591,7 @@ textarea {
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: var(--brand);
+  color: var(--brand-accent);
   background: var(--brand-soft);
   border: 1px solid var(--brand-border);
   padding: 0.15rem 0.5rem;
@@ -611,8 +637,8 @@ textarea {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--brand);
-  color: #ffffff;
+  background: var(--brand-accent);
+  color: var(--on-brand-accent);
   font-size: 0.95rem;
   font-weight: 800;
   display: flex;
@@ -639,7 +665,7 @@ textarea {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--brand);
+  color: var(--brand-accent);
   border-bottom: 1px solid #f3f4f6;
   padding-bottom: 0.4rem;
   margin: 1.25rem 0 0.85rem 0;
@@ -745,7 +771,7 @@ textarea {
 
 .push-gradient {
   background: var(--brand);
-  color: #ffffff;
+  color: var(--on-brand);
 }
 
 .das-gradient {
@@ -788,7 +814,7 @@ textarea {
 
 .int-tag-push {
   background: var(--brand-soft);
-  color: var(--brand);
+  color: var(--brand-accent);
   border: 1px solid var(--brand-border);
 }
 
@@ -843,7 +869,7 @@ textarea {
 .btn-primary {
   background: var(--brand);
   border-color: var(--brand);
-  color: #ffffff;
+  color: var(--on-brand);
   box-shadow: var(--shadow-sm);
 }
 
@@ -866,7 +892,7 @@ textarea {
 .btn-accent {
   background: var(--brand);
   border-color: var(--brand);
-  color: #ffffff;
+  color: var(--on-brand);
 }
 
 .btn-accent:hover {
@@ -908,7 +934,7 @@ textarea {
   margin-top: 1.25rem;
   background: #ffffff;
   border: 1px solid var(--border-color);
-  border-left: 4px solid var(--brand);
+  border-left: 4px solid var(--brand-accent);
   gap: 1rem;
 }
 
@@ -999,7 +1025,7 @@ textarea {
 .metric-val {
   font-size: 1.45rem;
   font-weight: 800;
-  color: var(--brand);
+  color: var(--brand-accent);
   font-family: var(--font-mono);
 }
 
@@ -1107,7 +1133,7 @@ textarea {
 
 .envelope-wrapper {
   border: 1px solid var(--border-color);
-  border-left: 4px solid var(--brand);
+  border-left: 4px solid var(--brand-accent);
   border-radius: var(--radius-md);
   padding: 1.15rem;
   background: #ffffff;
@@ -1120,7 +1146,7 @@ textarea {
 .envelope-title {
   font-size: 0.86rem;
   font-weight: 700;
-  color: var(--brand);
+  color: var(--brand-accent);
 }
 
 .envelope-sub {

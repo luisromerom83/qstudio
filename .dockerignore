@@ -19,3 +19,4 @@ manager/data/firebase-service-account.json
 manager/data/firebase-web.json
 manager/data/das-cloud.json
 use-cases/node_modules
+manager/data/das-demos.json

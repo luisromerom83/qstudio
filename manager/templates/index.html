@@ -275,13 +275,12 @@
     </section>
 
     <!-- --------------------------------------------------------------------- -->
-    <!-- VIEW 4: Almacenamiento & Snapshots                                   -->
+    <!-- VIEW 4: Almacenamiento                                               -->
     <!-- --------------------------------------------------------------------- -->
     <section id="view-storage" class="space-y-6 hidden">
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+      <div class="grid grid-cols-1 gap-6">
         <!-- Volumes Overview -->
-        <div class="lg:col-span-1 bg-slate-900/50 p-6 rounded-2xl border border-slate-800 space-y-4">
+        <div class="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 space-y-4">
           <h2 class="text-base font-bold text-white flex items-center gap-2">
             <i data-lucide="hard-drive" class="w-5 h-5 text-purple-400"></i>
             <span data-i18n="html.storage.volumes.title">Volúmenes de Persistencia</span>
@@ -291,39 +290,6 @@
             <!-- Rendered via JS -->
           </div>
         </div>
-
-        <!-- Snapshots / Backups -->
-        <div class="lg:col-span-2 bg-slate-900/50 p-6 rounded-2xl border border-slate-800 space-y-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <h2 class="text-base font-bold text-white flex items-center gap-2">
-                <i data-lucide="archive" class="w-5 h-5 text-emerald-400"></i>
-                <span data-i18n="html.storage.snapshots.title">Snapshots & Respaldos de Demos</span>
-              </h2>
-              <p class="text-xs text-slate-400 mt-1" data-i18n="html.storage.snapshots.subtitle">Crea copias exactas del estado de tus demostraciones para congelar datos exitosos o exportar.</p>
-            </div>
-            <button onclick="promptCreateSnapshot()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow">
-              <i data-lucide="camera" class="w-4 h-4"></i> <span data-i18n="html.storage.snapshots.create">Crear Snapshot</span>
-            </button>
-          </div>
-
-          <div id="snapshots-table-container" class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-slate-300">
-              <thead class="bg-slate-950/60 uppercase font-semibold text-slate-500 border-b border-slate-800">
-                <tr>
-                  <th class="py-2.5 px-3" data-i18n="html.storage.table.name">Nombre</th>
-                  <th class="py-2.5 px-3" data-i18n="html.storage.table.env">Ambiente</th>
-                  <th class="py-2.5 px-3" data-i18n="html.storage.table.date">Fecha</th>
-                  <th class="py-2.5 px-3" data-i18n="html.storage.table.size">Tamaño</th>
-                  <th class="py-2.5 px-3 text-right" data-i18n="html.storage.table.actions">Acciones</th>
-                </tr>
-              </thead>
-              <tbody id="snapshots-tbody" class="divide-y divide-slate-800/60">
-                <!-- Rendered via JS -->
-              </tbody>
-            </table>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -331,6 +297,29 @@
     <!-- VIEW 5: Ajustes y Administración                                      -->
     <!-- --------------------------------------------------------------------- -->
     <section id="view-settings" class="space-y-6 hidden">
+      <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-5">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="folder-sync" class="w-5 h-5 text-sky-400"></i>
+            <span data-i18n="html.settingsBackup.title">Respaldo de ajustes</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-1" data-i18n="html.settingsBackup.subtitle">Exporta todos los ajustes a un archivo para restaurarlos en otro equipo: credenciales de Azure, Firebase, Quadient Cloud, Banca en línea y demos personalizadas.</p>
+        </div>
+        <div class="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-[11px] leading-snug text-amber-200">
+          <i data-lucide="shield-alert" class="w-4 h-4 flex-shrink-0 mt-0.5"></i>
+          <span data-i18n-html="html.settingsBackup.note">El archivo incluye contraseñas y llaves (Azure, cuenta de servicio de Firebase, API key de Quadient Cloud): guárdalo en un lugar seguro. <strong>No incluye los ambientes ni sus datos de Flex</strong>; el contenido de Inspire se respalda exportándolo desde ICM.</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/api/settings/export" download class="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-brand-600 hover:bg-brand-500 text-white shadow-lg">
+            <i data-lucide="download" class="w-4 h-4"></i> <span data-i18n="html.settingsBackup.export">Exportar ajustes</span>
+          </a>
+          <label class="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg border border-slate-700 text-slate-200 hover:border-brand-500 hover:text-white cursor-pointer transition">
+            <i data-lucide="upload" class="w-4 h-4"></i> <span data-i18n="html.settingsBackup.import">Importar ajustes</span>
+            <input type="file" id="settings-import-file" accept=".json,application/json" class="sr-only" onchange="handleImportSettings(this)">
+          </label>
+        </div>
+      </div>
+
       <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
         <div>
           <h2 class="text-lg font-bold text-white flex items-center gap-2">
@@ -374,6 +363,49 @@
         </form>
       </div>
 
+      <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-4">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="network" class="w-5 h-5 text-sky-400"></i>
+            <span data-i18n="html.host.title">Dirección del host</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-1" data-i18n="html.host.subtitle">IP o nombre con el que otros equipos y clientes (ICM, FTP) llegan a esta computadora. Se muestra en las tarjetas de Servicios y logs.</p>
+        </div>
+        <form id="host-form" onsubmit="handleSaveHost(event)" class="flex flex-col sm:flex-row gap-3 sm:items-end">
+          <div class="flex-1">
+            <label for="setting-host-address" class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.host.label">IP o nombre del host</label>
+            <input type="text" id="setting-host-address" spellcheck="false" autocomplete="off" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-sm font-mono text-white focus:outline-none focus:border-brand-500">
+            <span id="host-detected" class="block mt-1 text-[10px] leading-snug text-slate-500"></span>
+          </div>
+          <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-xs font-semibold rounded-lg text-white shadow-lg sm:mb-5">
+            <span data-i18n="html.host.save">Guardar</span>
+          </button>
+        </form>
+      </div>
+
+      <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-5">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <i data-lucide="arrow-up-circle" class="w-5 h-5 text-sky-400"></i>
+              <span data-i18n="html.versions.title">Versión de Inspire</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-1" data-i18n="html.versions.subtitle">Actualiza un ambiente a otra versión publicada en Azure Container Registry.</p>
+          </div>
+          <button type="button" onclick="loadInspireVersions(true)" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-700 text-slate-200 hover:border-brand-500 hover:text-white transition">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span data-i18n="html.versions.refresh">Consultar versiones</span>
+          </button>
+        </div>
+
+        <div class="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-[11px] leading-snug text-amber-200">
+          <i data-lucide="triangle-alert" class="w-4 h-4 flex-shrink-0 mt-0.5"></i>
+          <span data-i18n-html="html.versions.warning">Se descargan las imágenes de la nueva versión (varios GB) y, si el ambiente está en ejecución, se reinicia con ellas. Al arrancar, Inspire migra sus bases de datos: <strong>no se puede regresar a la versión anterior con los mismos datos</strong>. Crea un respaldo antes en <em>Almacenamiento</em>.</span>
+        </div>
+
+        <div id="versions-status" class="text-xs text-slate-400"></div>
+        <div id="versions-envs" class="rounded-lg border border-slate-700 divide-y divide-slate-800 bg-slate-950 overflow-hidden"></div>
+      </div>
+
       <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
         <div>
           <h2 class="text-lg font-bold text-white flex items-center gap-2">
@@ -415,7 +447,7 @@
             <i data-lucide="cloud" class="w-5 h-5 text-sky-400"></i>
             <span data-i18n="html.das.title">Quadient Cloud para Digital Advantage Inbox</span>
           </h2>
-          <p class="text-xs text-slate-400 mt-1" data-i18n="html.das.subtitle">Aplicación de Quadient Cloud Digital Services a la que entra el caso de uso Digital Advantage Inbox. Se guarda solo en este equipo. La aplicación debe tener habilitada la autenticación Integrated Server-Side Authentication.</p>
+          <p class="text-xs text-slate-400 mt-1" data-i18n="html.das.subtitle">Aplicación de Quadient Cloud Digital Services a la que entran Digital Advantage Inbox y Banca en línea. Sus usuarios son cuentas de Quadient Cloud: la aplicación debe tener un almacén de usuarios con Inspire Authentication y autorregistro para crear cuentas desde el caso de uso.</p>
         </div>
 
         <form id="das-form" onsubmit="handleSaveDas(event)" class="space-y-4">
@@ -435,38 +467,102 @@
             </div>
           </div>
           <span class="block text-[10px] text-slate-500 -mt-2" data-i18n-html="html.das.appHint">Quadient Cloud &gt; Digital Services &gt; Applications: despliega los detalles de la aplicación.</span>
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.das.apiKey">API key (Integrated Server-Side Authentication)</label>
-            <input type="password" id="setting-das-api-key" autocomplete="new-password" spellcheck="false" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
-            <span class="block mt-1 text-[10px] leading-snug text-slate-500" data-i18n-html="html.das.apiKeyHint">Digital Services &gt; Authentications &gt; Integrated Server Side Authentication &gt; Edit &gt; generar llave. Solo la usa el servidor del caso de uso; nunca llega al navegador. Déjalo en blanco para conservar la guardada.</span>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.das.tokenLifetime">Vigencia del token (segundos)</label>
-            <input type="number" id="setting-das-lifetime" min="60" max="86400" value="1500" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
-          </div>
-          <div>
-            <div class="flex items-center justify-between mb-1">
-              <label class="block text-xs font-semibold text-slate-300 uppercase" data-i18n="html.das.users">Usuarios de la app</label>
-              <button type="button" onclick="addDasUserRow()" class="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-slate-700 text-slate-200 hover:border-brand-500 hover:text-white transition">
-                <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> <span data-i18n="html.das.addUser">Agregar usuario</span>
-              </button>
-            </div>
-            <div class="rounded-lg border border-slate-700 overflow-hidden">
-              <div class="hidden sm:grid grid-cols-[1fr_1fr_1fr_2rem] gap-2 px-3 py-1.5 bg-slate-900 text-[10px] font-semibold uppercase text-slate-500 border-b border-slate-800">
-                <span data-i18n="html.das.colUser">Usuario</span>
-                <span data-i18n="html.das.colPassword">Contraseña</span>
-                <span>Subject</span>
-                <span></span>
-              </div>
-              <div id="das-users-rows" class="divide-y divide-slate-800 bg-slate-950"></div>
-              <p id="das-users-empty" class="hidden px-3 py-3 text-[11px] text-slate-500" data-i18n="html.das.noUsers">Sin usuarios. Agrega al menos uno.</p>
-            </div>
-            <span class="block mt-1 text-[10px] leading-snug text-slate-500" data-i18n-html="html.das.usersHint">Usuario y contraseña son solo para entrar a la app. El subject es el owner (userId) de los documentos en Digital Services: cada usuario ve los documentos públicos y los suyos. Si lo dejas vacío, se usa el nombre de usuario.</span>
-          </div>
           <span class="block text-[10px] text-slate-500" data-i18n="html.das.reactivateHint">Al guardar, los ambientes en ejecución con este caso de uso lo reinician con la nueva configuración (tarda unos segundos).</span>
           <div class="pt-4 flex items-center justify-end border-t border-slate-800">
             <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-xs font-semibold rounded-lg text-white shadow-lg">
               <span data-i18n="html.das.save">Guardar Quadient Cloud</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="landmark" class="w-5 h-5 text-sky-400"></i>
+            <span data-i18n="html.banking.title">Banca en línea</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-1" data-i18n="html.banking.subtitle">Estados de cuenta mensuales del caso de uso Banca en línea.</p>
+        </div>
+
+        <div class="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-[11px] leading-snug text-amber-200">
+          <i data-lucide="link-2" class="w-4 h-4 flex-shrink-0 mt-0.5"></i>
+          <span data-i18n-html="html.banking.dependsNote">Depende de <strong>Quadient Cloud para Digital Advantage Inbox</strong>: usa la misma aplicación, los mismos usuarios y el mismo login. Configura primero ese apartado.</span>
+        </div>
+
+        <form id="banking-form" onsubmit="handleSaveBanking(event)" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label for="setting-banking-meta-name" class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.das.metaName">Metadato de estados de cuenta</label>
+              <input type="text" id="setting-banking-meta-name" maxlength="60" spellcheck="false" placeholder="DocType" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
+            </div>
+            <div>
+              <label for="setting-banking-meta-value" class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.das.metaValue">Valor</label>
+              <input type="text" id="setting-banking-meta-value" maxlength="120" spellcheck="false" placeholder="accstt" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
+            </div>
+          </div>
+          <span class="block -mt-2 text-[10px] leading-snug text-slate-500" data-i18n-html="html.das.metaHint">Banca en línea muestra como estados de cuenta solo los documentos con este metadato (por ejemplo <code>DocType</code> = <code>accstt</code>). Distingue mayúsculas y minúsculas. Deja el metadato vacío para mostrar todos los documentos.</span>
+          <span class="block text-[10px] text-slate-500" data-i18n="html.banking.reactivateHint">Al guardar, los ambientes en ejecución con Banca en línea la reinician con la nueva configuración (tarda unos segundos).</span>
+          <div class="pt-4 flex items-center justify-end border-t border-slate-800">
+            <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-xs font-semibold rounded-lg text-white shadow-lg">
+              <span data-i18n="html.banking.save">Guardar Banca en línea</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="max-w-2xl mx-auto bg-slate-900/50 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="file-text" class="w-5 h-5 text-sky-400"></i>
+            <span data-i18n="html.demos.title">Demos personalizadas</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-1" data-i18n="html.demos.subtitle">Cada demo abre un documento de una aplicación de Quadient Cloud con acceso anónimo, sin login. Aparece como un caso de uso más al crear o editar un ambiente.</p>
+        </div>
+
+        <div>
+          <div id="demos-list" class="rounded-lg border border-slate-700 divide-y divide-slate-800 bg-slate-950 overflow-hidden"></div>
+          <p id="demos-empty" class="hidden rounded-lg border border-dashed border-slate-700 px-3 py-3 text-[11px] text-slate-500" data-i18n="html.demos.empty">Todavía no hay demos personalizadas.</p>
+        </div>
+
+        <form id="demo-form" onsubmit="handleSaveDemo(event)" class="space-y-4 pt-4 border-t border-slate-800">
+          <input type="hidden" id="setting-demo-id">
+          <h3 id="demo-form-title" class="text-sm font-semibold text-white" data-i18n="html.demos.newTitle">Nueva demo</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.demos.name">Nombre</label>
+              <input type="text" id="setting-demo-name" maxlength="80" placeholder="Póliza de auto" data-i18n-attr="placeholder:html.demos.namePh" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.demos.description">Descripción (opcional)</label>
+              <input type="text" id="setting-demo-description" maxlength="200" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-500">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.das.cloudUrl">URL de Quadient Cloud</label>
+            <input type="url" id="setting-demo-url" spellcheck="false" placeholder="https://empresa.quadientcloud.eu" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Application ID</label>
+              <input type="text" id="setting-demo-app-id" inputmode="numeric" spellcheck="false" placeholder="123456789" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Client ID</label>
+              <input type="text" id="setting-demo-client-id" spellcheck="false" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Document ID</label>
+              <input type="text" id="setting-demo-document-id" spellcheck="false" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand-500">
+            </div>
+          </div>
+          <span class="block text-[10px] leading-snug text-slate-500 -mt-2" data-i18n-html="html.demos.hint">La aplicación debe tener un proveedor <strong>Anonymous Access</strong> (Application Settings &gt; Authentication). El Client ID es el Authentication Client ID de esa pantalla; no es una contraseña. Al guardar, los ambientes en ejecución con esta demo la reinician con la nueva configuración.</span>
+          <div class="pt-4 flex items-center justify-end gap-2 border-t border-slate-800">
+            <button type="button" id="demo-cancel" onclick="resetDemoForm()" class="hidden px-4 py-2 text-xs font-semibold rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500">
+              <span data-i18n="html.demos.cancel">Cancelar</span>
+            </button>
+            <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-xs font-semibold rounded-lg text-white shadow-lg">
+              <span id="demo-submit-label" data-i18n="html.demos.add">Agregar demo</span>
             </button>
           </div>
         </form>
@@ -523,7 +619,7 @@
   <!-- ========================================================================= -->
   <!-- MODAL: Nueva Demo / Ambiente                                             -->
   <!-- ========================================================================= -->
-  <dialog id="new-env-modal" class="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl shadow-2xl p-0 w-full max-w-lg backdrop:bg-black/70 backdrop:backdrop-blur-sm">
+  <dialog id="new-env-modal" class="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl shadow-2xl p-0 w-full max-w-2xl backdrop:bg-black/70 backdrop:backdrop-blur-sm">
     <div class="p-6 space-y-4">
       <div class="flex items-center justify-between">
         <h2 class="text-base font-bold text-white flex items-center gap-2">
@@ -534,6 +630,26 @@
       </div>
 
       <form id="new-env-form" onsubmit="handleCreateEnvSubmit(event)" class="space-y-4">
+        <div role="tablist" aria-label="Secciones" data-i18n-attr="aria-label:html.envTabs.aria" class="env-tabs" onkeydown="handleEnvTabKey('new', event)">
+          <button type="button" role="tab" id="new-env-tab-general" aria-controls="new-env-panel-general" data-env-tab="general" aria-selected="true" tabindex="0" onclick="switchEnvTab('new', 'general')" class="env-tab">
+            <i data-lucide="file-text" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.general">General</span>
+          </button>
+          <button type="button" role="tab" id="new-env-tab-platform" aria-controls="new-env-panel-platform" data-env-tab="platform" aria-selected="false" tabindex="-1" onclick="switchEnvTab('new', 'platform')" class="env-tab">
+            <i data-lucide="layers" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.platform">Inspire</span>
+          </button>
+          <button type="button" role="tab" id="new-env-tab-integrations" aria-controls="new-env-panel-integrations" data-env-tab="integrations" aria-selected="false" tabindex="-1" onclick="switchEnvTab('new', 'integrations')" class="env-tab">
+            <i data-lucide="plug" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.integrations">Integraciones</span>
+          </button>
+          <button type="button" role="tab" id="new-env-tab-usecases" aria-controls="new-env-panel-usecases" data-env-tab="usecases" aria-selected="false" tabindex="-1" onclick="switchEnvTab('new', 'usecases')" class="env-tab">
+            <i data-lucide="app-window" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.usecases">Casos de uso</span>
+          </button>
+          <button type="button" role="tab" id="new-env-tab-branding" aria-controls="new-env-panel-branding" data-env-tab="branding" aria-selected="false" tabindex="-1" onclick="switchEnvTab('new', 'branding')" class="env-tab">
+            <i data-lucide="palette" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.branding">Look & feel</span>
+          </button>
+        </div>
+
+        <div class="env-tab-panels">
+        <div role="tabpanel" id="new-env-panel-general" aria-labelledby="new-env-tab-general" data-env-tab-panel="general" class="space-y-4">
         <div>
           <label class="block text-xs font-semibold text-slate-300 uppercase mb-1" data-i18n="html.newEnv.vertical">Vertical de Industria</label>
           <select id="new-env-vertical" onchange="handleVerticalChange()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
@@ -582,12 +698,8 @@
             Linux: <code>/home/usuario/demos</code> | Windows: <code>C:\Inspire\Demos</code> o <code>C:/Inspire/Demos</code>. Si defines una ruta, los datos de Postgres, ICM y Filestore se guardarán en subcarpetas dentro de este folder físico. Si lo dejas vacío, Docker usará su volumen estándar (<code>/var/lib/docker/volumes/</code>).
           </p>
         </div>
-
-        <!-- Componentes & Servicios Opcionales del Stack -->
-        <div class="space-y-3 pt-2 border-t border-slate-800">
-          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider" data-i18n="html.stack.title">
-            Arquitectura de Servicios & Componentes
-          </label>
+        </div>
+        <div role="tabpanel" id="new-env-panel-platform" aria-labelledby="new-env-tab-platform" data-env-tab-panel="platform" class="space-y-3 hidden">
 
           <!-- Core Mandatory Note -->
           <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between text-xs">
@@ -684,7 +796,8 @@
               </div>
             </div>
           </div>
-
+        </div>
+        <div role="tabpanel" id="new-env-panel-integrations" aria-labelledby="new-env-tab-integrations" data-env-tab-panel="integrations" class="space-y-3 hidden">
           <!-- GRUPO: SERVICIOS OPCIONALES DE INTEGRACIÓN -->
           <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
@@ -714,7 +827,8 @@
               </div>
             </div>
           </div>
-
+        </div>
+        <div role="tabpanel" id="new-env-panel-usecases" aria-labelledby="new-env-tab-usecases" data-env-tab-panel="usecases" class="space-y-3 hidden">
           <!-- GRUPO: CASOS DE USO -->
           <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
             <div class="border-b border-slate-800/80 pb-2">
@@ -726,6 +840,11 @@
             </div>
             <div id="new-env-use-cases" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
           </div>
+        </div>
+
+        <div role="tabpanel" id="new-env-panel-branding" aria-labelledby="new-env-tab-branding" data-env-tab-panel="branding" class="hidden">
+          <div id="new-env-branding"></div>
+        </div>
         </div>
 
         <div class="pt-4 flex items-center justify-end gap-2 border-t border-slate-800">
@@ -743,7 +862,7 @@
   <!-- ========================================================================= -->
   <!-- MODAL: Configurar / Editar Componentes del Ambiente                      -->
   <!-- ========================================================================= -->
-  <dialog id="edit-env-modal" class="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl shadow-2xl p-0 w-full max-w-xl backdrop:bg-black/70 backdrop:backdrop-blur-sm">
+  <dialog id="edit-env-modal" class="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl shadow-2xl p-0 w-full max-w-2xl backdrop:bg-black/70 backdrop:backdrop-blur-sm">
     <div class="p-6 space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div>
@@ -761,6 +880,26 @@
       <form onsubmit="handleEditEnvSubmit(event)" class="space-y-4">
         <input type="hidden" id="edit-env-id">
 
+        <div role="tablist" aria-label="Secciones" data-i18n-attr="aria-label:html.envTabs.aria" class="env-tabs" onkeydown="handleEnvTabKey('edit', event)">
+          <button type="button" role="tab" id="edit-env-tab-general" aria-controls="edit-env-panel-general" data-env-tab="general" aria-selected="true" tabindex="0" onclick="switchEnvTab('edit', 'general')" class="env-tab">
+            <i data-lucide="file-text" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.general">General</span>
+          </button>
+          <button type="button" role="tab" id="edit-env-tab-platform" aria-controls="edit-env-panel-platform" data-env-tab="platform" aria-selected="false" tabindex="-1" onclick="switchEnvTab('edit', 'platform')" class="env-tab">
+            <i data-lucide="layers" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.platform">Inspire</span>
+          </button>
+          <button type="button" role="tab" id="edit-env-tab-integrations" aria-controls="edit-env-panel-integrations" data-env-tab="integrations" aria-selected="false" tabindex="-1" onclick="switchEnvTab('edit', 'integrations')" class="env-tab">
+            <i data-lucide="plug" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.integrations">Integraciones</span>
+          </button>
+          <button type="button" role="tab" id="edit-env-tab-usecases" aria-controls="edit-env-panel-usecases" data-env-tab="usecases" aria-selected="false" tabindex="-1" onclick="switchEnvTab('edit', 'usecases')" class="env-tab">
+            <i data-lucide="app-window" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.usecases">Casos de uso</span>
+          </button>
+          <button type="button" role="tab" id="edit-env-tab-branding" aria-controls="edit-env-panel-branding" data-env-tab="branding" aria-selected="false" tabindex="-1" onclick="switchEnvTab('edit', 'branding')" class="env-tab">
+            <i data-lucide="palette" class="w-3.5 h-3.5"></i><span data-i18n="html.envTabs.branding">Look & feel</span>
+          </button>
+        </div>
+
+        <div class="env-tab-panels">
+        <div role="tabpanel" id="edit-env-panel-general" aria-labelledby="edit-env-tab-general" data-env-tab-panel="general" class="space-y-4">
         <div>
           <label class="block text-xs font-medium text-slate-300 mb-1" data-i18n="html.editEnv.name">Nombre de la Demo</label>
           <input type="text" id="edit-env-name" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
@@ -770,12 +909,8 @@
           <label class="block text-xs font-medium text-slate-300 mb-1" data-i18n="html.editEnv.desc">Notas / Descripción</label>
           <textarea id="edit-env-desc" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-brand-500"></textarea>
         </div>
-
-        <!-- Componentes & Servicios Opcionales del Stack -->
-        <div class="space-y-3 pt-2 border-t border-slate-800">
-          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider" data-i18n="html.stack.title">
-            Arquitectura de Servicios & Componentes
-          </label>
+        </div>
+        <div role="tabpanel" id="edit-env-panel-platform" aria-labelledby="edit-env-tab-platform" data-env-tab-panel="platform" class="space-y-3 hidden">
 
           <!-- Core Mandatory Note -->
           <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between text-xs">
@@ -871,7 +1006,8 @@
               </div>
             </div>
           </div>
-
+        </div>
+        <div role="tabpanel" id="edit-env-panel-integrations" aria-labelledby="edit-env-tab-integrations" data-env-tab-panel="integrations" class="space-y-3 hidden">
           <!-- GRUPO: SERVICIOS OPCIONALES DE INTEGRACIÓN -->
           <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
@@ -901,10 +1037,11 @@
               </div>
             </div>
 
-            <!-- ICM environment variables for this environment's Kafka broker -->
-            <div id="edit-icm-env-vars" class="hidden"></div>
+            <!-- Scaler configuration and ICM environment variables: export / import through Scaler's REST API -->
+            <div id="edit-config-backups"></div>
           </div>
-
+        </div>
+        <div role="tabpanel" id="edit-env-panel-usecases" aria-labelledby="edit-env-tab-usecases" data-env-tab-panel="usecases" class="space-y-3 hidden">
           <!-- GRUPO: CASOS DE USO -->
           <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
             <div class="border-b border-slate-800/80 pb-2">
@@ -916,6 +1053,11 @@
             </div>
             <div id="edit-env-use-cases" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
           </div>
+        </div>
+
+        <div role="tabpanel" id="edit-env-panel-branding" aria-labelledby="edit-env-tab-branding" data-env-tab-panel="branding" class="hidden">
+          <div id="edit-env-branding"></div>
+        </div>
         </div>
 
         <div class="pt-4 flex items-center justify-end gap-2 border-t border-slate-800">
