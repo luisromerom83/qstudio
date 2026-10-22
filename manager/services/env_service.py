@@ -1037,7 +1037,7 @@ class EnvService:
     def save_layout(self, env_id: str, layout: Optional[Dict[str, Any]]) -> Tuple[bool, str]:
         """Stores the services view design of an environment: positions of groups and layers
         ({nodes|zones: {key: {x,y,w,h}}}), the order of the use case tiles inside their group ([key]), its arrows ([{from, to, label, bidir, style, animate}]) and the groups
-        added by hand ({custom: {key: {title, subtitle, icon, color}}}). None removes it and the view goes back to
+        added by hand ({custom: {key: {title, subtitle, icon, color, links: [{label, url}]}}}). None removes it and the view goes back to
         the automatic layout."""
         envs = self.list_environments()
         target = next((e for e in envs if e["id"] == env_id), None)
@@ -1074,11 +1074,36 @@ class EnvService:
             for key, group in section.items():
                 if not (isinstance(key, str) and re.match(r"^custom-[a-z0-9]{1,20}$", key) and isinstance(group, dict)):
                     return None
-                title, subtitle = text(group.get("title"), 60), text(group.get("subtitle"), 200)
+                title, subtitle = text(group.get("title"), 60), text(group.get("subtitle"), 500)
                 icon, color = str(group.get("icon") or "box"), str(group.get("color") or "")
                 if not title or subtitle is None or not re.match(r"^[a-z0-9-]{1,40}$", icon) or not re.match(r"^#[0-9a-fA-F]{6}$", color):
                     return None
-                out[key] = {"title": title, "subtitle": subtitle, "icon": icon, "color": color}
+                # Links: name + web address (http/https only), up to 6
+                raw_links = group.get("links", [])
+                if not isinstance(raw_links, list) or len(raw_links) > 6:
+                    return None
+                links = []
+                for link in raw_links:
+                    url = str((link or {}).get("url") or "").strip() if isinstance(link, dict) else ""
+                    label = text((link or {}).get("label"), 60) if isinstance(link, dict) else None
+                    if label is None or not re.match(r"^https?://[^\s\"'<>]{1,500}$", url, re.I):
+                        return None
+                    links.append({"label": label, "url": url})
+                out[key] = {"title": title, "subtitle": subtitle, "icon": icon, "color": color, "links": links}
+            return out
+
+        def clean_zone_meta(section: Any) -> Optional[Dict[str, Dict[str, Any]]]:
+            # Groups (boxes): renamed or hidden automatic ones and custom ones
+            if not isinstance(section, dict) or len(section) > 40:
+                return None
+            out = {}
+            for key, meta in section.items():
+                if not (isinstance(key, str) and KEY_RE.match(key) and isinstance(meta, dict)):
+                    return None
+                title = text(meta.get("title"), 60)
+                if title is None:
+                    return None
+                out[key] = {k: v for k, v in (("title", title), ("hidden", bool(meta.get("hidden"))), ("custom", bool(meta.get("custom")))) if v}
             return out
 
         def clean_edges(section: Any) -> Optional[List[Dict[str, Any]]]:
@@ -1103,9 +1128,10 @@ class EnvService:
         tiles = layout.get("tiles", [])
         if not (isinstance(tiles, list) and len(tiles) <= 100 and all(isinstance(k, str) and KEY_RE.match(k) for k in tiles)):
             tiles = None
-        if nodes is None or zones is None or custom is None or edges is None or tiles is None:
+        zone_meta = clean_zone_meta(layout.get("zoneMeta", {}))
+        if nodes is None or zones is None or custom is None or edges is None or tiles is None or zone_meta is None:
             return False, "Diseño inválido"
-        target["layout"] = {"nodes": nodes, "zones": zones, "tiles": tiles, "custom": custom, "edges": edges}
+        target["layout"] = {"nodes": nodes, "zones": zones, "tiles": tiles, "custom": custom, "edges": edges, "zoneMeta": zone_meta}
         self._save_environments(envs)
         return True, "Diseño guardado"
 

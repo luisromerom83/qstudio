@@ -273,6 +273,32 @@ dialog::backdrop {
   stroke-dasharray: 4 4;
 }
 
+/* Selected elements (Shift / Ctrl + click adds): they move together and "Group" boxes them */
+.arch-stage.is-editing .arch-node.is-selected {
+  outline: 3px solid rgba(52, 211, 153, 0.95);
+  outline-offset: 3px;
+}
+
+/* Pencil on a group's title: rename it or take it away */
+.arch-zone-edit {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid #334155;
+  cursor: pointer !important;
+  letter-spacing: normal;
+}
+
+.arch-zone-edit:hover {
+  color: #fff;
+  border-color: #38bdf8;
+}
+
 .arch-custom-edit {
   position: absolute;
   right: 8px;
@@ -496,3 +522,33 @@ dialog::backdrop {
   overflow-y: auto;
   padding-right: 0.25rem;
 }
+
+/* Ayuda: user manual (manager/static/help/manual.*.html) */
+.help-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+}
+@media (min-width: 1024px) {
+  .help-layout { grid-template-columns: 15rem minmax(0, 1fr); }
+  .manual-toc { position: sticky; top: 6rem; align-self: start; max-height: calc(100vh - 7rem); overflow-y: auto; }
+}
+.manual-toc ul { list-style: none; margin: 0; padding: 0.75rem; border: 1px solid #1e293b; border-radius: 1rem; background: rgba(15, 23, 42, 0.5); }
+.manual-toc a { display: block; padding: 0.4rem 0.6rem; border-radius: 0.5rem; font-size: 0.8rem; color: #94a3b8; }
+.manual-toc a:hover { color: #fff; background: #1e293b; }
+.manual { min-width: 0; padding: 1.5rem; border: 1px solid #1e293b; border-radius: 1rem; background: rgba(15, 23, 42, 0.5); color: #cbd5e1; font-size: 0.9rem; line-height: 1.65; }
+.manual h1 { font-size: 1.5rem; font-weight: 800; color: #fff; margin-bottom: 0.75rem; }
+.manual h2 { font-size: 1.15rem; font-weight: 700; color: #fff; margin: 2.25rem 0 0.75rem; padding-top: 1.25rem; border-top: 1px solid #1e293b; scroll-margin-top: 6rem; }
+.manual p { margin: 0.75rem 0; }
+.manual strong { color: #f1f5f9; }
+.manual ul, .manual ol { margin: 0.5rem 0 0.75rem; padding-left: 1.4rem; }
+.manual ul { list-style: disc; }
+.manual ol { list-style: decimal; }
+.manual li { margin: 0.25rem 0; }
+.manual li > ul { margin: 0.25rem 0; }
+.manual code { font-size: 0.8em; padding: 0.1rem 0.35rem; border-radius: 0.35rem; background: #0f172a; border: 1px solid #1e293b; color: #fdba74; overflow-wrap: anywhere; }
+.manual a { color: #fb923c; text-decoration: underline; text-underline-offset: 2px; }
+.manual table { display: block; overflow-x: auto; width: 100%; margin: 0.75rem 0 1rem; border-collapse: collapse; font-size: 0.82rem; }
+.manual th, .manual td { padding: 0.55rem 0.75rem; border: 1px solid #1e293b; text-align: left; vertical-align: top; }
+.manual th { background: #0f172a; color: #e2e8f0; font-weight: 600; white-space: nowrap; }
+@media (max-width: 640px) { .manual { padding: 1rem; } }

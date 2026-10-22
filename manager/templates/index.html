@@ -115,6 +115,10 @@
           <i data-lucide="settings" class="w-4 h-4 opacity-80"></i>
           <span data-i18n="html.nav.settings">Ajustes</span>
         </button>
+        <button type="button" onclick="switchTab('help')" data-tab="help" title="Ayuda" data-i18n-attr="title:html.nav.help" class="tab-btn shrink-0 whitespace-nowrap px-2 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
+          <i data-lucide="book-open" class="w-4 h-4 opacity-80"></i>
+          <span class="sr-only" data-i18n="html.nav.help">Ayuda</span>
+        </button>
         </nav>
 
         <div class="shrink-0 flex items-center gap-2">
@@ -153,6 +157,10 @@
         <button type="button" onclick="switchTab('settings')" data-tab="settings" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
           <i data-lucide="settings" class="w-4 h-4 opacity-80"></i>
           <span data-i18n="html.nav.settings">Ajustes</span>
+        </button>
+        <button type="button" onclick="switchTab('help')" data-tab="help" class="tab-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition flex items-center gap-2 border text-slate-400 hover:text-slate-200 border-transparent">
+          <i data-lucide="book-open" class="w-4 h-4 opacity-80"></i>
+          <span data-i18n="html.nav.help">Ayuda</span>
         </button>
       </nav>
     </div>
@@ -591,6 +599,15 @@
       </div>
     </section>
 
+    <!-- --------------------------------------------------------------------- -->
+    <!-- VIEW 6: Ayuda (manual de usuario, docs/manual-usuario.*.md)           -->
+    <!-- --------------------------------------------------------------------- -->
+    <section id="view-help" class="hidden">
+      <p id="help-lang-note" class="hidden mb-4 text-xs text-sky-200 bg-sky-500/10 border border-sky-500/30 rounded-lg px-3 py-2" data-i18n="html.help.onlySpanish">El manual está disponible en español.</p>
+      <div id="help-content" class="help-layout">
+        <p class="text-sm text-slate-500" data-i18n="html.help.loading">Cargando manual…</p>
+      </div>
+    </section>
   </main>
 
   <!-- ========================================================================= -->

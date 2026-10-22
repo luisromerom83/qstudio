@@ -88,7 +88,7 @@ async function initApp() {
 // Navigation & Tabs
 // ------------------------------------------------------------------------------
 function switchTab(tabId) {
-  ["catalog", "services", "acr", "storage", "settings"].forEach(t => {
+  ["catalog", "services", "acr", "storage", "settings", "help"].forEach(t => {
     document.getElementById(`view-${t}`).classList.toggle("hidden", t !== tabId);
   });
   // Desktop and mobile navs share the same data-tab buttons
@@ -113,9 +113,36 @@ function switchTab(tabId) {
   } else if (tabId === "settings") {
     switchSettingsTab(savedSettingsTab());
     loadInspireVersions();
+  } else if (tabId === "help") {
+    loadHelp();
   }
 
   lucide.createIcons();
+}
+
+// Ayuda: the user manual, rendered from docs/manual-usuario.<lang>.md (only es-MX for now)
+const HELP_LANGS = ["es-MX"];
+let helpLoaded = false;
+async function loadHelp() {
+  const lang = HELP_LANGS.includes(currentLang) ? currentLang : HELP_LANGS[0];
+  document.getElementById("help-lang-note").classList.toggle("hidden", lang === currentLang);
+  if (helpLoaded) return;
+  const box = document.getElementById("help-content");
+  try {
+    const res = await fetch(`/static/help/manual.${lang}.html`, { cache: "no-cache" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    box.innerHTML = await res.text();
+    helpLoaded = true;
+    // Table of contents: scroll inside the page instead of changing the address
+    box.querySelector("[data-manual-toc]").addEventListener("click", ev => {
+      const link = ev.target.closest("a[href^='#']");
+      if (!link) return;
+      ev.preventDefault();
+      document.getElementById(link.getAttribute("href").slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  } catch (err) {
+    box.innerHTML = `<p class="text-sm text-rose-300">${escapeHtml(t("app.help.loadError", { error: err.message }))}</p>`;
+  }
 }
 
 // ------------------------------------------------------------------------------
@@ -3011,6 +3038,7 @@ function layoutToolbarHtml(env) {
       </p>
       <div class="flex flex-wrap items-center gap-2">
         ${editing ? `
+          <span id="arch-group-selection" class="hidden">${button("group", t("app.layout.groupSelection", { count: 0 }), "groupSelectedElements()", "bg-emerald-600/20 text-emerald-200 border border-emerald-500/50 hover:bg-emerald-600/30")}</span>
           ${button("plus", t("app.layout.addGroup"), "openCustomGroupDialog()", "bg-slate-800 text-sky-200 border border-sky-500/40 hover:bg-slate-700")}
           ${locked ? button("rotate-ccw", t("app.layout.reset"), "resetArchitectureLayout()", neutral) : ""}
           ${button("x", t("app.layout.cancel"), "cancelArchitectureLayout()", neutral)}
@@ -3023,6 +3051,7 @@ function layoutToolbarHtml(env) {
 function customGroupElement(key, group, editing) {
   const color = HEX_COLOR.test(group.color || "") ? group.color : "#57534E";
   const icon = ICON_NAME.test(group.icon || "") ? group.icon : "box";
+  const links = elementLinks(group);
   const el = document.createElement("div");
   el.dataset.node = key;
   el.dataset.custom = "";
@@ -3032,8 +3061,32 @@ function customGroupElement(key, group, editing) {
       <i data-lucide="${icon}" class="w-5 h-5 flex-shrink-0"></i><span class="min-w-0 break-words">${escapeHtml(group.title)}</span>
       ${editing ? `<button type="button" data-custom-edit class="arch-custom-edit" title="${t("app.layout.groupEditTitle")}" aria-label="${t("app.layout.groupEditTitle")}"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>` : ""}
     </div>
-    ${group.subtitle ? `<div class="p-4 text-xs text-slate-300 leading-relaxed bg-slate-900/60 whitespace-pre-line">${escapeHtml(group.subtitle)}</div>` : ""}`;
+    ${group.subtitle || links.length ? `
+      <div class="p-4 sm:p-5 bg-slate-900/60 space-y-3">
+        ${group.subtitle ? `<p class="text-xs text-slate-300 leading-relaxed whitespace-pre-line">${escapeHtml(group.subtitle)}</p>` : ""}
+        ${links.map(link => `
+          <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(link.url)}"
+             class="flex items-center justify-between gap-2 w-full px-3 py-2 rounded-lg text-xs font-semibold bg-[#C2410C]/20 text-[#E07A50] hover:bg-[#C2410C]/30 hover:text-white border border-[#D9541F]/40 shadow-sm transition group">
+            <span class="flex items-center gap-2 min-w-0">
+              <i data-lucide="external-link" class="w-3.5 h-3.5 text-brand-400 flex-shrink-0"></i>
+              <span class="min-w-0">
+                <span class="block text-[11px] text-slate-100 truncate">${escapeHtml(link.label)}</span>
+                <span class="block font-mono text-[10px] font-normal text-slate-400 truncate">${escapeHtml(link.url)}</span>
+              </span>
+            </span>
+            <span class="text-[10px] uppercase font-bold text-white bg-[#C2410C] px-2 py-0.5 rounded shadow-sm flex-shrink-0">${t("app.common.open")}</span>
+          </a>`).join("")}
+      </div>` : ""}`;
   return el;
+}
+
+// Only web addresses: anything else (javascript:, data:...) is dropped
+const SAFE_URL = /^https?:\/\/[^\s"'<>]{1,500}$/i;
+function elementLinks(group) {
+  return (Array.isArray(group.links) ? group.links : [])
+    .filter(link => link && SAFE_URL.test(String(link.url || "")))
+    .slice(0, 6)
+    .map(link => ({ url: String(link.url), label: String(link.label || "").trim() || new URL(link.url).host }));
 }
 
 // The arrows the automatic layout draws; a new design starts with them
@@ -3097,6 +3150,8 @@ function applyArchitectureCanvas(env) {
   const layout = {
     nodes: {}, zones: {},
     custom: cloneLayout(source.custom || {}),
+    // Groups (boxes): the automatic ones can be renamed or hidden, custom ones are added; {key: {title, hidden, custom}}
+    zoneMeta: cloneLayout(source.zoneMeta || {}),
     tiles: Array.isArray(source.tiles) ? [...source.tiles] : [],
     edges: Array.isArray(source.edges) ? cloneLayout(source.edges) : null
   };
@@ -3119,21 +3174,34 @@ function applyArchitectureCanvas(env) {
   stage.innerHTML = `<svg id="arch-edges" class="arch-edges" aria-hidden="true"></svg>`;
   const handles = `<span class="arch-resize" data-resize title="${t("app.layout.resize")}"></span>`;
 
-  zones.forEach(el => {
-    const key = el.dataset.zone;
-    const meta = ZONE_META[key] || { icon: "square", title: () => key };
+  const addZone = (key, icon, title, rect) => {
     const zone = document.createElement("section");
     zone.className = "arch-item arch-zone tier-frame rounded-2xl border-2 border-slate-500/70 bg-slate-950/40";
     zone.dataset.kind = "zone";
     zone.dataset.key = key;
     zone.innerHTML = `
       <header class="arch-zone-header flex items-center gap-2 px-4 pt-3 pb-2 text-xs font-black uppercase tracking-[0.2em] text-slate-300">
-        <i data-lucide="${meta.icon}" class="w-4 h-4 text-slate-400"></i>${escapeHtml(meta.title())}
+        <i data-lucide="${icon}" class="w-4 h-4 text-slate-400"></i><span class="truncate">${escapeHtml(title)}</span>
+        ${editing ? `
+          <span class="ml-auto flex items-center gap-1.5">
+            <button type="button" data-zone-ungroup class="arch-zone-edit" title="${t("app.layout.zoneRemove")}" aria-label="${t("app.layout.zoneRemove")}"><i data-lucide="ungroup" class="w-3.5 h-3.5"></i></button>
+            <button type="button" data-zone-edit class="arch-zone-edit" title="${t("app.layout.zoneEdit")}" aria-label="${t("app.layout.zoneEdit")}"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+          </span>` : ""}
       </header>
       ${editing ? handles : ""}`;
-    layout.zones[key] = place(source.zones && source.zones[key], auto.get(el));
+    layout.zones[key] = rect;
     stage.appendChild(zone);
-    placeCanvasItem(zone, layout.zones[key]);
+    placeCanvasItem(zone, rect);
+  };
+  zones.forEach(el => {
+    const key = el.dataset.zone;
+    const custom = layout.zoneMeta[key] || {};
+    if (custom.hidden) return;
+    const meta = ZONE_META[key] || { icon: "square", title: () => key };
+    addZone(key, meta.icon, custom.title || meta.title(), place(source.zones && source.zones[key], auto.get(el)));
+  });
+  Object.entries(layout.zoneMeta).forEach(([key, meta]) => {
+    if (meta.custom && source.zones && source.zones[key]) addZone(key, "group", meta.title || t("app.layout.newGroup"), { ...source.zones[key] });
   });
 
   const addNode = (el, rect) => {
@@ -3194,6 +3262,11 @@ function applyArchitectureCanvas(env) {
   fitCanvasStage();
   drawCanvasEdges();
   lucide.createIcons();
+  if (editing) {
+    // Elements that are no longer on the stage leave the selection
+    [...canvasSelection].forEach(k => { if (!layout.nodes[k]) canvasSelection.delete(k); });
+    updateCanvasSelection();
+  }
   return true;
 }
 
@@ -3220,8 +3293,56 @@ function fitCanvasStage() {
   stage.style.height = `${bottom + (layoutEditing ? 240 : 20)}px`;
 }
 
+// Elements selected in the design (Shift / Ctrl + click adds); they move together and can be grouped
+const canvasSelection = new Set();
+
+function updateCanvasSelection() {
+  document.querySelectorAll("#arch-stage .arch-node").forEach(el => el.classList.toggle("is-selected", canvasSelection.has(el.dataset.key)));
+  const wrap = document.getElementById("arch-group-selection");
+  if (!wrap) return;
+  wrap.classList.toggle("hidden", canvasSelection.size < 2);
+  const label = wrap.querySelector("button");
+  if (label) label.lastChild.textContent = t("app.layout.groupSelection", { count: canvasSelection.size });
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && canvasSelection.size && document.getElementById("arch-stage")?.classList.contains("is-editing") && !document.querySelector("dialog[open]")) {
+    canvasSelection.clear();
+    updateCanvasSelection();
+  }
+});
+
+// Elements whose center lies inside a group belong to it (and nested groups fully inside it)
+function zoneMembers(zoneKey) {
+  const draft = layoutEditing.draft;
+  const zone = draft.zones[zoneKey];
+  const inside = (x, y) => x >= zone.x && x <= zone.x + zone.w && y >= zone.y && y <= zone.y + zone.h;
+  const nodes = Object.entries(draft.nodes).filter(([key, r]) => {
+    const el = document.querySelector(`#arch-stage .arch-node[data-key="${CSS.escape(key)}"]`);
+    return el && inside(r.x + r.w / 2, r.y + (el.offsetHeight || r.h || 0) / 2);
+  }).map(([key]) => key);
+  const zones = Object.entries(draft.zones).filter(([key, r]) => key !== zoneKey
+    && r.x >= zone.x && r.y >= zone.y && r.x + r.w <= zone.x + zone.w && r.y + r.h <= zone.y + zone.h).map(([key]) => key);
+  return { nodes, zones };
+}
+
 function onCanvasPointerDown(e) {
   if (!layoutEditing || e.button !== 0) return;
+  // A click on the empty stage clears the selection
+  if (!e.target.closest(".arch-item, [data-edge]") && canvasSelection.size) {
+    canvasSelection.clear();
+    updateCanvasSelection();
+  }
+  if (e.target.closest("[data-zone-ungroup]")) {
+    e.preventDefault();
+    ungroupZone(e.target.closest(".arch-zone").dataset.key);
+    return;
+  }
+  if (e.target.closest("[data-zone-edit]")) {
+    e.preventDefault();
+    openZoneDialog(e.target.closest(".arch-zone").dataset.key);
+    return;
+  }
   const edge = e.target.closest("[data-edge]");
   if (edge) {
     e.preventDefault();
@@ -3245,30 +3366,69 @@ function onCanvasPointerDown(e) {
   if (isZone && !resizing && !e.target.closest(".arch-zone-header")) return;
   e.preventDefault();
 
-  const rect = layoutEditing.draft[isZone ? "zones" : "nodes"][item.dataset.key];
+  const draft = layoutEditing.draft;
+  const key = item.dataset.key;
+  const rect = draft[isZone ? "zones" : "nodes"][key];
   const start = { px: e.clientX, py: e.clientY, x: rect.x, y: rect.y, w: rect.w, h: rect.h };
+  // What moves along: a group carries its elements; a selected element carries the rest of the selection
+  const followers = [];
+  if (!resizing) {
+    const add = (kind, k) => {
+      const el = document.querySelector(`#arch-stage .arch-item[data-kind="${kind}"][data-key="${CSS.escape(k)}"]`);
+      if (el && draft[kind === "zone" ? "zones" : "nodes"][k]) followers.push({ el, r: draft[kind === "zone" ? "zones" : "nodes"][k], x: 0, y: 0 });
+    };
+    if (isZone) {
+      const members = zoneMembers(key);
+      members.nodes.forEach(k => add("node", k));
+      members.zones.forEach(k => add("zone", k));
+    } else if (canvasSelection.has(key) && canvasSelection.size > 1) {
+      canvasSelection.forEach(k => { if (k !== key) add("node", k); });
+    }
+    followers.forEach(f => { f.x = f.r.x; f.y = f.r.y; });
+  }
+  let moved = false;
   item.setPointerCapture(e.pointerId);
   item.classList.add("is-dragging");
 
   const move = ev => {
     const dx = ev.clientX - start.px;
     const dy = ev.clientY - start.py;
+    if (!moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+    moved = true;
     if (resizing) {
       rect.w = Math.max(isZone ? 200 : 160, snapToGrid(start.w + dx));
       if (isZone) rect.h = Math.max(80, snapToGrid(start.h + dy));
     } else {
+      // Every follower shifts by the same snapped amount as the item, so their relative layout is kept
       rect.x = Math.max(0, snapToGrid(start.x + dx));
       rect.y = Math.max(0, snapToGrid(start.y + dy));
+      const sx = rect.x - start.x;
+      const sy = rect.y - start.y;
+      followers.forEach(f => {
+        f.r.x = Math.max(0, f.x + sx);
+        f.r.y = Math.max(0, f.y + sy);
+        placeCanvasItem(f.el, f.r);
+      });
     }
     placeCanvasItem(item, rect);
     scheduleCanvasEdges();
   };
-  const end = () => {
+  const end = ev => {
     item.removeEventListener("pointermove", move);
     item.removeEventListener("pointerup", end);
     item.removeEventListener("pointercancel", end);
     item.classList.remove("is-dragging");
     if (!isZone) rect.h = snapToGrid(item.offsetHeight);
+    // A click (no movement) on an element selects it; Shift / Ctrl / Cmd adds it to the selection or takes it out
+    if (!moved && !isZone && !resizing && ev.type === "pointerup") {
+      if (ev.shiftKey || ev.ctrlKey || ev.metaKey) {
+        if (canvasSelection.has(key)) canvasSelection.delete(key); else canvasSelection.add(key);
+      } else {
+        canvasSelection.clear();
+        canvasSelection.add(key);
+      }
+      updateCanvasSelection();
+    }
     fitCanvasStage();
     drawCanvasEdges();
   };
@@ -3511,10 +3671,10 @@ async function openEdgeDialog(index, isNew = false) {
 // Add or edit a custom group: a preset (AWS, SAP, a CRM...) or a free name, a description and a color
 function openCustomGroupDialog(key) {
   if (!layoutEditing) return;
-  const draft = layoutEditing.draft;
-  const existing = key ? draft.custom[key] : null;
+  const existing = key ? layoutEditing.draft.custom[key] : null;
   const first = CUSTOM_GROUP_PRESETS[0];
   const state = existing ? { ...existing } : { title: presetTitle(first), subtitle: "", icon: first.icon, color: first.color };
+  const envId = layoutEditing.envId;
 
   let dlg = document.getElementById("group-dialog");
   if (!dlg) {
@@ -3544,7 +3704,17 @@ function openCustomGroupDialog(key) {
       </div>
       <div>
         <label for="group-dialog-subtitle" class="block text-xs text-slate-400 mb-1.5">${t("app.layout.groupDescription")}</label>
-        <textarea id="group-dialog-subtitle" rows="3" maxlength="200" class="${field}">${escapeHtml(state.subtitle || "")}</textarea>
+        <textarea id="group-dialog-subtitle" rows="3" maxlength="500" class="${field}">${escapeHtml(state.subtitle || "")}</textarea>
+      </div>
+      <div>
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="text-xs text-slate-400">${t("app.layout.elementLinks")}</span>
+          <button type="button" data-add-link class="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md border border-slate-700 text-slate-200 hover:border-brand-500 hover:text-white">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>${t("app.layout.addLink")}
+          </button>
+        </div>
+        <div data-links class="space-y-2"></div>
+        <p data-links-empty class="text-[11px] text-slate-500">${t("app.layout.noLinks")}</p>
       </div>
       <div>
         <span class="block text-xs text-slate-400 mb-1.5">${t("app.layout.groupColor")}</span>
@@ -3560,6 +3730,41 @@ function openCustomGroupDialog(key) {
     </form>`;
 
   const titleInput = dlg.querySelector("#group-dialog-title");
+  // Links: a name and a web address per row (up to 6)
+  const linksBox = dlg.querySelector("[data-links]");
+  const syncLinks = () => {
+    const rows = linksBox.querySelectorAll("[data-link-row]").length;
+    dlg.querySelector("[data-links-empty]").classList.toggle("hidden", rows > 0);
+    dlg.querySelector("[data-add-link]").disabled = rows >= 6;
+  };
+  const addLinkRow = (link = {}) => {
+    linksBox.insertAdjacentHTML("beforeend", `
+      <div data-link-row class="grid grid-cols-[1fr_1.6fr_auto] gap-2 items-center">
+        <input type="text" data-link-label maxlength="60" placeholder="${escapeHtml(t("app.layout.linkLabel"))}" value="${escapeHtml(link.label || "")}" class="${field} py-1.5 text-xs">
+        <input type="url" data-link-url maxlength="500" placeholder="https://" value="${escapeHtml(link.url || "")}" class="${field} py-1.5 text-xs font-mono">
+        <button type="button" data-remove-link title="${escapeHtml(t("app.layout.removeLink"))}" aria-label="${escapeHtml(t("app.layout.removeLink"))}" class="w-8 h-8 flex items-center justify-center rounded-md text-slate-500 hover:text-rose-400 hover:bg-slate-800">
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
+        </button>
+      </div>`);
+    lucide.createIcons();
+    syncLinks();
+  };
+  (Array.isArray(state.links) ? state.links : []).forEach(addLinkRow);
+  syncLinks();
+  dlg.querySelector("[data-add-link]").addEventListener("click", () => {
+    addLinkRow();
+    linksBox.lastElementChild.querySelector("input").focus();
+  });
+  linksBox.addEventListener("click", ev => {
+    const remove = ev.target.closest("[data-remove-link]");
+    if (!remove) return;
+    remove.closest("[data-link-row]").remove();
+    syncLinks();
+  });
+  const readLinks = () => Array.from(linksBox.querySelectorAll("[data-link-row]")).map(row => ({
+    label: row.querySelector("[data-link-label]").value.trim().slice(0, 60),
+    url: row.querySelector("[data-link-url]").value.trim()
+  })).filter(link => link.url);
   const markSelected = () => {
     dlg.querySelectorAll(".group-color").forEach(b => b.classList.toggle("is-selected", b.dataset.color.toLowerCase() === state.color.toLowerCase()));
     dlg.querySelectorAll(".group-preset").forEach(b => {
@@ -3582,8 +3787,20 @@ function openCustomGroupDialog(key) {
   lucide.createIcons();
 
   dlg.onclick = ev => { if (ev.target === dlg) dlg.close(""); };
+  // Addresses that aren't web links keep the dialog open with the field marked
+  dlg.querySelector("form").addEventListener("submit", ev => {
+    if (ev.submitter && ev.submitter.value !== "save") return;
+    const bad = Array.from(linksBox.querySelectorAll("[data-link-url]")).find(input => input.value.trim() && !SAFE_URL.test(input.value.trim()));
+    if (!bad) return;
+    ev.preventDefault();
+    bad.setCustomValidity(t("app.layout.badLink"));
+    bad.reportValidity();
+    bad.addEventListener("input", () => bad.setCustomValidity(""), { once: true });
+  });
   dlg.addEventListener("close", () => {
-    if (!layoutEditing || layoutEditing.draft !== draft) return;
+    // The stage may have been redrawn while the dialog was open: work on the current draft
+    if (!layoutEditing || layoutEditing.envId !== envId) return;
+    const draft = layoutEditing.draft;
     const action = dlg.returnValue;
     if (action === "delete" && key) {
       delete draft.custom[key];
@@ -3592,9 +3809,10 @@ function openCustomGroupDialog(key) {
     } else if (action === "save") {
       const group = {
         title: titleInput.value.trim().slice(0, 60) || state.title,
-        subtitle: dlg.querySelector("#group-dialog-subtitle").value.trim().slice(0, 200),
+        subtitle: dlg.querySelector("#group-dialog-subtitle").value.trim().slice(0, 500),
         icon: state.icon,
-        color: state.color
+        color: state.color,
+        links: readLinks().filter(link => SAFE_URL.test(link.url))
       };
       if (key) {
         draft.custom[key] = group;
@@ -3615,6 +3833,71 @@ function openCustomGroupDialog(key) {
   titleInput.focus();
 }
 
+// A new group (box) around the selected elements, with room for its title
+function groupSelectedElements() {
+  if (!layoutEditing || canvasSelection.size < 2) return;
+  const draft = layoutEditing.draft;
+  const rects = [...canvasSelection].map(k => {
+    const r = draft.nodes[k];
+    const el = document.querySelector(`#arch-stage .arch-node[data-key="${CSS.escape(k)}"]`);
+    return r && { x: r.x, y: r.y, w: r.w, h: el ? el.offsetHeight : (r.h || 0) };
+  }).filter(Boolean);
+  if (rects.length < 2) return;
+  const left = Math.min(...rects.map(r => r.x));
+  const top = Math.min(...rects.map(r => r.y));
+  const right = Math.max(...rects.map(r => r.x + r.w));
+  const bottom = Math.max(...rects.map(r => r.y + r.h));
+  const x = Math.max(0, snapToGrid(left - 20));
+  const y = Math.max(0, snapToGrid(top - 50));
+  createZone({ x, y, w: snapToGrid(right + 20 - x), h: snapToGrid(bottom + 20 - y) });
+}
+
+function createZone(rect) {
+  const key = `zone-${Date.now().toString(36)}`;
+  layoutEditing.draft.zoneMeta[key] = { custom: true, title: t("app.layout.newGroup") };
+  layoutEditing.draft.zones[key] = rect;
+  canvasSelection.clear();
+  renderServicesView();
+  openZoneDialog(key, true);
+}
+
+// Rename a group or take it away (its elements stay where they are); the automatic ones are hidden
+async function openZoneDialog(key, isNew = false) {
+  if (!layoutEditing) return;
+  const envId = layoutEditing.envId;
+  const meta = layoutEditing.draft.zoneMeta[key] || {};
+  const current = meta.title || (ZONE_META[key] ? ZONE_META[key].title() : t("app.layout.newGroup"));
+  const { action, value } = await openActionDialog({
+    title: t(isNew ? "app.layout.zoneNewTitle" : "app.layout.zoneEdit"),
+    message: `<p class="text-xs text-slate-400">${t("app.layout.zoneHint")}</p>`,
+    input: { label: t("app.layout.zoneName"), value: current },
+    actions: [
+      { id: "remove", label: t("app.layout.zoneRemove"), style: "dangerOutline" },
+      { id: "save", label: t("app.layout.zoneSave"), style: "primary", gate: "value", default: true }
+    ]
+  });
+  // The stage may have been redrawn while the dialog was open (a new group is): use the current draft
+  if (!layoutEditing || layoutEditing.envId !== envId) return;
+  if (action === "remove") {
+    ungroupZone(key);
+  } else if (action === "save") {
+    layoutEditing.draft.zoneMeta[key] = { ...meta, title: value.slice(0, 60) };
+    renderServicesView();
+  }
+}
+
+// Ungroup: the box goes away and its elements stay where they are (the automatic groups are only hidden)
+function ungroupZone(key) {
+  if (!layoutEditing) return;
+  const draft = layoutEditing.draft;
+  const meta = draft.zoneMeta[key] || {};
+  delete draft.zones[key];
+  if (meta.custom) delete draft.zoneMeta[key];
+  else draft.zoneMeta[key] = { hidden: true };
+  canvasSelection.clear();
+  renderServicesView();
+}
+
 function selectedServicesEnv() {
   const envId = document.getElementById("service-env-select")?.value;
   return allEnvironments.find(e => e.id === envId) || null;
@@ -3625,11 +3908,13 @@ function editArchitectureLayout() {
   if (!env) return;
   const saved = savedLayout(env);
   layoutEditing = { envId: env.id, draft: saved ? cloneLayout(saved) : { nodes: {}, zones: {} } };
+  canvasSelection.clear();
   renderServicesView();
 }
 
 function cancelArchitectureLayout() {
   layoutEditing = null;
+  canvasSelection.clear();
   renderServicesView();
 }
 
